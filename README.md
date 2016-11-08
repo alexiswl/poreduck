@@ -22,7 +22,7 @@ poreduck can be used for six key steps of handling MinION data:
 
 An examples of poreduck usage is shown below:
 
-<poreduck server_transfer --run_name E_COLI_R9p4 --laptop_directory C://data//reads --server_name super_computer --server_user alexis --server_directory /data/MinION/>
+`poreduck server_transfer --run_name E_COLI_R9p4 --laptop_directory C://data//reads --server_name super_computer --server_user alexis --server_directory /data/MinION/`
 
 
 Please see the installation guide at "insert installation guide here"
