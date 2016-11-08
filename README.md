@@ -6,6 +6,7 @@ A comprehensive toolkit for running Oxford Nanopore's MinION - symbolised above 
 poreduck has a set of wrappers that can all be run simultaneously to pipe MinION reads through to analysis in real-time.  
 
 poreduck can be used for six key steps of handling MinION data:  
+
 1.  Transferring of reads from a laptop to a local server in real-time.  
 2.  Running of a local basecalling algorithm in real-time.  
 3.  Classifying metagenomic samples in real-time, metagenomic classification options:  
