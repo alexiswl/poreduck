@@ -8,8 +8,8 @@ poreduck has a set of wrappers that can all be run simultaneously to pipe MinION
 poreduck can be used for six key steps of handling MinION data:  
 1.  Transferring of reads from a laptop to a local server in real-time.  
 2.  Running of a local basecalling algorithm in real-time.  
-3.  Classifying metagenomic samples in real-time - OneCodex or Kraken.
-4.  Categorising fast5 files by Metrichor exit status.
+3.  Classifying metagenomic samples in real-time - OneCodex or Kraken.  
+4.  Categorising fast5 files by Metrichor exit status.  
 5.  Extracting fastq data (through poretools) of pass and failed reads, producing yield plots (through poretools)  
 6.  Aligning reads to a reference genome. Either locally basecalled or through Metrichor.  
 
