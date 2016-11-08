@@ -3,7 +3,8 @@
 A comprehensive toolkit for running Oxford Nanopore's MinION - symbolised above by this poorly drawn duck.  
 *In memory of Jacob & Jacob - two poor ducks.*  
 
-poreduck has a set of wrappers that can all be run simultaneously to pipe MinION reads through to analysis in real-time.  
+poreduck is a set of python built commandline wrappers that can all be run simultaneously to pipe MinION reads 
+through to analysis in real-time.  
 
 poreduck can be used for six key steps of handling MinION data:  
 
@@ -19,6 +20,13 @@ poreduck can be used for six key steps of handling MinION data:
     +  graphmap  
     +  last  
 
-An example of poreduck usage is shown below:
+An examples of poreduck usage is shown below:
+
+<poreduck server_transfer --run_name E_COLI_R9p4 --laptop_directory C://data//reads --server_name super_computer --server_user alexis --server_directory /data/MinION/>
+
 
 Please see the installation guide at "insert installation guide here"
+
+Dependencies for poreduck are also listed in the installation guide.
+
+More examples on using poreduck can be found in the readthedocs page.
