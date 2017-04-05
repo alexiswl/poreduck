@@ -168,14 +168,14 @@ def run_rsync_command():
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
     rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s" % (
-                                                      PASSWORD, 
-                                                      ' '.join(rsync_command_options),
-						      READS_DIR, 
-                                                      SERVER_USERNAME,
-                                                      SERVER_NAME,
-                                                      DEST_DIRECTORY)
-    
-    RSYNC_COMMAND = subprocess.Popen(rsync_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                                                            PASSWORD,
+                                                            ' '.join(rsync_command_options),
+                                                            READS_DIR,
+                                                            SERVER_USERNAME,
+                                                            SERVER_NAME,
+                                                            DEST_DIRECTORY)
+
+    RSYNC_SUBPROCESS = subprocess.Popen(rsync_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
    
   
 
