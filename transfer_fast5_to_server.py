@@ -30,7 +30,7 @@ import sys  # For stopping in the event of errors.
 import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
 import getpass  # Prompts user for password, just a oneoff to runt he script.
-import pxssh  # Connecting via ssh to make sure that the parent of the destination folder is there.
+from pexpect import pxssh  # Connecting via ssh to make sure that the parent of the destination folder is there.
 import time  # For snoozing
 import pandas as pd  # Create dataframe of list of files with attributes for each.
 
@@ -99,7 +99,7 @@ def set_global_variables(args):
     global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, DEST_DIRECTORY, TIMEOUT
     READS_DIR = args.reads_dir
     SERVER_NAME = args.server_name
-    SERVER_USERNAME = args.server_username
+    SERVER_USERNAME = args.user_name
     PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
     TIMEOUT = args.timeout
@@ -124,7 +124,7 @@ def check_directories():
         os.mkdir(CSV_DIR)
 
     # Check if server is active using the ping command.
-    ping_command = subprocess.Popen(["ping", "-n 1", SERVER_NAME],
+    ping_command = subprocess.Popen("ping -c 1 %s" % SERVER_NAME, shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ping_command.wait()
     out, error = ping_command.communicate()
@@ -133,12 +133,21 @@ def check_directories():
     # Check if folder on server is present.
     # Log into server, then check for folder.
     dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-1])
-    s = pxssh.pxssh()
-    s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD)
-    s.sendline('if [-d %s]; then echo "PRESENT"' % dest_parent)  # Command to check if folder is there.
+    print(dest_parent)
+
+    s = pxssh.pxssh()  
+    
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+	print("SSH failed on login")
+    else:
+	print("SSH passed")
+      
+    s.sendline('if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent)  # Command to check if folder is there.
     s.prompt()  # match the prompt
-    output = s.before()  # Gets the output of the sendline command
-    if not output == "PRESENT":
+    output = s.before  # Gets the `output of the sendline command
+    
+    print(output.rstrip().split('\n')[-1]) 
+    if not output.rstrip().split('\n')[-1] == "PRESENT":
         # Parent folder is not present. Exit.
         sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
 
@@ -146,9 +155,9 @@ def check_directories():
 def run_rsync_command():
     # Create password file:
     pwd_filename = "~/.minion_transfer_pwd.txt"
-    subprocess.call(["touch", pwd_filename])  # Create the password
-    subprocess.call(["chmod", "600", pwd_filename])  # Reduce the permissions so only you can read/write to it.
-    subprocess.call("echo %s > %s" % (PASSWORD, pwd_filename))
+    subprocess.call("touch %s" % pwd_filename, shell=True)  # Create the password
+    subprocess.call("chmod 600 %s" % pwd_filename, shell=True)  # Reduce the permissions so only you can read/write to it.
+    subprocess.call("echo %s > %s" % (PASSWORD, pwd_filename), shell=True)
 
     # Generate list of rsync options to be used.
     rsync_command_options = []
@@ -163,7 +172,7 @@ def run_rsync_command():
                                                       SERVER_USERNAME,
                                                       SERVER_NAME,
                                                       DEST_DIRECTORY)
-    subprocess.Popen(rsync_command)
+    subprocess.Popen(rsync_command, shell=True)
 
 
 def get_subdirs():
