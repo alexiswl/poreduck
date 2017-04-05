@@ -43,7 +43,7 @@ PASSWORD = ""
 DEST_DIRECTORY = ""
 TIMEOUT = 1800
 CSV_DIR = ""
-RSYNC_SUBPROCESS = ""
+RSYNC_SUBPROCESS = None
 
 def main():
     # Get argument list, password for server and set directories.
@@ -158,7 +158,7 @@ def check_directories():
 
 
 def run_rsync_command():
-    global RSYNC_COMMAND
+    global RSYNC_SUBPROCESS
     # Generate list of rsync options to be used.
     rsync_command_options = []
     # Free space on the laptop by deleting files that have been transferred

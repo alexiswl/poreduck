@@ -20,3 +20,9 @@ print(runs)
 for run in runs:
     print(fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "NO")].index.values)
 
+sub_int = "0_7276"
+
+try:
+    print(int(sub_int))
+except ValueError:
+    print(sub_int)
