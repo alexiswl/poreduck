@@ -70,7 +70,7 @@ def main():
             # Is folder finished?
             folder_status = check_folder_status(subdir)
             if folder_status == "still writing":
-                pass
+                continue
 
             # Tar up folder(s)
             tar_folders(subdir)
