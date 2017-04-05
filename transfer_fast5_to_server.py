@@ -227,31 +227,30 @@ def check_folder_status(subdir):
 
     for run in runs:
         # Before moving the mux files we need to make sure that there is some sequencing run files in the folder
-        if len(fast5_pd.loc[fast5_pd.rnumber == run and fast5_pd.mux == "NO"]) == 0:
+        if len(fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "NO")]) == 0:
             continue  # No sequencing run files in the folder, skipping folder.
 
         # Move mux scan files for a given run
-        fast5_to_move = fast5_pd.loc[fast5_pd.rnumber == run and fast5_pd.mux == "YES"]
-        if len(fast5_to_move) == 0:
-            pass
-        else:
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "YES")]
+        fast5_to_move = fast5_to_move_pd.index.values  # The row names equal the names of the files.
+        if len(fast5_to_move) != 0:  # Something here, let's move!!
             is_mux = True
             return_status = "moving files"
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            #fast5_pd.to_csv(CSV_DIR + subdir + rnumber)
+            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + "_mux")
 
         # Move standard sequencing run files for a given run
-        fast5_to_move = fast5_pd.loc[fast5_pd.rnumber == run and fast5_pd.mux == "NO"]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "NO")]
+        fast5_to_move = fast5_to_move_pd.index.values  # The row names equal the names of the files.
 
-        # Before moving the sequencing run files, we need to make sure that this is == 4000
-        if len(fast5_to_move) != 4000:
-            continue  # Folder is not full
-        else:
+        # Before moving the sequencing run files, we need to make sure that this the number of fast5 files is 4000
+        if len(fast5_to_move) == 4000:
             return_status = "moving_files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
+            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run)
 
-    return return_status
+    return return_status  # Used for if we bother trying to tar up in the next step.
 
 
 def move_fast5_files(subdir, fast5_files, run, is_mux):
