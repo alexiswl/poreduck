@@ -45,6 +45,7 @@ TIMEOUT = 1800
 CSV_DIR = ""
 RSYNC_SUBPROCESS = None
 CHECK_SUMS_FILE = ""
+PARENT_DIRECTORY = ""
 
 
 def main():
@@ -109,13 +110,14 @@ def get_arguments():
 
 
 def set_global_variables(args):
-    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, DEST_DIRECTORY, TIMEOUT
+    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY
     READS_DIR = args.reads_dir
     SERVER_NAME = args.server_name
     SERVER_USERNAME = args.user_name
     PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
     TIMEOUT = args.timeout
+    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
 
 
 def get_password():
@@ -386,8 +388,7 @@ def tar_folders(subdir_prefix):
 
 def md5sum_tar_file(tar_file):
     # Change to parent directory, this is so we have reads/0_12345.tar.gz in the checksums file.
-    parent_directory = os.path.abspath(os.path.join(READS_DIR, os.pardir))
-    os.chdir(parent_directory)
+    os.chdir(PARENT_DIRECTORY)
 
     md5sum_command = "md5sum %s >> %s" % (tar_file, CHECK_SUMS_FILE)
     # Append the md5sum of the tar file to the list of md5sums.
