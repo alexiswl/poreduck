@@ -134,7 +134,7 @@ def is_minknow_still_running():
     is_running = False  # Now to disprove this.
 
     psef_command = "ps -ef | grep MinKNOW"
-    psef_proc = subprocess.pOpen(psef_command, shell=True)
+    psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
     for line in stdout.split("\n"):  # Split stdout by line, should be a bunch of MinKNOW commands running
         if line.endswith(".py") and "python" in line:
@@ -234,20 +234,24 @@ def copy_across_csv_files():
 
 def run_rsync_command():
     global RSYNC_SUBPROCESS
+    reads_dir = READS_DIR.split("/")[-2]
     # Generate list of rsync options to be used.
     rsync_command_options = []
     rsync_command_options.append("--remove-source-files")  # Delete the tar.gz files from the laptop.
-    rsync_command_options.append("--include=*.tar.gz")  # Include only the tar and zipped files.
+    rsync_command_options.append("--include='*.tar.gz'")  # Include only the tar and zipped files.
+    rsync_command_options.append("--exclude='*'")  # Exclude everything else!
+    rsync_command_options.append("--recursive")
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
     # The tar.gz files will be placed in the reads subfolder
-    rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s/reads" % (
+    rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s/%s" % (
                                                             PASSWORD,
                                                             ' '.join(rsync_command_options),
                                                             READS_DIR,
                                                             SERVER_USERNAME,
                                                             SERVER_NAME,
-                                                            DEST_DIRECTORY)
+                                                            DEST_DIRECTORY,
+                                                            reads_dir)
 
     RSYNC_SUBPROCESS = subprocess.Popen(rsync_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
@@ -344,9 +348,9 @@ def check_folder_status(subdir):
 
 
 def is_folder_maxxed_out(subdir, num_files):
-    if subdir == "0" and num_files == 4000:
+    if subdir == "0" and num_files >= 4000:
         return True
-    elif subdir != "0" and num_files == 4001:
+    elif subdir != "0" and num_files >= 4001:
         return True
     else:
         return False
@@ -389,8 +393,11 @@ def tar_folders(subdir_prefix):
 def md5sum_tar_file(tar_file):
     # Change to parent directory, this is so we have reads/0_12345.tar.gz in the checksums file.
     os.chdir(PARENT_DIRECTORY)
-
-    md5sum_command = "md5sum %s >> %s" % (tar_file, CHECK_SUMS_FILE)
+    print(PARENT_DIRECTORY)
+    
+    reads_dir = READS_DIR.split("/")[-2]
+ 
+    md5sum_command = "md5sum %s/%s >> %s" % (reads_dir, tar_file, CHECK_SUMS_FILE)
     # Append the md5sum of the tar file to the list of md5sums.
     checksum_proc = subprocess.Popen(md5sum_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, stderr = checksum_proc.communicate()
