@@ -44,6 +44,8 @@ DEST_DIRECTORY = ""
 TIMEOUT = 1800
 CSV_DIR = ""
 RSYNC_SUBPROCESS = None
+CHECK_SUMS_FILE = ""
+
 
 def main():
     # Get argument list, password for server and set directories.
@@ -53,34 +55,40 @@ def main():
 
     # Get rsync up and running - shouldn't be anything to sync
     run_rsync_command()
-    rsync_running = True
+    minknow_running = True
 
     # While loop to continue tarring up folders
-    while rsync_running:
-        os.chdir(READS_DIR)
+    while minknow_running:
         # Get list of sub-directories
         subdirs = get_subdirs()
         print(subdirs)
-        # May not be any new folders
-        if len(subdirs) == 0:
-            have_a_break()
-            pass
+
+        # Check if MinKNOW is still running
+        if not is_minknow_still_running():
+            minknow_running = False
 
         # For any new folders.
         for subdir in subdirs:
             # Is folder finished?
             folder_status = check_folder_status(subdir)
             if folder_status == "still writing":
-               next 
-	    print(folder_status)
+                continue
+            print(folder_status)
             # Tar up folder(s)
             tar_folders(subdir.split("/")[-2])
-        
-        if RSYNC_SUBPROCESS.poll() is not None:
-           stdout, stderr = RSYNC_SUBPROCESS.communicate()
-           print(stdout, stderr)
-           rsync_running = False 
+
+            if RSYNC_SUBPROCESS.poll() is not None:
+                stdout, stderr = RSYNC_SUBPROCESS.communicate()
+                print(stdout, stderr)
+                # Sync up with the rest of the team
+                run_rsync_command()
+
     # Now we need to tar up the last folder.
+    # create last folder.
+    # Send across csvs and md5sum file.
+    tar_up_last_folder()
+    copy_across_md5sum()
+    copy_across_csv_files()
 
 
 def get_arguments():
@@ -114,8 +122,40 @@ def get_password():
     return getpass.getpass('password: ')
 
 
+def is_minknow_still_running():
+    # For linux systems we can use the ps -ef command to see what processes are running.
+    # ps stands for process status, -e for everyone, -f for full.
+    # We can check for the minknow python script. File.
+    # If this has stopped, there will be no more reads produced and we can tar up the last folder and perform
+    # One last rsync command.
+
+    is_running = False  # Now to disprove this.
+
+    psef_command = "ps -ef | grep MinKNOW"
+    psef_proc = subprocess.pOpen(psef_command, shell=True)
+    stdout, stderr = psef_proc.communicate()
+    for line in stdout.split("\n"):  # Split stdout by line, should be a bunch of MinKNOW commands running
+        if line.endswith(".py") and "python" in line:
+            is_running = True  # The nc python script is presently active.
+
+    # Now return what we found.
+    return is_running
+
+
+def tar_up_last_folder():
+    for subdir in get_subdirs():
+        # Don't worry about counting the number of files, we're finished.
+        tar_folders(subdir.split("/")[-2])
+    # Perform final rsync command if need be:
+    if RSYNC_SUBPROCESS.poll() is not None:
+        stdout, stderr = RSYNC_SUBPROCESS.communicate()
+        print(stdout, stderr)
+        # Sync up with the rest of the team
+        run_rsync_command()
+
+
 def check_directories():
-    global READS_DIR, CSV_DIR
+    global READS_DIR, CSV_DIR, CHECK_SUMS_FILE
     # Check if reads directory exists
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, reads directory, %s, does not exist" % READS_DIR)
@@ -127,6 +167,7 @@ def check_directories():
     CSV_DIR = READS_DIR + "csv/"
     if not os.path.isdir(CSV_DIR):
         os.mkdir(CSV_DIR)
+    CHECK_SUMS_FILE = READS_DIR + "checksums.md5"
 
     # Check if server is active using the ping command.
     ping_command = subprocess.Popen("ping -c 1 %s" % SERVER_NAME, shell=True,
@@ -143,31 +184,62 @@ def check_directories():
     s = pxssh.pxssh()  
     
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-	print("SSH failed on login")
+        print("SSH failed on login")
     else:
-	print("SSH passed")
+        print("SSH passed")
       
     s.sendline('if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent)  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the sendline command
-    
-    print(output.rstrip().split('\n')[-1]) 
+
     if not output.rstrip().split('\n')[-1] == "PRESENT":
         # Parent folder is not present. Exit.
         sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
+
+    # Otherwise create the DEST_DIRECTORY
+    s.sendline('if [ ! -d %s ]; then mkdir %s; fi' % (DEST_DIRECTORY, DEST_DIRECTORY))
+    s.prompt()
+    output = s.before
+    print(output)
+
+
+def copy_across_md5sum():
+    # Use the scp command to copy across the md5sum file into the destination directory on the server
+    scp_command = "sshpass -p %s scp %s %s@%s:%s" % (
+                                                     PASSWORD,
+                                                     CHECK_SUMS_FILE,
+                                                     SERVER_USERNAME,
+                                                     SERVER_NAME,
+                                                     DEST_DIRECTORY
+                                                     )
+    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = scp_proc.communicate()
+    print("Output of scp command", stdout, stderr)
+
+
+def copy_across_csv_files():
+    # Use the scp command to copy across the csv files into the destination directory on the server.
+    scp_command = "sshpass -p %s scp -r %s %s@%s:%s" % (
+                                                        PASSWORD,
+                                                        CSV_DIR,
+                                                        SERVER_USERNAME,
+                                                        SERVER_NAME,
+                                                        DEST_DIRECTORY)
+    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = scp_proc.communicate()
+    print("Output of scp command", stdout, stderr)
 
 
 def run_rsync_command():
     global RSYNC_SUBPROCESS
     # Generate list of rsync options to be used.
     rsync_command_options = []
-    # Free space on the laptop by deleting files that have been transferred
-    rsync_command_options.append("--remove-source-files")
-    rsync_command_options.append("--timeout=%d" % TIMEOUT) 
-    rsync_command_options.append("--include=*.tar.gz")
+    rsync_command_options.append("--remove-source-files")  # Delete the tar.gz files from the laptop.
+    rsync_command_options.append("--include=*.tar.gz")  # Include only the tar and zipped files.
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
-    rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s" % (
+    # The tar.gz files will be placed in the reads subfolder
+    rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s/reads" % (
                                                             PASSWORD,
                                                             ' '.join(rsync_command_options),
                                                             READS_DIR,
@@ -176,8 +248,6 @@ def run_rsync_command():
                                                             DEST_DIRECTORY)
 
     RSYNC_SUBPROCESS = subprocess.Popen(rsync_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-   
-  
 
 
 def get_subdirs():
@@ -193,10 +263,9 @@ def get_subdirs():
         try:
             int(sub_int) 
             print("%s is an int" % sub_int)
-	    subdirs_keep.append(subdir)
+            subdirs_keep.append(subdir)
         except ValueError:
             print("%s is not our folder" % subdir)
-
     subdirs = subdirs_keep
 
     # Sort subdirectories by writing time.
@@ -254,10 +323,9 @@ def check_folder_status(subdir):
         # Move standard sequencing run files for a given run
         fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "NO")]
         fast5_to_move = fast5_to_move_pd.index.values  # The row names equal the names of the files.
-       
-        print(len(fast5_to_move))
-        # Before moving the sequencing run files, we need to make sure that this the number of fast5 files is 4000
-        if len(fast5_to_move) >= 4000:
+
+        # Before moving the sequencing run files, we need to ensure that the folder is full.
+        if is_folder_maxxed_out(subdir.split("/")[-2], len(fast5_to_move)):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
@@ -267,10 +335,19 @@ def check_folder_status(subdir):
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5")]
     if len(fast5_files) == 0:
-       subprocess.call("rm -r %s" % subdir, shell=True)
-    
+        subprocess.call("rm -r %s" % subdir, shell=True)
+
     os.chdir(READS_DIR)  # Return to the reads directory
     return return_status  # Used for if we bother trying to tar up in the next step.
+
+
+def is_folder_maxxed_out(subdir, num_files):
+    if subdir == "0" and num_files == 4000:
+        return True
+    elif subdir != "0" and num_files == 4001:
+        return True
+    else:
+        return False
 
 
 def move_fast5_files(subdir, fast5_files, run, is_mux):
@@ -298,11 +375,26 @@ def tar_folders(subdir_prefix):
     print(subdirs)
     # Now tar up each folder individually
     for subdir in subdirs:
-        tar_command = "tar -cf - %s | pigz -9 -p 32 > %s.tar.gz" % (subdir, subdir)
+        tar_file = "%s.tar.gz" % (subdir)
+        tar_command = "tar -cf - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
+        md5sum_tar_file(tar_file)
         if stderr is not None:
             print(stderr)
+
+
+def md5sum_tar_file(tar_file):
+    # Change to parent directory, this is so we have reads/0_12345.tar.gz in the checksums file.
+    parent_directory = os.path.abspath(os.path.join(READS_DIR, os.pardir))
+    os.chdir(parent_directory)
+
+    md5sum_command = "md5sum %s >> %s" % (tar_file, CHECK_SUMS_FILE)
+    # Append the md5sum of the tar file to the list of md5sums.
+    checksum_proc = subprocess.Popen(md5sum_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    stdout, stderr = checksum_proc.communicate()
+
+    os.chdir(READS_DIR)    # Change back out of parent directory
 
 
 main()
