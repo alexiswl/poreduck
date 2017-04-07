@@ -46,6 +46,7 @@ CSV_DIR = ""
 RSYNC_SUBPROCESS = None
 CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
+MINKNOW_RUNNING = True
 
 
 def main():
@@ -56,40 +57,11 @@ def main():
 
     # Get rsync up and running - shouldn't be anything to sync
     run_rsync_command()
-    minknow_running = True
 
     # While loop to continue tarring up folders
-    while minknow_running:
-        # Get list of sub-directories
-        subdirs = get_subdirs()
-        print(subdirs)
-
-        # Check if MinKNOW is still running
-        if not is_minknow_still_running():
-            minknow_running = False
-
-        new_folders = False
-        # For any new folders.
-        for subdir in subdirs:
-            # Is folder finished?
-            folder_status = check_folder_status(subdir)
-            if folder_status == "still writing":
-                continue
-            new_folders = True
-            # Tar up folder(s)
-            tar_folders(subdir.split("/")[-2])
-
-            if RSYNC_SUBPROCESS.poll() is not None:
-                stdout, stderr = RSYNC_SUBPROCESS.communicate()
-                print(stdout, stderr)
-                # Sync up with the rest of the team
-                run_rsync_command()
-            copy_across_md5sum()  # Update the md5sum
-            copy_across_csv_files() # Update the csv file list.
-
-        # Let's have a rest if no new folders have been created recently.
-        if not new_folders:
-            have_a_break()
+    while MINKNOW_RUNNING:
+        # Commence transfer of fast5 files.
+        transfer_fast5_files()
 
     # Now we need to tar up the last folder.
     # create last folder.
@@ -97,6 +69,40 @@ def main():
     tar_up_last_folder()
     copy_across_md5sum()
     copy_across_csv_files()
+
+
+def transfer_fast5_files():
+    global MINKNOW_RUNNING
+    # Get list of sub-directories
+    subdirs = get_subdirs()
+    print(subdirs)
+
+    # Check if MinKNOW is still running
+    if not is_minknow_still_running():
+        MINKNOW_RUNNING = False
+
+    new_folders = False
+    # For any new folders.
+    for subdir in subdirs:
+        # Is folder finished?
+        folder_status = check_folder_status(subdir)
+        if folder_status == "still writing":
+            continue
+        new_folders = True
+        # Tar up folder(s)
+        tar_folders(subdir.split("/")[-2])
+
+        if RSYNC_SUBPROCESS.poll() is not None:
+            stdout, stderr = RSYNC_SUBPROCESS.communicate()
+            print(stdout, stderr)
+            # Sync up with the rest of the team
+            run_rsync_command()
+        copy_across_md5sum()  # Update the md5sum
+        copy_across_csv_files()  # Update the csv file list.
+
+    # Let's have a rest if no new folders have been created recently.
+    if not new_folders:
+        have_a_break()
 
 
 def get_arguments():
@@ -188,7 +194,6 @@ def check_directories():
     # Check if folder on server is present.
     # Log into server, then check for folder.
     dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-1])
-    print(dest_parent)
 
     s = pxssh.pxssh()  
     
