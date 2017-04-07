@@ -32,11 +32,11 @@ CHOSEN_CONFIG = ""
 PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 
-CONFIGS = {"FC106_RAD001": "FLO-MIN106_RAD001_linear.cfg",
-           "FC106_LSK208_tc": "FLO-MIN106_LSK208_tc.cfg",
-           "FC106_LSK108": "FLO-MIN106_LSK108_linear.cfg",
-           "FC106_RAD002": "FLO-MIN106_RAD002_linear.cfg",
-           "FC106_LSK208_2d": "FLO-MIN106_LSK208_2d.cfg"}
+CONFIGS = {"FC106_RAD001": "FLO-MIN106_RAD001_linear.cfg",  # Rapid sequencing
+           "FC106_LSK208_tc": "FLO-MIN106_LSK208_tc.cfg",   # 2D unsure which one
+           "FC106_LSK108": "FLO-MIN106_LSK108_linear.cfg",  # For 1D ligation sequencing.
+           "FC106_RAD002": "FLO-MIN106_RAD002_linear.cfg",  # Second Rapid sequencing kit.
+           "FC106_LSK208_2d": "FLO-MIN106_LSK208_2d.cfg"}   # 2D unsure which one.
 
 
 def main():
@@ -74,6 +74,7 @@ def get_arguments():
 
 
 def set_global_variables(args):
+    # Global variables
     global READS_DIR, OUTPUT_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
@@ -83,6 +84,8 @@ def set_global_variables(args):
 
 
 def check_directories():
+    # Make sure the directories exist, change to reads directory,
+    # Create any other necessary directories for the script to run.
     global READS_DIR, OUTPUT_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, %s does not exist" % READS_DIR)
@@ -103,6 +106,7 @@ def check_directories():
 
 
 def get_tarred_files():
+    # Get the tarred files, note, must not be already be being basecalled, vicious cycle!
     tarred_files = [READS_DIR + tarred_file for tarred_file in os.listdir(READS_DIR)
                     if tarred_file.endswith(".tar.gz")  # Is a zip file and
                     and tarred_file.replace(".tar.gz", "/")  # basecalled output folder
@@ -111,6 +115,7 @@ def get_tarred_files():
 
 
 def extract_tarred_read_set(tar_file):
+    # Extract the tarred reads, we currently do not delete after extraction, maybe a good idea?
     tar_command = "tar -xf %s" % tar_file
     tar_proc = subprocess.Popen(tar_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
@@ -118,6 +123,7 @@ def extract_tarred_read_set(tar_file):
 
 
 def run_albacore(tarred_read_set):
+    # Combine, docker, albacore and qsub commands together to be run on one line.
     folder = tarred_read_set.replace(".tar.gz", "/")
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
