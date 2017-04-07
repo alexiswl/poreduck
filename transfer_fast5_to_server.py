@@ -68,13 +68,14 @@ def main():
         if not is_minknow_still_running():
             minknow_running = False
 
+        new_folders = False
         # For any new folders.
         for subdir in subdirs:
             # Is folder finished?
             folder_status = check_folder_status(subdir)
             if folder_status == "still writing":
                 continue
-            print(folder_status)
+            new_folders = True
             # Tar up folder(s)
             tar_folders(subdir.split("/")[-2])
 
@@ -83,6 +84,12 @@ def main():
                 print(stdout, stderr)
                 # Sync up with the rest of the team
                 run_rsync_command()
+            copy_across_md5sum()  # Update the md5sum
+            copy_across_csv_files() # Update the csv file list.
+
+        # Let's have a rest if no new folders have been created recently.
+        if not new_folders:
+            have_a_break()
 
     # Now we need to tar up the last folder.
     # create last folder.
@@ -261,7 +268,7 @@ def get_subdirs():
                if os.path.isdir(directory)  # Make sure that the subdirectory is a directory
                and not directory == "tmp"   # And not the tmp directory
                and not directory == "csv"]  # And not our csv directory that we'll create.
-    
+
     subdirs_keep = []
     # Remove those that are not ints.
     for subdir in subdirs: 
@@ -296,14 +303,15 @@ def check_folder_status(subdir):
     #       fast5 file name       - name of fast5 file
     #       Modification time - time of modification of file, useful for deciding if run has finished.
     #       rnumber tag       - unique to each run, so can pull out different runs in a file.
-    #       mux scan          - Is the run part of the mux scan or sequencing run? (YES/NO)
+    #       mux scan          - Is the run part of the mux scan or sequencing run? (TRUE/FALSE)
     #       channel           - Channel ID of the run.
     #       read number       - What number read is this.
 
-    fast5_pd = pd.DataFrame(index=fast5_files, columns=['mtime', 'rnumber', 'mux', 'channel', 'read_no'])
-    fast5_pd['mtime'] = [os.path.getmtime(fast5_file) for fast5_file in fast5_files]
+    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'rnumber', 'mux', 'channel', 'read_no'])
+    fast5_pd['filename'] = fast5_files
+    fast5_pd['ctime'] = [time.ctime(os.path.getmtime(fast5_file)) for fast5_file in fast5_files]
     fast5_pd['rnumber'] = [fast5_file.split('_')[-4] for fast5_file in fast5_files]
-    fast5_pd['mux'] = ["YES" if "mux_scan" in fast5_file else "NO" for fast5_file in fast5_files]
+    fast5_pd['mux'] = ["TRUE" if "mux_scan" in fast5_file else "FALSE" for fast5_file in fast5_files]
     fast5_pd['channel'] = [fast5_file.split('_')[-3] for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-2] for fast5_file in fast5_files]
 
@@ -312,11 +320,11 @@ def check_folder_status(subdir):
 
     for run in runs:
         # Before moving the mux files we need to make sure that there is some sequencing run files in the folder
-        if len(fast5_pd.loc[(fast5_pd.mux == "NO")]) == 0:
+        if len(fast5_pd.loc[(fast5_pd.mux == "FALSE")]) == 0:
             continue  # No sequencing run files in the folder, skipping folder.
 
         # Move mux scan files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "YES")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "TRUE")]
         fast5_to_move = fast5_to_move_pd.index.values  # The row names equal the names of the files.
         print("Number of mux files to move is %s for %s" % (len(fast5_to_move), subdir))
         if len(fast5_to_move) != 0:  # Something here, let's move!!
@@ -324,10 +332,11 @@ def check_folder_status(subdir):
             is_mux = True
             return_status = "moving files"
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + "_mux")
+            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + "_mux" + ".csv",
+                                    header=True, index=False)
 
         # Move standard sequencing run files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "NO")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "FALSE")]
         fast5_to_move = fast5_to_move_pd.index.values  # The row names equal the names of the files.
 
         # Before moving the sequencing run files, we need to ensure that the folder is full.
@@ -335,7 +344,7 @@ def check_folder_status(subdir):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run)
+            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
         
     # Check if folder is empty
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
