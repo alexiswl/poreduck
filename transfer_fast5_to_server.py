@@ -29,10 +29,10 @@ import os  # list directories and path checking
 import sys  # For stopping in the event of errors.
 import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
-import getpass  # Prompts user for password, just a oneoff to runt he script.
+import getpass  # Prompts user for password, just a one off to runt he script.
 from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the destination folder is there.
 import time  # For snoozing
-import pandas as pd  # Create dataframe of list of files with attributes for each.
+import pandas as pd  # Create data frame of list of files with attributes for each.
 
 # Set global variables that aren't actually global,
 # Just easier than piping them into everything.
@@ -47,6 +47,7 @@ RSYNC_SUBPROCESS = None
 CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
+TRANSFER_LOCK_FILE = TRANSFERRING
 
 
 def main():
@@ -59,16 +60,48 @@ def main():
     run_rsync_command()
 
     # While loop to continue tarring up folders
+    create_transferring_lock_file()  # Indicator for download the line base callers that more data is coming!
+
     while MINKNOW_RUNNING:
         # Commence transfer of fast5 files.
         transfer_fast5_files()
 
     # Now we need to tar up the last folder.
     # create last folder.
-    # Send across csvs and md5sum file.
+    # Send across csv(s) and md5sum file.
+
     tar_up_last_folder()
     copy_across_md5sum()
     copy_across_csv_files()
+
+    # Remove the lock file from the server.
+    remove_transferring_lock_file()
+
+
+def create_transferring_lock_file():
+    s = pxssh.pxssh()
+
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+        print("SSH failed on login")
+    else:
+        print("SSH passed")
+
+    s.sendline('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
+    s.prompt()  # match the prompt
+    output = s.before  # Gets the `output of the send line command
+
+
+def remove_transferring_lock_file():
+    s = pxssh.pxssh()
+
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+        print("SSH failed on login")
+    else:
+        print("SSH passed")
+
+    s.sendline('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
+    s.prompt()  # match the prompt
+    output = s.before  # Gets the `output of the send line command
 
 
 def transfer_fast5_files():
@@ -204,7 +237,7 @@ def check_directories():
       
     s.sendline('if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent)  # Command to check if folder is there.
     s.prompt()  # match the prompt
-    output = s.before  # Gets the `output of the sendline command
+    output = s.before  # Gets the `output of the send line command
 
     if not output.rstrip().split('\n')[-1] == "PRESENT":
         # Parent folder is not present. Exit.
@@ -255,7 +288,7 @@ def run_rsync_command():
     rsync_command_options.append("--recursive")
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
-    # The tar.gz files will be placed in the reads subfolder
+    # The tar.gz files will be placed in the reads sub folder
     rsync_command = "sshpass -p %s rsync %s %s %s@%s:%s/%s" % (
                                                             PASSWORD,
                                                             ' '.join(rsync_command_options),
@@ -395,7 +428,7 @@ def tar_folders(subdir_prefix):
     print(subdirs)
     # Now tar up each folder individually
     for subdir in subdirs:
-        tar_file = "%s.tar.gz" % (subdir)
+        tar_file = "%s.tar.gz" % subdir
         tar_command = "tar -cf - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
@@ -415,6 +448,7 @@ def md5sum_tar_file(tar_file):
     # Append the md5sum of the tar file to the list of md5sums.
     checksum_proc = subprocess.Popen(md5sum_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, stderr = checksum_proc.communicate()
+    print("md5sum output", stdout, stderr)
 
     os.chdir(READS_DIR)    # Change back out of parent directory
 
