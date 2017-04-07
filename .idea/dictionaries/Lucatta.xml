@@ -1,9 +1,12 @@
 <component name="ProjectDictionaryState">
   <dictionary name="Lucatta">
     <words>
+      <w>basecaller</w>
+      <w>dest</w>
       <w>minknow</w>
       <w>pigz</w>
       <w>proc</w>
+      <w>qsub</w>
     </words>
   </dictionary>
 </component>

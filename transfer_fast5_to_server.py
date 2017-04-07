@@ -11,17 +11,17 @@ ONT have taken the step in MinKNOW version 1.4+ to reduce some problems by restr
 each folder to 4000. This is done by creating sub-folders in the 'reads' directory, 0, 1, 2, as needed.
 
 However this comes with a couple of bugs and a couple more issues. Any scripts that relied on all reads
-being in one folder now have implement a recursive stage, and the number of files isn't strictly 4000.
+being in one folder now have to implement a recursive stage, and the number of files isn't strictly 4000.
 Why? Because 'mux-reads' don't seem to count (so folder 0 will often have around 6000-7000 reads), and
 if a run is restarted then you will end up with at least 8000 reads in each folder.
 
 This script is designed to:
-1. Detect amy 'completed' folders, those that have 4000 reads in them.
+1. Detect any 'completed' folders, those that have 4000 reads in them.
    1a. Rename this folder specific to this run so it won't be accidentally overwritten.
-2. Tar up, check integrity and then md5sum this folder. We will use tiam5.sh to do this from my boubs repo.
+2. Tar up, check integrity and then md5sum this folder.
 3. Rsync the tar.gz file over to the server, and remove the source file to save space on the computer.
 
-Rsync script will eventually timeout, which will most likely mean that the run is complete.
+We use the ps -ef command to search for an active MinKNOW session.
 """
 
 # Import necessary modules,
@@ -31,7 +31,7 @@ import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
 import getpass  # Prompts user for password, just a one off to runt he script.
 from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the destination folder is there.
-import time  # For snoozing
+import time  # For snoozing and for generating csv time of generation output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
 
 # Set global variables that aren't actually global,
@@ -60,7 +60,7 @@ def main():
     run_rsync_command()
 
     # While loop to continue tarring up folders
-    create_transferring_lock_file()  # Indicator for download the line base callers that more data is coming!
+    create_transferring_lock_file()  # Indicator for down-the-line base callers that more data is coming!
 
     while MINKNOW_RUNNING:
         # Commence transfer of fast5 files.
