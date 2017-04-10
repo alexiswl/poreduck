@@ -30,3 +30,7 @@ try:
     print(int(sub_int))
 except ValueError:
     print(sub_int)
+
+number = 0
+
+print("%05d" % number)
