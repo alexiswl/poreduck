@@ -32,11 +32,10 @@ CHOSEN_CONFIG = ""
 PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 
-CONFIGS = {"FC106_RAD001": "FLO-MIN106_RAD001_linear.cfg",  # Rapid sequencing
-           "FC106_LSK208_tc": "FLO-MIN106_LSK208_tc.cfg",   # 2D unsure which one
-           "FC106_LSK108": "FLO-MIN106_LSK108_linear.cfg",  # For 1D ligation sequencing.
-           "FC106_RAD002": "FLO-MIN106_RAD002_linear.cfg",  # Second Rapid sequencing kit.
-           "FC106_LSK208_2d": "FLO-MIN106_LSK208_2d.cfg"}   # 2D unsure which one.
+CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
+           "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
+           "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
+           "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit. 
 
 
 def main():
@@ -53,7 +52,9 @@ def main():
             extract_tarred_read_set(tarred_read_set)
             run_albacore(tarred_read_set)
 
-        is_still_transferring()
+        if not is_still_transferring():
+		TRANSFERRING = FALSE
+
         if len(tarred_read_sets) == 0:
             take_a_break()
 
@@ -109,7 +110,7 @@ def get_tarred_files():
     # Get the tarred files, note, must not be already be being base called, vicious cycle!
     tarred_files = [READS_DIR + tarred_file for tarred_file in os.listdir(READS_DIR)
                     if tarred_file.endswith(".tar.gz")  # Is a zip file and
-                    and tarred_file.replace(".tar.gz", "/")  # base called output folder
+                    and tarred_file.replace(".tar.gz", "")  # basecalled output folder
                     not in os.listdir(OUTPUT_DIR)]           # does not already exist.
     return tarred_files
 
@@ -127,7 +128,7 @@ def run_albacore(tarred_read_set):
     folder = tarred_read_set.replace(".tar.gz", "/")
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
-
+    output_folder = OUTPUT_DIR + folder.split("/")[-2]
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
@@ -135,13 +136,14 @@ def run_albacore(tarred_read_set):
                          "--worker_threads %s " \
                          "--save_path %s " \
                          "--config %s" \
-                         % (folder, NUM_THREADS, OUTPUT_DIR, CHOSEN_CONFIG)
+                         % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
     qsub_command = "qsub -o %s -e %s -S /bin/bash" % (qsub_log_file, qsub_error_file)
 
     # Put these all together into one grand command
-    albacore_command = "echo \"%s %s\" | %s " % ( basecaller_command, qsub_command)
+    albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
+    print(albacore_command)
 
     # Execute via subprocess.
     albacore_proc = subprocess.Popen(albacore_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
