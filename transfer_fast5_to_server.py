@@ -48,6 +48,7 @@ CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
+FLOWCELL = None
 
 
 def main():
@@ -152,11 +153,15 @@ def get_arguments():
                         help="Where abouts on the server do you wish to place these files?")
     parser.add_argument("--timeout", type=int, required=False, default=1800,
                         help="How long did you wish to wait before rsync times out. Default is 30 mins")
+    parser.add_argument("--flowcell", type=str, required=False,
+                        help="Flowcell ID, in case you are running two separate runs at once and wish to run" +
+                             "two rsync commands at a time, with each transferring different flowcell IDs" +
+                             "to different folders")
     return parser.parse_args()
 
 
 def set_global_variables(args):
-    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY
+    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, FLOWCELL
     READS_DIR = args.reads_dir
     SERVER_NAME = args.server_name
     SERVER_USERNAME = args.user_name
@@ -164,6 +169,7 @@ def set_global_variables(args):
     DEST_DIRECTORY = args.dest_directory
     TIMEOUT = args.timeout
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
+    FLOWCELL = args.flowcell
 
 
 def get_password():
@@ -335,7 +341,8 @@ def check_folder_status(subdir, full=True):
 
     os.chdir(subdir)
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
-                   if fast5_file.endswith(".fast5")]
+                   if fast5_file.endswith(".fast5") and
+                   (FLOWCELL in fast5_file or FLOWCELL is None)]
 
     # Create pandas data frame with each fast5 file as a row.
     # Final columns will include:

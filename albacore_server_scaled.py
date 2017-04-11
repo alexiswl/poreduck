@@ -106,10 +106,10 @@ def check_directories():
 
 
 def get_tarred_files():
-    # Get the tarred files, note, must not be already be being basecalled, vicious cycle!
+    # Get the tarred files, note, must not be already be being base called, vicious cycle!
     tarred_files = [READS_DIR + tarred_file for tarred_file in os.listdir(READS_DIR)
                     if tarred_file.endswith(".tar.gz")  # Is a zip file and
-                    and tarred_file.replace(".tar.gz", "/")  # basecalled output folder
+                    and tarred_file.replace(".tar.gz", "/")  # base called output folder
                     not in os.listdir(OUTPUT_DIR)]           # does not already exist.
     return tarred_files
 
@@ -123,17 +123,12 @@ def extract_tarred_read_set(tar_file):
 
 
 def run_albacore(tarred_read_set):
-    # Combine, docker, albacore and qsub commands together to be run on one line.
+    # Combine albacore and qsub commands together to be run on one line.
     folder = tarred_read_set.replace(".tar.gz", "/")
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
 
-    # This command is one giant line that we're going to break down into components.
-    # The docker command opens up the docker, of Ubuntu 16.04
-    docker_command = "sudo docker run --rm -v $(pwd):$(pwd) " \
-                     "-u $(id -u):$(id -g) -w $(pwd) " \
-                     "genomicpariscentre/albacore"
-    # The read_fast5_basecaller is the algorithm that does the actual basecalling,
+    # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
                          "--input %s " \
@@ -146,7 +141,7 @@ def run_albacore(tarred_read_set):
     qsub_command = "qsub -o %s -e %s -S /bin/bash" % (qsub_log_file, qsub_error_file)
 
     # Put these all together into one grand command
-    albacore_command = "echo \"%s %s\" | %s " % (docker_command, basecaller_command, qsub_command)
+    albacore_command = "echo \"%s %s\" | %s " % ( basecaller_command, qsub_command)
 
     # Execute via subprocess.
     albacore_proc = subprocess.Popen(albacore_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
