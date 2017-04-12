@@ -112,7 +112,7 @@ def get_tarred_files():
                     # If the file is a zip file and
                     if tarred_file.endswith(".tar.gz")  
                     # albacore folder does not already exist
-		    and not os.path.isdir(OUTPUT_DIR + tarred_file.replace(".tar.gz", "")]
+		    and not os.path.isdir(OUTPUT_DIR + tarred_file.replace(".tar.gz", ""))]
     return tarred_files
 
 
@@ -130,7 +130,7 @@ def run_albacore(tarred_read_set):
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
     output_folder = OUTPUT_DIR + folder.split("/")[-2]
-    memory_allocation = 
+    memory_allocation = 4 + NUM_THREADS  # Number of gigabytes required for a given qsub command
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
@@ -141,7 +141,7 @@ def run_albacore(tarred_read_set):
                          % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command = "qsub -o %s -e %s -S /bin/bash" % (qsub_log_file, qsub_error_file)
+    qsub_command = "qsub -o %s -e %s -h_vmem %dG -S /bin/bash" % (qsub_log_file, qsub_error_file, memory_allocation)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
