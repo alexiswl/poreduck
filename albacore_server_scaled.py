@@ -109,9 +109,10 @@ def check_directories():
 def get_tarred_files():
     # Get the tarred files, note, must not be already be being base called, vicious cycle!
     tarred_files = [READS_DIR + tarred_file for tarred_file in os.listdir(READS_DIR)
-                    if tarred_file.endswith(".tar.gz")  # Is a zip file and
-                    and tarred_file.replace(".tar.gz", "")  # basecalled output folder
-                    not in os.listdir(OUTPUT_DIR)]           # does not already exist.
+                    # If the file is a zip file and
+                    if tarred_file.endswith(".tar.gz")  
+                    # albacore folder does not already exist
+		    and not os.path.isdir(OUTPUT_DIR + tarred_file.replace(".tar.gz", "")]
     return tarred_files
 
 
@@ -129,6 +130,7 @@ def run_albacore(tarred_read_set):
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
     output_folder = OUTPUT_DIR + folder.split("/")[-2]
+    memory_allocation = 
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
@@ -145,7 +147,7 @@ def run_albacore(tarred_read_set):
     albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
     print(albacore_command)
 
-    # Execute via subprocess.
+    # Execute qsub command via subprocess.
     albacore_proc = subprocess.Popen(albacore_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     stdout, stderr = albacore_proc.communicate()
