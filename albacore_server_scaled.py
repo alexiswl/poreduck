@@ -201,11 +201,11 @@ def perform_fastq_extraction(albacore_folder):
     # If the albacore job has completed.
     # Use subprocess to run the fastq extraction on the folder.
 
-    fastq_folder = FASTQ_DIR + albacore_folder
+    fastq_file = FASTQ_DIR + albacore_folder + ".fastq"
     qsub_log_file = QSUB_LOG_DIR + albacore_folder + ".fastq.o.log"
     qsub_error_file = QSUB_LOG_DIR + albacore_folder + ".fastq.e.log"
 
-    poretools_command = "poretools fastq %s > %s" % (ALBACORE_DIR + albacore_folder, fastq_folder)
+    poretools_command = "poretools fastq %s > %s" % (ALBACORE_DIR + albacore_folder, fastq_file)
     qsub_command = "echo \"%s\" | qsub -o %s -e %s -S /bin/bash" % \
                    (poretools_command, qsub_log_file, qsub_error_file)
 
