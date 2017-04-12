@@ -3,8 +3,10 @@
     <words>
       <w>basecaller</w>
       <w>dest</w>
+      <w>fastq</w>
       <w>minknow</w>
       <w>pigz</w>
+      <w>poretools</w>
       <w>proc</w>
       <w>qsub</w>
     </words>
