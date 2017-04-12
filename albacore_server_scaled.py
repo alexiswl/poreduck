@@ -125,7 +125,7 @@ def check_directories():
 
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir)) + "/"
 
-    if ALBACORE_DIR is not None:
+    if ALBACORE_DIR == "":
         ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
     if not os.path.isdir(ALBACORE_DIR):
         os.mkdir(ALBACORE_DIR)
@@ -135,8 +135,9 @@ def check_directories():
     if not os.path.isdir(QSUB_LOG_DIR):
         os.mkdir(QSUB_LOG_DIR)
 
-    if FASTQ_DIR is not None:
+    if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
@@ -162,8 +163,8 @@ def extract_tarred_read_set(tar_file):
 def run_albacore(tarred_read_set):
     # Combine albacore and qsub commands together to be run on one line.
     folder = tarred_read_set.replace(".tar.gz", "/")
-    qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".o.log"
-    qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + ".e.log"
+    qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.o.log"
+    qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.e.log"
     output_folder = ALBACORE_DIR + folder.split("/")[-2]
     memory_allocation = 4 + NUM_THREADS  # Number of gigabytes required for a given qsub command
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
