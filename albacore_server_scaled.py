@@ -56,7 +56,8 @@ def main():
             run_albacore(tarred_read_set)
 
         for folder, job in ALBACORE_QSUBJOB_BY_FOLDER.iteritems():
-            perform_fastq_extraction(folder)
+            if is_job_complete(job):
+                perform_fastq_extraction(folder)
 
         if not is_still_transferring():
             TRANSFERRING = False
