@@ -48,7 +48,7 @@ CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
-FLOWCELL = None
+FLOWCELL = "" 
 
 
 def main():
@@ -169,7 +169,8 @@ def set_global_variables(args):
     DEST_DIRECTORY = args.dest_directory
     TIMEOUT = args.timeout
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
-    FLOWCELL = args.flowcell
+    if args.flowcell is not None:
+        FLOWCELL = args.flowcell
 
 
 def get_password():
@@ -200,7 +201,7 @@ def tar_up_last_folder():
     for subdir in get_subdirs():
         # Don't worry about counting the number of files, we're finished.
         check_folder_status(subdir, full=False)
-        tar_folders(subdir.split("/")[-2])
+        tar_folders(standardise_int_length(subdir.split("/")[-2]))
     # Perform final rsync command if need be:
     if RSYNC_SUBPROCESS.poll() is not None:
         stdout, stderr = RSYNC_SUBPROCESS.communicate()
@@ -342,7 +343,7 @@ def check_folder_status(subdir, full=True):
     os.chdir(subdir)
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5") and
-                   (FLOWCELL in fast5_file or FLOWCELL is None)]
+                   (FLOWCELL in fast5_file or FLOWCELL == "")]
 
     # Create pandas data frame with each fast5 file as a row.
     # Final columns will include:
@@ -470,6 +471,6 @@ def md5sum_tar_file(tar_file):
 
 def standardise_int_length(my_integer):
     # Input of 15 returns 0015
-    return "%04d" % my_integer
+    return "%04d" % int(my_integer)
 
 main()
