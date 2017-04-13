@@ -142,7 +142,7 @@ def transfer_fast5_files():
 def get_arguments():
     parser = argparse.ArgumentParser(
         description="The transfer_fast5_to_server transfers MiNION data from a laptop in realtime." +
-                    "The process will finish when rsync times out. Use the --timeout option to adjust this.")
+                    "The process will finish when the script believes MinKNOW is no longer running.")
     parser.add_argument("--reads_dir", type=str, required=True,
                         help="/path/to/reads, should have a bunch of subfolders from 0 to N")
     parser.add_argument("--server_name", type=str, required=True,
@@ -151,8 +151,6 @@ def get_arguments():
                         help="If you were to ssh username@server, please type in the username bit")
     parser.add_argument("--dest_directory", type=str, required=True,
                         help="Where abouts on the server do you wish to place these files?")
-    parser.add_argument("--timeout", type=int, required=False, default=1800,
-                        help="How long did you wish to wait before rsync times out. Default is 30 mins")
     parser.add_argument("--flowcell", type=str, required=False,
                         help="Flowcell ID, in case you are running two separate runs at once and wish to run" +
                              "two rsync commands at a time, with each transferring different flowcell IDs" +
@@ -167,7 +165,6 @@ def set_global_variables(args):
     SERVER_USERNAME = args.user_name
     PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
-    TIMEOUT = args.timeout
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
     if args.flowcell is not None:
         FLOWCELL = args.flowcell
@@ -398,7 +395,8 @@ def check_folder_status(subdir, full=True):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
+            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv",
+                                    header=True, index=False)
         
     # Check if folder is empty
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
