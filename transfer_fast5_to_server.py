@@ -385,6 +385,7 @@ def check_folder_status(subdir, full=True):
 
         # If this is the final folder, we will move regardless of if it is full.
         if not full:
+            is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
             fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
             continue
