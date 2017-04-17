@@ -445,7 +445,7 @@ def tar_folders(subdir_prefix):
     # Now tar up each folder individually
     for subdir in subdirs:
         tar_file = "%s.tar.gz" % subdir
-        tar_command = "tar -cf --remove-files - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
+        tar_command = "tar -cf - %s --remove-files | pigz -9 -p 32 > %s" % (subdir, tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
         md5sum_tar_file(tar_file)
