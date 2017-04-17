@@ -81,7 +81,7 @@ def main():
 
 def create_transferring_lock_file():
     s = pxssh.pxssh()
-
+    print(PASSWORD)
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
         print("SSH failed on login")
     else:
@@ -232,9 +232,10 @@ def check_directories():
     # Check if folder on server is present.
     # Log into server, then check for folder.
     dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-1])
-
-    s = pxssh.pxssh()  
     
+    s = pxssh.pxssh()  
+    print(repr('youresovain'))
+    print(repr(PASSWORD)) 
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
         print("SSH failed on login")
     else:
@@ -444,7 +445,7 @@ def tar_folders(subdir_prefix):
     # Now tar up each folder individually
     for subdir in subdirs:
         tar_file = "%s.tar.gz" % subdir
-        tar_command = "tar -cf - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
+        tar_command = "tar -cf --remove-files - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
         md5sum_tar_file(tar_file)
