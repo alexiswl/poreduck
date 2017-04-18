@@ -90,7 +90,7 @@ def create_transferring_lock_file():
     s.sendline('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
-
+    s.logout()  # Logout
 
 def remove_transferring_lock_file():
     s = pxssh.pxssh()
@@ -103,7 +103,7 @@ def remove_transferring_lock_file():
     s.sendline('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
-
+    s.logout()  # Logout
 
 def transfer_fast5_files():
     global MINKNOW_RUNNING
@@ -377,7 +377,7 @@ def check_folder_status(subdir, full=True):
             is_mux = True
             return_status = "moving files"
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + "_mux" + ".csv",
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + "_mux" + ".csv",
                                     header=True, index=False)
 
         # Move standard sequencing run files for a given run
@@ -388,7 +388,7 @@ def check_folder_status(subdir, full=True):
         if not full:
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv")
             continue
 
         # Otherwise we will go business as usual.
