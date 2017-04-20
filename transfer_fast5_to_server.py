@@ -292,6 +292,7 @@ def run_rsync_command():
     rsync_command_options.append("--include='*.tar.gz'")  # Include only the tar and zipped files.
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
+    rsync_command_options.append("--times")
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
     # The tar.gz files will be placed in the reads sub folder
@@ -397,7 +398,7 @@ def check_folder_status(subdir, full=True):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv",
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv",
                                     header=True, index=False)
         
     # Check if folder is empty
