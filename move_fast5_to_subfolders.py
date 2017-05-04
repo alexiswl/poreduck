@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
-import argparse
-import os
-import itertools
-import subprocess
-import sys
+import argparse  # For importing arguments
+import os  # Get file lists, check directories
+import itertools  # Iterate through fast5file and mv commands
+import subprocess  # Run mv commands
+import sys  # For exiting with errors
 
 # Global variables
 READS_DIR = ""
-NUM_THREADS = 5
 
 
 def main():
@@ -18,6 +17,8 @@ def main():
 
 
 def get_args():
+    """Use the argparse command to retrieve the reads directory input,
+    and the archive toggle and number of threads set by the user"""
     parser = argparse.ArgumentParser(description="Moves fast5 files from folder into subdirectories")
     parser.add_argument("--reads_dir", type=str, required=True,
                         help="The directory with all the fast5 files in them")
@@ -46,23 +47,32 @@ def move_fast5_files(args):
     fast5_files are sorted by their modification time
     We use the subprocess command to parallelise the set of mv commands
     """
-
+    # Get the set of fast5 files in a folder and sort them by their mod time.
     fast5_files = [fast5_file for fast5_file in os.listdir(READS_DIR)
                    if fast5_file.endswith(".fast5")]
     fast5_files.sort(key=lambda x: os.path.getmtime(x))
 
+    # subdirectory_list, each element a string of 4000 fast5 files.
     subdirectory_list = []
+
+    # Set the first subdirectory to zero
     subdirectory = 0
+
+    # mv_fast5_commands, almost identical to subdirectory list,
+    # but the mv and subdirectory on each end.
     mv_fast5_commands = []
 
+    # Get list of mv commandss
     for f_index, fast5_file in itertools.izip(range(0, len(fast5_files)), fast5_files):
         subdirectory_list[subdirectory] = subdirectory_list[subdirectory] + "," + fast5_file
+        # We've reached 4000
         if f_index + 1 % 4000 == 0:
-            mv_fast5_commands.append(' '.join(subdirectory_list[subdirectory].split(","))
+            mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
                                      + subdirectory)
             subdirectory += 1
+        # Or we're at the last fast5 file.
         elif f_index + 1 == len(fast5_files):
-            mv_fast5_commands.append(' '.join(subdirectory_list[subdirectory].split(","))
+            mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
                                      + subdirectory)
 
     # Generate processing list
@@ -76,7 +86,7 @@ def move_fast5_files(args):
         for i, process in enumerate(running_processes):
             if process.poll() is not None:  # Means that the process is complete!
                 stdout, stderr = process.communicate()  # Get the output of the completed process
-                if not stderr == "":
+                if not stderr == "":  # Print stderr if it exists.
                     print stderr
                 running_processes[i] = next(processes, None)
                 # Run the next number in the list.
@@ -84,4 +94,5 @@ def move_fast5_files(args):
                     del running_processes[i]  # Not a valid process.
                     break
 
+# Run the main function.
 main()
