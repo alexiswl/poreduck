@@ -111,7 +111,8 @@ def set_global_variables(args):
         ALBACORE_DIR = args.output_dir
     CHOSEN_CONFIG = CONFIGS[args.config]
     NUM_THREADS = args.num_threads
-    FASTQ_DIR = args.fastq_dir
+    if args.fastq_dir is not None:
+        FASTQ_DIR = args.fastq_dir
 
 
 def check_directories():
@@ -134,10 +135,10 @@ def check_directories():
 
     if not os.path.isdir(QSUB_LOG_DIR):
         os.mkdir(QSUB_LOG_DIR)
-
+   
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
-
+    
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
@@ -177,7 +178,7 @@ def run_albacore(tarred_read_set):
                          % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command = "qsub -o %s -e %s -h_vmem %dG -S /bin/bash" % (qsub_log_file, qsub_error_file, memory_allocation)
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (qsub_log_file, qsub_error_file, memory_allocation)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
@@ -189,6 +190,7 @@ def run_albacore(tarred_read_set):
     stdout, stderr = albacore_proc.communicate()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
+    print("Output of albacore command", stdout, stderr) 
     ALBACORE_QSUBJOB_BY_FOLDER[folder.split("/")[-2]] = stdout.rstrip().split()[2]
     print("Output of albacore_proc", stdout, stderr)
 
