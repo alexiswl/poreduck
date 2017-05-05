@@ -231,10 +231,10 @@ def check_directories():
 
     # Check if folder on server is present.
     # Log into server, then check for folder.
-    dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-1])
+    dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-2])
     
     s = pxssh.pxssh()  
-    print(repr('youresovain'))
+    
     print(repr(PASSWORD)) 
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
         print("SSH failed on login")
@@ -244,7 +244,7 @@ def check_directories():
     s.sendline('if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent)  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
-
+    print(dest_parent, output)
     if not output.rstrip().split('\n')[-1] == "PRESENT":
         # Parent folder is not present. Exit.
         sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)

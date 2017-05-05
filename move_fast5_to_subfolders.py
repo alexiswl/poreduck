@@ -13,7 +13,8 @@ READS_DIR = ""
 def main():
     args = get_args()
     set_directories(args)
-    move_fast5_files(args)
+    directory_list = move_fast5_files(args)
+    archive_folders(args, directory_list)
 
 
 def get_args():
@@ -57,23 +58,26 @@ def move_fast5_files(args):
 
     # Set the first subdirectory to zero
     subdirectory = 0
+    os.mkdir(READS_DIR + str(subdirectory))
 
     # mv_fast5_commands, almost identical to subdirectory list,
     # but the mv and subdirectory on each end.
     mv_fast5_commands = []
 
-    # Get list of mv commandss
+    # Get list of mv commands
     for f_index, fast5_file in itertools.izip(range(0, len(fast5_files)), fast5_files):
         subdirectory_list[subdirectory] = subdirectory_list[subdirectory] + "," + fast5_file
         # We've reached 4000
         if f_index + 1 % 4000 == 0:
             mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
-                                     + subdirectory)
+                                     + " " + str(subdirectory))
             subdirectory += 1
+            os.mkdir(READS_DIR + str(subdirectory))
+
         # Or we're at the last fast5 file.
         elif f_index + 1 == len(fast5_files):
             mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
-                                     + subdirectory)
+                                     + " " + str(subdirectory))
 
     # Generate processing list
     # Talk to the shell. Note these commands won't run just yet.
@@ -93,6 +97,30 @@ def move_fast5_files(args):
                 if running_processes[i] is None:  # No more commands waiting to be processed.
                     del running_processes[i]  # Not a valid process.
                     break
+
+    return subdirectory_list
+
+
+def archive_folders(args, directory_list):
+    """
+    Use the tar command with pigz to compress each of the subfolders
+    """
+    # Archive each of the subfolders
+    # If we haven't selected archive then we return immediately.
+    if args.archive is None:
+        return
+
+    # Otherwise a simple tar command should do
+    tar_commands = []
+    for directory in directory_list:
+        tar_commands.append("tar -cf - %s --remove-files | pigz -9 -p 16 > %s.tar.gz" %
+                            directory, directory)
+
+    # Now use the subprocess command to tar up each of the files
+    for tar_command in tar_commands:
+        tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        stdout, stderr = tar_proc.communicate()
+
 
 # Run the main function.
 main()
