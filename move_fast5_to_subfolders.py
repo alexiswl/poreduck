@@ -102,6 +102,9 @@ def move_fast5_files(args):
 
 
 def archive_folders(args, directory_list):
+    """
+    Use the tar command with pigz to compress each of the subfolders
+    """
     # Archive each of the subfolders
     # If we haven't selected archive then we return immediately.
     if args.archive is None:
