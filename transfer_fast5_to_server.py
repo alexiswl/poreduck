@@ -48,7 +48,7 @@ CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
-FLOWCELL = None
+FLOWCELL = "" 
 
 
 def main():
@@ -81,7 +81,7 @@ def main():
 
 def create_transferring_lock_file():
     s = pxssh.pxssh()
-
+    print(PASSWORD)
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
         print("SSH failed on login")
     else:
@@ -90,7 +90,7 @@ def create_transferring_lock_file():
     s.sendline('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
-
+    s.logout()  # Logout
 
 def remove_transferring_lock_file():
     s = pxssh.pxssh()
@@ -103,7 +103,7 @@ def remove_transferring_lock_file():
     s.sendline('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))  # Command to check if folder is there.
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
-
+    s.logout()  # Logout
 
 def transfer_fast5_files():
     global MINKNOW_RUNNING
@@ -142,7 +142,7 @@ def transfer_fast5_files():
 def get_arguments():
     parser = argparse.ArgumentParser(
         description="The transfer_fast5_to_server transfers MiNION data from a laptop in realtime." +
-                    "The process will finish when rsync times out. Use the --timeout option to adjust this.")
+                    "The process will finish when the script believes MinKNOW is no longer running.")
     parser.add_argument("--reads_dir", type=str, required=True,
                         help="/path/to/reads, should have a bunch of subfolders from 0 to N")
     parser.add_argument("--server_name", type=str, required=True,
@@ -151,8 +151,6 @@ def get_arguments():
                         help="If you were to ssh username@server, please type in the username bit")
     parser.add_argument("--dest_directory", type=str, required=True,
                         help="Where abouts on the server do you wish to place these files?")
-    parser.add_argument("--timeout", type=int, required=False, default=1800,
-                        help="How long did you wish to wait before rsync times out. Default is 30 mins")
     parser.add_argument("--flowcell", type=str, required=False,
                         help="Flowcell ID, in case you are running two separate runs at once and wish to run" +
                              "two rsync commands at a time, with each transferring different flowcell IDs" +
@@ -167,9 +165,9 @@ def set_global_variables(args):
     SERVER_USERNAME = args.user_name
     PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
-    TIMEOUT = args.timeout
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
-    FLOWCELL = args.flowcell
+    if args.flowcell is not None:
+        FLOWCELL = args.flowcell
 
 
 def get_password():
@@ -200,7 +198,7 @@ def tar_up_last_folder():
     for subdir in get_subdirs():
         # Don't worry about counting the number of files, we're finished.
         check_folder_status(subdir, full=False)
-        tar_folders(subdir.split("/")[-2])
+        tar_folders(standardise_int_length(subdir.split("/")[-2]))
     # Perform final rsync command if need be:
     if RSYNC_SUBPROCESS.poll() is not None:
         stdout, stderr = RSYNC_SUBPROCESS.communicate()
@@ -234,9 +232,10 @@ def check_directories():
     # Check if folder on server is present.
     # Log into server, then check for folder.
     dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-1])
-
-    s = pxssh.pxssh()  
     
+    s = pxssh.pxssh()  
+    print(repr('youresovain'))
+    print(repr(PASSWORD)) 
     if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
         print("SSH failed on login")
     else:
@@ -293,6 +292,7 @@ def run_rsync_command():
     rsync_command_options.append("--include='*.tar.gz'")  # Include only the tar and zipped files.
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
+    rsync_command_options.append("--times")
 
     # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST' permutation of the command
     # The tar.gz files will be placed in the reads sub folder
@@ -342,7 +342,7 @@ def check_folder_status(subdir, full=True):
     os.chdir(subdir)
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5") and
-                   (FLOWCELL in fast5_file or FLOWCELL is None)]
+                   (FLOWCELL in fast5_file or FLOWCELL == "")]
 
     # Create pandas data frame with each fast5 file as a row.
     # Final columns will include:
@@ -378,7 +378,7 @@ def check_folder_status(subdir, full=True):
             is_mux = True
             return_status = "moving files"
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + "_mux" + ".csv",
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + "_mux" + ".csv",
                                     header=True, index=False)
 
         # Move standard sequencing run files for a given run
@@ -387,8 +387,9 @@ def check_folder_status(subdir, full=True):
 
         # If this is the final folder, we will move regardless of if it is full.
         if not full:
+            is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv")
             continue
 
         # Otherwise we will go business as usual.
@@ -397,7 +398,8 @@ def check_folder_status(subdir, full=True):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + subdir.split("/")[-2] + "_" + run + ".csv")
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv",
+                                    header=True, index=False)
         
     # Check if folder is empty
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
@@ -444,7 +446,7 @@ def tar_folders(subdir_prefix):
     # Now tar up each folder individually
     for subdir in subdirs:
         tar_file = "%s.tar.gz" % subdir
-        tar_command = "tar -cf - %s | pigz -9 -p 32 > %s" % (subdir, tar_file)
+        tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir, tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
         md5sum_tar_file(tar_file)
@@ -470,6 +472,6 @@ def md5sum_tar_file(tar_file):
 
 def standardise_int_length(my_integer):
     # Input of 15 returns 0015
-    return "%04d" % my_integer
+    return "%04d" % int(my_integer)
 
 main()

@@ -121,6 +121,7 @@ def check_directories():
     global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, %s does not exist" % READS_DIR)
+
     READS_DIR = os.path.abspath(READS_DIR) + "/"
     os.chdir(READS_DIR)
 
@@ -132,13 +133,16 @@ def check_directories():
         os.mkdir(ALBACORE_DIR)
 
     QSUB_LOG_DIR = PARENT_DIRECTORY + "qsub_log/"
-
     if not os.path.isdir(QSUB_LOG_DIR):
         os.mkdir(QSUB_LOG_DIR)
    
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+<<<<<<< HEAD
     
+=======
+   
+>>>>>>> 16cf080b28ba75326c0aa0ef5fc8ffec06e85b0f
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
