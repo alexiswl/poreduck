@@ -9,6 +9,9 @@
       <w>poretools</w>
       <w>proc</w>
       <w>qsub</w>
+      <w>runmux</w>
+      <w>seqid</w>
+      <w>taxid</w>
     </words>
   </dictionary>
 </component>
