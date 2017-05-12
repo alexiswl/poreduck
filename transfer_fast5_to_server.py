@@ -392,11 +392,11 @@ def check_folder_status(subdir, full=True):
             continue
 
         # Before moving the mux files we need to make sure that there is some sequencing run files in the folder
-        if len(fast5_pd.loc[(fast5_pd.mux == False)]) == 0:
+        if len(fast5_pd.loc[(fast5_pd.mux is False)]) == 0:
             continue  # No sequencing run files in the folder, skipping folder.
 
         # Move mux scan files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == True)]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux is True)]
         fast5_to_move = fast5_to_move_pd['filename']
         print("Number of mux files to move is %s for %s" % (len(fast5_to_move), subdir))
         if len(fast5_to_move) != 0:  # Something here, let's move!!
@@ -408,7 +408,7 @@ def check_folder_status(subdir, full=True):
                                     header=True, index=False)
 
         # Move standard sequencing run files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == False)]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux is False)]
         fast5_to_move = fast5_to_move_pd['filename']
 
         # If this is the final folder, we will move regardless of if it is full.
