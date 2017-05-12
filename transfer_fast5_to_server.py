@@ -49,8 +49,8 @@ PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
 FLOWCELL = "" 
-RUNMUX_RN = ""
-RUN_RN = ""
+RUNMUX_RN = 0
+RUN_RN = 0
 
 
 def main():
@@ -292,9 +292,9 @@ def run_rsync_command():
     rsync_command_options = []
     rsync_command_options.append("--remove-source-files")  # Delete the tar.gz files from the laptop.
     # Include only the tar and zipped files with the RUN random number.
-    rsync_command_options.append("--include='*_%s.tar.gz'" % RUN_RN)
+    rsync_command_options.append("--include='*_%d.tar.gz'" % RUN_RN)
     # Include only the tar and zipped files with the RUNMUX random number.
-    rsync_command_options.append("--include='*_%s.tar.gz'" % RUNMUX_RN)
+    rsync_command_options.append("--include='*_%d.tar.gz'" % RUNMUX_RN)
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
     rsync_command_options.append("--times")
@@ -368,7 +368,7 @@ def check_folder_status(subdir, full=True):
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(fast5_file)) for fast5_file in fast5_files]
     fast5_pd['rnumber'] = [fast5_file.split('_')[-4] for fast5_file in fast5_files]
-    fast5_pd['mux'] = ["TRUE" if "mux_scan" in fast5_file else "FALSE" for fast5_file in fast5_files]
+    fast5_pd['mux'] = [True if "mux_scan" in fast5_file else False for fast5_file in fast5_files]
     fast5_pd['channel'] = [fast5_file.split('_')[-3] for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-2] for fast5_file in fast5_files]
 
@@ -377,25 +377,26 @@ def check_folder_status(subdir, full=True):
 
     # Set global variables RUN_RN and RUNMUX_RN
     # Should be done in the first folder, but things can crash :(
-    if RUN_RN == "" or RUNMUX_RN == "":
+    if RUN_RN == 0 or RUNMUX_RN == 0:
         for run in runs:
-            if fast5_pd[(fast5_pd['mux'] == "TRUE") & (fast5_pd['rnumber'] == run)].count() > 0:
+            # mux read as boolean, > 0
+            if sum(fast5_pd['mux']) > 0 and sum(fast5_pd['rnumber'] == run) > 0:
                 RUNMUX_RN = run
-            if fast5_pd[(fast5_pd['mux'] == "FALSE") & (fast5_pd['rnumber'] == run)].count() > 0:
+            if sum(fast5_pd['mux']) == 0 and sum(fast5_pd['rnumber'] == run) > 0:
                 RUN_RN = run
 
     # Now iterate through the two variables in the list.
     for run in [RUNMUX_RN, RUN_RN]:
         # We may have come from a restart with no RUNMUX_RN variable set, skip if so.
-        if run == "":
+        if run == 0:
             continue
 
         # Before moving the mux files we need to make sure that there is some sequencing run files in the folder
-        if len(fast5_pd.loc[(fast5_pd.mux == "FALSE")]) == 0:
+        if len(fast5_pd.loc[(fast5_pd.mux == False)]) == 0:
             continue  # No sequencing run files in the folder, skipping folder.
 
         # Move mux scan files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "TRUE")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == True)]
         fast5_to_move = fast5_to_move_pd['filename']
         print("Number of mux files to move is %s for %s" % (len(fast5_to_move), subdir))
         if len(fast5_to_move) != 0:  # Something here, let's move!!
@@ -407,7 +408,7 @@ def check_folder_status(subdir, full=True):
                                     header=True, index=False)
 
         # Move standard sequencing run files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "FALSE")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == False)]
         fast5_to_move = fast5_to_move_pd['filename']
 
         # If this is the final folder, we will move regardless of if it is full.
