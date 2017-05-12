@@ -298,7 +298,7 @@ def run_rsync_command():
     	rsync_command_options.append("--include='*_%d.tar.gz'" % RUN_RN)
     if not RUNMUX_RN == 0:
     	# Include only the tar and zipped files with the RUNMUX random number.
-    	rsync_command_options.append("--include='*_%d.tar.gz'" % RUNMUX_RN)
+    	rsync_command_options.append("--include='*_%d_mux_scan.tar.gz'" % RUNMUX_RN)
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
     rsync_command_options.append("--times")
@@ -388,7 +388,7 @@ def check_folder_status(subdir, full=True):
                 RUNMUX_RN = run
             if sum(fast5_pd['mux']) == 0 and sum(fast5_pd['rnumber'] == run) > 0:
                 RUN_RN = run
-
+    print(RUN_RN, RUNMUX_RN)
     # Now iterate through the two variables in the list.
     for run in [RUNMUX_RN, RUN_RN]:
         # We may have come from a restart with no RUNMUX_RN variable set, skip if so.
