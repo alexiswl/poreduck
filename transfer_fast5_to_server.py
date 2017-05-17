@@ -49,6 +49,8 @@ PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
 FLOWCELL = "" 
+RUNMUX_RN = 0
+RUN_RN = 0
 
 
 def main():
@@ -57,11 +59,10 @@ def main():
     set_global_variables(args)
     check_directories()
 
-    # Get rsync up and running - shouldn't be anything to sync
-    run_rsync_command()
-
     # While loop to continue tarring up folders
     create_transferring_lock_file()  # Indicator for down-the-line base callers that more data is coming!
+    # Get rsync up and running
+    run_rsync_command()
 
     while MINKNOW_RUNNING:
         # Commence transfer of fast5 files.
@@ -92,6 +93,7 @@ def create_transferring_lock_file():
     output = s.before  # Gets the `output of the send line command
     s.logout()  # Logout
 
+
 def remove_transferring_lock_file():
     s = pxssh.pxssh()
 
@@ -104,6 +106,7 @@ def remove_transferring_lock_file():
     s.prompt()  # match the prompt
     output = s.before  # Gets the `output of the send line command
     s.logout()  # Logout
+
 
 def transfer_fast5_files():
     global MINKNOW_RUNNING
@@ -151,10 +154,11 @@ def get_arguments():
                         help="If you were to ssh username@server, please type in the username bit")
     parser.add_argument("--dest_directory", type=str, required=True,
                         help="Where abouts on the server do you wish to place these files?")
-    parser.add_argument("--flowcell", type=str, required=False,
+    parser.add_argument("--flowcell", type=str, required=True,
                         help="Flowcell ID, in case you are running two separate runs at once and wish to run" +
                              "two rsync commands at a time, with each transferring different flowcell IDs" +
-                             "to different folders")
+                             "to different folders. The flowcell ID is now mandatory incase you change your" +
+                             "mind.")
     return parser.parse_args()
 
 
@@ -288,8 +292,13 @@ def run_rsync_command():
     reads_dir = READS_DIR.split("/")[-2]
     # Generate list of rsync options to be used.
     rsync_command_options = []
-    rsync_command_options.append("--remove-source-files")  # Delete the tar.gz files from the laptop.
-    rsync_command_options.append("--include='*.tar.gz'")  # Include only the tar and zipped files.
+    rsync_command_options.append("--remove-source-files")  # Delete the tar.gz files from the laptop. 
+    if not RUN_RN == 0:
+    	# Include only the tar and zipped files with the RUN random number.
+    	rsync_command_options.append("--include='*_%d.tar.gz'" % RUN_RN)
+    if not RUNMUX_RN == 0:
+    	# Include only the tar and zipped files with the RUNMUX random number.
+    	rsync_command_options.append("--include='*_%d_mux_scan.tar.gz'" % RUNMUX_RN)
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
     rsync_command_options.append("--times")
@@ -335,11 +344,17 @@ def have_a_break():
 
 
 def check_folder_status(subdir, full=True):
+    global RUNMUX_RN, RUN_RN
     # Returns the folder status, also generates a little csv file for each of the corresponding folders
     # for you take home.
     return_status = "still writing"
 
-    os.chdir(subdir)
+    try:
+        os.chdir(subdir)
+    except OSError:
+        print("Folder has been deleted by another script.")
+        return return_status
+
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5") and
                    (FLOWCELL in fast5_file or FLOWCELL == "")]
@@ -356,21 +371,36 @@ def check_folder_status(subdir, full=True):
     fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'rnumber', 'mux', 'channel', 'read_no'])
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(fast5_file)) for fast5_file in fast5_files]
-    fast5_pd['rnumber'] = [fast5_file.split('_')[-4] for fast5_file in fast5_files]
-    fast5_pd['mux'] = ["TRUE" if "mux_scan" in fast5_file else "FALSE" for fast5_file in fast5_files]
+    fast5_pd['rnumber'] = [int(fast5_file.split('_')[-4]) for fast5_file in fast5_files]
+    fast5_pd['mux'] = [True if "mux_scan" in fast5_file else False for fast5_file in fast5_files]
     fast5_pd['channel'] = [fast5_file.split('_')[-3] for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-2] for fast5_file in fast5_files]
 
     # Get list of runs in the folder.
     runs = fast5_pd['rnumber'].unique().tolist()
 
-    for run in runs:
+    # Set global variables RUN_RN and RUNMUX_RN
+    # Should be done in the first folder, but things can crash :(
+    if RUN_RN == 0 or RUNMUX_RN == 0:
+        for run in runs:
+            # mux read as boolean, > 0
+            if sum(fast5_pd['mux']) > 0 and sum(fast5_pd['rnumber'] == run) > 0:
+                RUNMUX_RN = run
+            if sum(fast5_pd['mux']) == 0 and sum(fast5_pd['rnumber'] == run) > 0:
+                RUN_RN = run
+    print(RUN_RN, RUNMUX_RN)
+    # Now iterate through the two variables in the list.
+    for run in [RUNMUX_RN, RUN_RN]:
+        # We may have come from a restart with no RUNMUX_RN variable set, skip if so.
+        if run == 0:
+            continue
+
         # Before moving the mux files we need to make sure that there is some sequencing run files in the folder
-        if len(fast5_pd.loc[(fast5_pd.mux == "FALSE")]) == 0:
+        if len(fast5_pd.loc[(fast5_pd.mux == False)]) == 0:
             continue  # No sequencing run files in the folder, skipping folder.
 
         # Move mux scan files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "TRUE")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == True)]
         fast5_to_move = fast5_to_move_pd['filename']
         print("Number of mux files to move is %s for %s" % (len(fast5_to_move), subdir))
         if len(fast5_to_move) != 0:  # Something here, let's move!!
@@ -378,18 +408,18 @@ def check_folder_status(subdir, full=True):
             is_mux = True
             return_status = "moving files"
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + "_mux" + ".csv",
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + str(run) + "_mux" + ".csv",
                                     header=True, index=False)
 
         # Move standard sequencing run files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == "FALSE")]
+        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) & (fast5_pd.mux == False)]
         fast5_to_move = fast5_to_move_pd['filename']
 
         # If this is the final folder, we will move regardless of if it is full.
         if not full:
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv")
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + str(run) + ".csv")
             continue
 
         # Otherwise we will go business as usual.
@@ -398,7 +428,7 @@ def check_folder_status(subdir, full=True):
             return_status = "moving files"
             is_mux = False
             move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + run + ".csv",
+            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2]) + "_" + str(run) + ".csv",
                                     header=True, index=False)
         
     # Check if folder is empty
@@ -429,7 +459,7 @@ def move_fast5_files(subdir, fast5_files, run, is_mux):
 
     # Create a folder in the reads directory.
     subdir = READS_DIR + standardise_int_length(subdir.split("/")[-2])
-    new_dir = subdir + "_" + run + mux
+    new_dir = subdir + "_" + str(run) + mux
     os.mkdir(new_dir)
 
     for fast5_file in fast5_files:

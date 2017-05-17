@@ -87,18 +87,22 @@ def main():
 
 def get_arguments():
     parser = argparse.ArgumentParser(
-        description="The albacore-server scaled command incorporates qsub to spread the server load and rapidly " +
-                    "generate data off the MinION.")
+        description="The albacore-server scaled command incorporates qsub to spread " +
+                    "the server load and rapidly " + "generate data off the MinION.")
     parser.add_argument("--reads_dir", type=str, required=True,
-                        help="/path/to/reads, should have a bunch of tar zipped files in it.")
+                        help="/path/to/reads, " +
+                             "should have a bunch of tar zipped files in it.")
     parser.add_argument("--config", type=str, choices=CONFIGS.keys(),
                         help="Pick a config")
     parser.add_argument("--output_dir", type=str, required=False, default=None,
-                        help="Will be called 'albacore' and sit adjacent to the reads folder if left blank.")
+                        help="Will be called 'albacore'" +
+                             " and sit adjacent to the reads folder if left blank.")
     parser.add_argument("--num_threads", type=int, required=False, default=5,
-                        help="How many threads did you wish to use per parallel output, default is 5.")
+                        help="How many threads did you wish to use " +
+                             "per parallel output default is 5.")
     parser.add_argument("--fastq_dir", type=str, required=False, default=None,
-                        help="Where should the fastq data be placed. Will be called 'fastq' " +
+                        help="Where should the fastq data be placed." +
+                             "Will be called 'fastq'" +
                              "and sit adjacent to reads folder if left blank.")
     return parser.parse_args()
 
@@ -153,14 +157,17 @@ def get_tarred_files():
                     # If the file is a zip file and
                     if tarred_file.endswith(".tar.gz")
                     # albacore folder does not already exist
-                    and not os.path.isdir(ALBACORE_DIR + tarred_file.replace(".tar.gz", ""))]
+                    and not os.path.isdir(ALBACORE_DIR +
+                                          tarred_file.replace(".tar.gz", ""))]
     return tarred_files
 
 
 def extract_tarred_read_set(tar_file):
-    # Extract the tarred reads, we currently do not delete after extraction, maybe a good idea?
+    # Extract the tarred reads, we currently do not delete after extraction...
+    # maybe a good idea?
     tar_command = "tar -xf %s" % tar_file
-    tar_proc = subprocess.Popen(tar_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    tar_proc = subprocess.Popen(tar_command, shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
     print("Output of tar command", stdout, stderr)
 
@@ -171,7 +178,8 @@ def run_albacore(tarred_read_set):
     qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.o.log"
     qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.e.log"
     output_folder = ALBACORE_DIR + folder.split("/")[-2]
-    memory_allocation = 4 + NUM_THREADS  # Number of gigabytes required for a given qsub command
+    # Number of gigabytes required for a given qsub command
+    memory_allocation = 4 + NUM_THREADS
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
@@ -182,14 +190,21 @@ def run_albacore(tarred_read_set):
                          % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
+<<<<<<< HEAD
     qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (qsub_log_file, qsub_error_file, memory_allocation)
+=======
+    qsub_command = "qsub -o %s -e %s -h_vmem %dG -S /bin/bash" % (qsub_log_file,
+                                                                  qsub_error_file,
+                                                                  memory_allocation)
+>>>>>>> 6a9a772966d1b71ff487da15e61f2245372dad91
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
     print(albacore_command)
 
     # Execute qsub command via subprocess.
-    albacore_proc = subprocess.Popen(albacore_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    albacore_proc = subprocess.Popen(albacore_command, shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     stdout, stderr = albacore_proc.communicate()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
@@ -200,7 +215,8 @@ def run_albacore(tarred_read_set):
 
 
 def get_albacore_subfolders():
-    albacore_subfolders = [ALBACORE_DIR + subfolder + "/" for subfolder in os.listdir(ALBACORE_DIR)
+    albacore_subfolders = [ALBACORE_DIR + subfolder + "/"
+                           for subfolder in os.listdir(ALBACORE_DIR)
                            if os.path.isdir(ALBACORE_DIR + subfolder)]
     return albacore_subfolders
 
@@ -213,13 +229,15 @@ def perform_fastq_extraction(albacore_folder):
     qsub_log_file = QSUB_LOG_DIR + albacore_folder + ".fastq.o.log"
     qsub_error_file = QSUB_LOG_DIR + albacore_folder + ".fastq.e.log"
 
-    poretools_command = "poretools fastq %s > %s" % (ALBACORE_DIR + albacore_folder, fastq_file)
+    poretools_command = "poretools fastq %s > %s" % (ALBACORE_DIR + albacore_folder,
+                                                     fastq_file)
     qsub_command = "echo \"%s\" | qsub -o %s -e %s -S /bin/bash" % \
                    (poretools_command, qsub_log_file, qsub_error_file)
 
     # Fastq command must not already be starting processing
     if albacore_folder not in FASTQ_QSUBJOB_BY_FOLDER:
-        qsub_proc = subprocess.Popen(qsub_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        qsub_proc = subprocess.Popen(qsub_command, shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = qsub_proc.communicate()
         # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
         # So job equal to third element of the array.
@@ -230,8 +248,9 @@ def perform_fastq_extraction(albacore_folder):
 def is_still_transferring():
     # Get list of files in dest directory.
     transferring_file = [t_file for t_file in os.listdir(PARENT_DIRECTORY)
-                         if t_file == "TRANSFERRING"]  # Lock name is called transferring.
-    # Can the file be found.
+                         # Lock name is called TRANSFERRING.
+                         if t_file == "TRANSFERRING"]
+    # Can the lock file file be found?
     if len(transferring_file) == 0:
         return False
     else:
@@ -241,7 +260,8 @@ def is_still_transferring():
 def is_job_complete(job):
     # Use qstat -u '*' to get all the jobs. We'll pass this into a pandas dataframe
     get_jobs_command = "qstat -u '*'"
-    get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
 
     # job id is the first column of each row
