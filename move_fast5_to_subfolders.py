@@ -5,6 +5,8 @@ import os  # Get file lists, check directories
 import itertools  # Iterate through fast5file and mv commands
 import subprocess  # Run mv commands
 import sys  # For exiting with errors
+import pandas as pd
+from itertools import izip
 
 # Global variables
 READS_DIR = ""
@@ -48,41 +50,20 @@ def move_fast5_files(args):
     fast5_files are sorted by their modification time
     We use the subprocess command to parallelise the set of mv commands
     """
-    # Get the set of fast5 files in a folder and sort them by their mod time.
-    fast5_files = [fast5_file for fast5_file in os.listdir(READS_DIR)
-                   if fast5_file.endswith(".fast5")]
-    fast5_files.sort(key=lambda x: os.path.getmtime(x))
+    # Create pandas dataframe with x columns.
+    fast5_df = pd.DataFrame(columns=['fast5_file', 'subfolder', 'mv_command'])
 
-    # subdirectory_list, each element a string of 4000 fast5 files.
-    subdirectory_list = []
+    fast5_df['fast5_file'] = [fast5_file for fast5_file in os.listdir(READS_DIR)]
+    fast5_df['subfolder'] = [int(i / 4000) for i in xrange(len(fast5_df))]
+    fast5_df['mv_command'] = ["mv %s %s" % (fast5_file, subfolder)
+                              for fast5_file, subfolder in izip(fast5_df.fast5_file, fast5_df.subfolder)]
 
-    # Set the first subdirectory to zero
-    subdirectory = 0
-    os.mkdir(READS_DIR + str(subdirectory))
+    subdirectories = fast5_df.subfolder.unique()
+    for subdirectory in subdirectories:
+        os.mkdir(subdirectory)
 
-    # mv_fast5_commands, almost identical to subdirectory list,
-    # but the mv and subdirectory on each end.
-    mv_fast5_commands = []
-
-    # Get list of mv commands
-    for f_index, fast5_file in itertools.izip(range(0, len(fast5_files)), fast5_files):
-        subdirectory_list[subdirectory] = subdirectory_list[subdirectory] + "," + fast5_file
-        # We've reached 4000
-        if f_index + 1 % 4000 == 0:
-            mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
-                                     + " " + str(subdirectory))
-            subdirectory += 1
-            os.mkdir(READS_DIR + str(subdirectory))
-
-        # Or we're at the last fast5 file.
-        elif f_index + 1 == len(fast5_files):
-            mv_fast5_commands.append("mv " + ' '.join(subdirectory_list[subdirectory].split(","))
-                                     + " " + str(subdirectory))
-
-    # Generate processing list
-    # Talk to the shell. Note these commands won't run just yet.
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                 for cmd in mv_fast5_commands)
+                 for cmd in fast5_df.mv_command.to_list())
 
     # We use the islice command to split our list of mv commands into five smaller lists.
     running_processes = list(itertools.islice(processes, args.num_threads))
@@ -98,7 +79,7 @@ def move_fast5_files(args):
                     del running_processes[i]  # Not a valid process.
                     break
 
-    return subdirectory_list
+    return subdirectories
 
 
 def archive_folders(args, directory_list):
