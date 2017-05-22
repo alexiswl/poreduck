@@ -116,12 +116,12 @@ def archive_folders(args, directory_list):
             if process.poll() is not None:  # Means that the process is complete!
                 stdout, stderr = process.communicate()  # Get the output of the completed process
                 if not stderr == "":
-			print stderr 
+			        print stderr
                 running_processes[i] = next(processes, None)
                 # Run the next number in the list.
                 if running_processes[i] is None:  # No more commands waiting to be processed.
                    del running_processes[i]  # Not a valid process.
-                   break 
+                   break
 
 
 def standardise_int_length(my_integer):
@@ -131,3 +131,4 @@ def standardise_int_length(my_integer):
 
 # Run the main function.
 main()
+

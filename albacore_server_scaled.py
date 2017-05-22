@@ -4,9 +4,11 @@
 This albacore script searches for tar zipped folders in a directory.
 From here, it extracts the fast5 files and runs them through the albacore basecaller.
 
-We can scale up the threads with qsub such that each of these tarred files can be run in parallel.
+We can scale up the threads with qsub such that each of these tarred files can be run in
+parallel.
 
-Each folder takes about 30 minutes to run on 10 threads. So with infinite threads and ram we could basecall everything
+Each folder takes about 30 minutes to run on 10 threads. So with infinite threads and ram
+we could basecall everything
 in half an hour!
 
 The transfer_fast5_to_server.py script places a "TRANSFERRING" lock file on the folder.
@@ -142,11 +144,7 @@ def check_directories():
    
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
-<<<<<<< HEAD
-    
-=======
-   
->>>>>>> 16cf080b28ba75326c0aa0ef5fc8ffec06e85b0f
+
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
@@ -190,13 +188,9 @@ def run_albacore(tarred_read_set):
                          % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
-<<<<<<< HEAD
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (qsub_log_file, qsub_error_file, memory_allocation)
-=======
-    qsub_command = "qsub -o %s -e %s -h_vmem %dG -S /bin/bash" % (qsub_log_file,
-                                                                  qsub_error_file,
-                                                                  memory_allocation)
->>>>>>> 6a9a772966d1b71ff487da15e61f2245372dad91
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (qsub_log_file,
+                                                                    qsub_error_file,
+                                                                    memory_allocation)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
