@@ -53,15 +53,21 @@ def move_fast5_files(args):
     # Create pandas dataframe with x columns.
     fast5_df = pd.DataFrame(columns=['fast5_file', 'subfolder', 'mv_command'])
 
-    fast5_df['fast5_file'] = [fast5_file for fast5_file in os.listdir(READS_DIR)]
+    fast5_df['fast5_file'] = [fast5_file for fast5_file in os.listdir(READS_DIR) if fast5_file.endswith(".fast5")]
     fast5_df['subfolder'] = [standardise_int_length(int(i / 4000)) for i in xrange(len(fast5_df))]
-    fast5_df['mv_command'] = ["mv %s %s" % (fast5_file, subfolder)
+    fast5_df['mv_command'] = ["mv %s %s/" % (fast5_file, subfolder)
                               for fast5_file, subfolder in izip(fast5_df.fast5_file, fast5_df.subfolder)]
 
     subdirectories = fast5_df.subfolder.unique().tolist()
     print(subdirectories)
     for subdirectory in subdirectories:
-        os.mkdir(subdirectory)
+	# Create directory
+	if os.path.isdir(subdirectory):
+		# If directory already exists, make sure nothing is inside
+		if len(os.listdir(subdirectory)) > 0:
+			sys.exit("Directory '%s' exists with files inside" % subdirectory)
+        else:
+		os.mkdir(subdirectory)
 
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                  for cmd in fast5_df.mv_command.tolist())
@@ -102,7 +108,7 @@ def archive_folders(args, directory_list):
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                                   for cmd in tar_commands)
 
-    # We use the islice command to split our  commands into five smaller lists.
+    # We use the islice command to split our commands into five smaller lists.
     running_processes = list(itertools.islice(processes, args.num_threads))
 
     while running_processes:
