@@ -11,6 +11,7 @@
       <w>qsub</w>
       <w>runmux</w>
       <w>seqid</w>
+      <w>sshpass</w>
       <w>taxid</w>
     </words>
   </dictionary>
