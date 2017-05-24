@@ -498,8 +498,8 @@ def check_folder_status(subdir, run, full=True):
 
 def get_complementary_run_id(run):
     for other_run in RUNS:
-        if other_run == run:
-            continue
+        if other_run.random == run.random:
+            continue  # Same mux id..
         if other_run.flowcell == run.flowcell \
                 and abs(other_run.start_time - run.start_time) < MUX_PROCESSING_TIME:
             # These are the same run!
@@ -509,13 +509,9 @@ def get_complementary_run_id(run):
     return None
 
 
-def is_folder_maxxed_out(subdir, num_files):
-    if subdir == "0" and num_files >= 4000:
+def is_folder_maxxed_out(num_files):
+    if num_files >= 4000:
         return True
-    elif subdir != "0" and num_files >= 4001:
-        return True
-    else:
-        return False
 
 
 def move_fast5_files(subdir, subdir_as_standard_int, fast5_files, run):
