@@ -21,6 +21,9 @@ Why? Because 'mux-reads' don't seem to count
 (so folder 0 will often have around 6000-7000 reads), and
 if a run is restarted then you will end up with at least 8000 reads in each folder.
 
+Scratch that, MinKNOW 1.6+ now generates a separate folder for each sequencing run.
+This has a minor problem in that mux scans and sequencing runs are considered separate runs.
+
 This script is designed to:
 1. Detect any 'completed' folders, those that have 4000 reads in them.
    1a. Rename this folder specific to this run so it won't be accidentally overwritten.
@@ -38,7 +41,7 @@ import argparse  # Allow users to set commandline arguments and show help
 import getpass  # Prompts user for password, just a one off to runt he script.
 from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the
                                   #  destination folder is there.
-import time  # For snoozing and for generating csv time of generation output.
+import time  # For snoozing and for adding time of generation in csv output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
 
 # Set global variables that aren't actually global,
@@ -55,9 +58,23 @@ CHECK_SUMS_FILE = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
-FLOWCELL = "" 
-RUNMUX_RN = 0
-RUN_RN = 0
+SAMPLE_NAME = ""
+RUNS = []
+MUX_PROCESSING_TIME = 600 # seconds
+
+
+class Run:
+    def __init__(self, name, flowcell, random, mux, sample_id):
+        self.name = name
+        self.flowcell = flowcell
+        self.random = random
+        self.mux = mux
+        self.sample_id = sample_id
+        date, time = name.split("_")[0:1]
+        self.start_time = time.strptime(date + time, "%Y%m%d%H%M")
+        self.dir = os.path.join(READS_DIR, name)
+        self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
+        self.csv_dir = os.path.join(READS_DIR, name, 'csv')
 
 
 def main():
@@ -74,7 +91,9 @@ def main():
 
     while MINKNOW_RUNNING:
         # Commence transfer of fast5 files.
-        transfer_fast5_files()
+        set_runs()
+        for run in RUNS:
+            transfer_fast5_files(run)
 
     # Now we need to tar up the last folder.
     # create last folder.
@@ -86,6 +105,73 @@ def main():
 
     # Remove the lock file from the server.
     remove_transferring_lock_file()
+
+
+def set_runs():
+    global RUNS
+    runs = [run for run in os.listdir(READS_DIR)
+            if os.path.isdir(os.path.join(READS_DIR, run))
+            and run.endswith(SAMPLE_NAME)]
+
+    initialised_runs = []
+    for initalised_run in RUNS:
+        initialised_runs.append(initalised_run.name)
+
+    for run in runs:
+        if run in initialised_runs:
+            continue
+
+        flowcell, random, mux = get_run_details(run)
+
+        RUNS.append(Run(run, flowcell, random, mux, SAMPLE_NAME))
+    return runs
+
+
+def get_run_details(run):
+    # Get list of files in the first directory we come across.
+    subfolders = sorted([folder for folder in os.listdir(run.fast5_dir)
+                         if os.path.isdir(run.fast5_dir, folder)
+                         and is_int(folder)])
+    # Get the first subfolder we see.
+    folder = subfolders[0]
+    subfolder_path = os.path.join(run.fast5_dir, folder)
+    subfolder_df = pd.DataFrame(columns=["filename", "flowcell", "random"])
+    fast5_files = [filename for filename in os.listdir(subfolder_path)
+                   if filename.endswith(".fast5")]
+    # We need to know where 'sequencing_run' sits in the name of the file.
+    # In order to pick out the flowcell ID.
+    # alexis_MacBookPro_20170518_FNFAF18353_MN19582_sequencing_run_...
+    # PRAWN_P28_R9p4_11874_ch162_read134_strand.fast5
+    # Or it's mux scan
+    sequencing_run_index = fast5_files[0].index("sequencing_run")
+    mux = False
+    if sequencing_run_index == -1:
+        mux = True
+        sequencing_run_index = fast5_files[0].index("mux_scan")
+
+    subfolder_df["filename"] = fast5_files
+    subfolder_df['flowcell'] = [fast5_file.split('_')[sequencing_run_index - 2]
+                                for fast5_file in fast5_files]
+    subfolder_df['random'] = [fast5_file.split('_')[-4]
+                              for fast5_file in fast5_files]
+
+    flowcell = subfolder_df['flowcell'].unique().tolist()[0]
+    random = subfolder_df['random'].unique().tolist()[0]
+
+    # Check that all of these are the same
+    if not len(subfolder_df['flowcell'].unique().tolist()) == 1 \
+        or not len(subfolder_df['random'].unique().tolist()) == 1:
+        sys.exit("Houston, it appears that one of these files is not like the others.")
+
+    return flowcell, random, mux
+
+
+def is_int(folder):
+    try:
+        int(folder)
+    except ValueError:
+        return False
+    return True
 
 
 def create_transferring_lock_file():
@@ -118,10 +204,10 @@ def remove_transferring_lock_file():
     s.logout()  # Logout
 
 
-def transfer_fast5_files():
+def transfer_fast5_files(run):
     global MINKNOW_RUNNING
     # Get list of sub-directories
-    subdirs = get_subdirs()
+    subdirs = get_subdirs(run)
     print(subdirs)
 
     # Check if MinKNOW is still running
@@ -131,13 +217,14 @@ def transfer_fast5_files():
     new_folders = False
     # For any new folders.
     for subdir in subdirs:
+        subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
         # Is folder finished?
-        folder_status = check_folder_status(subdir)
+        folder_status = check_folder_status(subdir, run=run)
         if folder_status == "still writing":
             continue
         new_folders = True
         # Tar up folder(s)
-        tar_folders(standardise_int_length(subdir.split("/")[-2]))
+        tar_folders(subdir_as_standard_int)
 
         if RSYNC_SUBPROCESS.poll() is not None:
             stdout, stderr = RSYNC_SUBPROCESS.communicate()
@@ -168,12 +255,8 @@ def get_arguments():
                              "please type in the username bit")
     parser.add_argument("--dest_directory", type=str, required=True,
                         help="Where abouts on the server do you wish to place these files?")
-    parser.add_argument("--flowcell", type=str, required=True,
-                        help="Flowcell ID, in case you are running two separate runs at " +
-                             "once and wish to run two rsync commands at a time, " +
-                             "with each transferring different flowcell IDs " +
-                             "to different folders. The flowcell ID is now mandatory " +
-                             "in case you change your mind.")
+    parser.add_argument("--sample_name", type=str, required=True,
+                        help="Sample name that you typed into MinKNOW.")
     return parser.parse_args()
 
 
@@ -186,8 +269,6 @@ def set_global_variables(args):
     PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
-    if args.flowcell is not None:
-        FLOWCELL = args.flowcell
 
 
 def get_password():
@@ -218,9 +299,10 @@ def is_minknow_still_running():
 
 def tar_up_last_folder():
     for subdir in get_subdirs():
+        subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
         # Don't worry about counting the number of files, we're finished.
         check_folder_status(subdir, full=False)
-        tar_folders(standardise_int_length(subdir.split("/")[-2]))
+        tar_folders(subdir_as_standard_int)
     # Perform final rsync command if need be:
     if RSYNC_SUBPROCESS.poll() is not None:
         stdout, stderr = RSYNC_SUBPROCESS.communicate()
@@ -316,12 +398,7 @@ def run_rsync_command():
     rsync_command_options = []
     # Delete the tar.gz files from the laptop.
     rsync_command_options.append("--remove-source-files")
-    if not RUN_RN == 0:
-        # Include only the tar and zipped files with the RUN random number.
-        rsync_command_options.append("--include='*_%d.tar.gz'" % RUN_RN)
-    if not RUNMUX_RN == 0:
-        # Include only the tar and zipped files with the RUNMUX random number.
-        rsync_command_options.append("--include='*_%d_mux_scan.tar.gz'" % RUNMUX_RN)
+    rsync_command_options.append("--include='*.tar.gz'")
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
     rsync_command_options.append("--times")
@@ -343,26 +420,15 @@ def run_rsync_command():
                                         stderr=subprocess.PIPE, shell=True)
 
 
-def get_subdirs():
-    subdirs = [READS_DIR + directory + "/" for directory in os.listdir(READS_DIR)
+def get_subdirs(run):
+    subdirs = [os.path.join(run.fast5_dir, folder)
+               for folder in os.listdir(run.fast5_dir)
                # Make sure that the subdirectory is a directory
-               if os.path.isdir(directory)
+               if os.path.isdir(os.path.join(run.fast5_dir, folder))
                # And not the tmp directory
-               and not directory == "tmp"
-               # And not our csv directory that we'll create.
-               and not directory == "csv"]
-
-    subdirs_keep = []
-    # Remove those that are not ints.
-    for subdir in subdirs: 
-        sub_int = subdir.split("/")[-2] 
-        try:
-            int(sub_int) 
-            print("%s is an int" % sub_int)
-            subdirs_keep.append(subdir)
-        except ValueError:
-            print("%s is not our folder" % subdir)
-    subdirs = subdirs_keep
+               and not folder == "tmp"
+               # And subdirectory is int
+               and is_int(folder)]
 
     # Sort subdirectories by writing time.
     return sorted(subdirs, key=os.path.getmtime)
@@ -372,18 +438,10 @@ def have_a_break():
     time.sleep(60)
 
 
-def check_folder_status(subdir, full=True):
-    global RUNMUX_RN, RUN_RN
+def check_folder_status(subdir, run, full=True):
+    subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
     # Returns the folder status, also generates a little csv file
     # for each of the corresponding folders for you take home.
-    return_status = "still writing"
-
-    try:
-        os.chdir(subdir)
-    except OSError:
-        print("Folder has been deleted by another script.")
-        return return_status
-
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5") and
                    (FLOWCELL in fast5_file or FLOWCELL == "")]
@@ -393,89 +451,39 @@ def check_folder_status(subdir, full=True):
     #       fast5 file name       - name of fast5 file
     #       Modification time - time of modification of file,
     #                           useful for deciding if run has finished.
-    #       rnumber tag       - unique to each run,
-    #                           so can pull out different runs in a file.
-    #       mux scan          - Is the run part of the mux scan
-    #                           or sequencing run? (True/False)
     #       channel           - Channel ID of the run.
     #       read number       - What number read is this.
 
-    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'rnumber', 'mux',
-                                     'channel', 'read_no'])
+    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no'])
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(fast5_file))
                          for fast5_file in fast5_files]
-    fast5_pd['rnumber'] = [int(fast5_file.split('_')[-4])
-                           for fast5_file in fast5_files]
-    fast5_pd['mux'] = [True if "mux_scan" in fast5_file else False
-                       for fast5_file in fast5_files]
     fast5_pd['channel'] = [fast5_file.split('_')[-3]
                            for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-2]
                            for fast5_file in fast5_files]
 
-    # Get list of runs in the folder.
-    runs = fast5_pd['rnumber'].unique().tolist()
+    # If this is the final folder, we will move regardless of if it is full:
+    if not full:
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + ".csv"))
+        return "moving files"
+    # Is this a folder with mux scans, if so, we'll move the files over to the
+    # actual sequencing run folder
+    if run.mux:
+        comp_run = get_complementary_run_id(run)
+        if comp_run is None:
+            # No complementary run, be patient will be there soon!
+            return "still writing"
+        run.fast5_dir = comp_run.fast5_dir
+        run.csv_dir = comp_run.csv_dir
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        return "moving files"
 
-    # Set global variables RUN_RN and RUNMUX_RN
-    # Should be done in the first folder, but things can crash :(
-    if RUN_RN == 0 or RUNMUX_RN == 0:
-        for run in runs:
-            # mux read as boolean, > 0
-            if sum(fast5_pd['mux']) > 0 and sum(fast5_pd['rnumber'] == run) > 0:
-                RUNMUX_RN = run
-            if sum(fast5_pd['mux']) == 0 and sum(fast5_pd['rnumber'] == run) > 0:
-                RUN_RN = run
-    print(RUN_RN, RUNMUX_RN)
-    # Now iterate through the two variables in the list.
-    for run in [RUNMUX_RN, RUN_RN]:
-        # We may have come from a restart with no RUNMUX_RN variable set, skip if so.
-        if run == 0:
-            continue
+    if is_folder_maxxed_out(subdir, len(fast5_pd)):
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + ".csv"))
 
-        # Before moving the mux files we need to make sure that there is
-        # some sequencing run files in the folder
-        if len(fast5_pd.loc[(fast5_pd.mux == False)]) == 0:
-            continue  # No sequencing run files in the folder, skipping folder.
-
-        # Move mux scan files for a given run
-        # Need to use vector booleans ( |, &, !) when querying
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) &
-                                        (fast5_pd.mux == True)]
-        fast5_to_move = fast5_to_move_pd['filename']
-        print("Number of mux files to move is %s for %s" % (len(fast5_to_move), subdir))
-        if len(fast5_to_move) != 0:  # Something here, let's move!!
-            print("We have mux files!")
-            is_mux = True
-            return_status = "moving files"
-            move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2])
-                                    + "_" + str(run) + "_mux" + ".csv",
-                                    header=True, index=False)
-
-        # Move standard sequencing run files for a given run
-        fast5_to_move_pd = fast5_pd.loc[(fast5_pd.rnumber == run) &
-                                        (fast5_pd.mux == False)]
-        fast5_to_move = fast5_to_move_pd['filename']
-
-        # If this is the final folder, we will move regardless of if it is full.
-        if not full:
-            is_mux = False
-            move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2])
-                                    + "_" + str(run) + ".csv")
-            continue
-
-        # Otherwise we will go business as usual.
-        # Before moving the sequencing run files, we need to ensure that the folder is full.
-        if is_folder_maxxed_out(subdir.split("/")[-2], len(fast5_to_move)):
-            return_status = "moving files"
-            is_mux = False
-            move_fast5_files(subdir, fast5_to_move, run, is_mux)
-            fast5_to_move_pd.to_csv(CSV_DIR + standardise_int_length(subdir.split("/")[-2])
-                                    + "_" + str(run) + ".csv",
-                                    header=True, index=False)
-        
     # Check if folder is empty
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5")]
@@ -485,7 +493,20 @@ def check_folder_status(subdir, full=True):
     # Return to the reads directory
     os.chdir(READS_DIR)
     # Used for if we bother trying to tar up in the next step.
-    return return_status
+    return "still writing"
+
+
+def get_complementary_run_id(run):
+    for other_run in RUNS:
+        if other_run == run:
+            continue
+        if other_run.flowcell == run.flowcell \
+                and abs(other_run.start_time - run.start_time) < MUX_PROCESSING_TIME:
+            # These are the same run!
+            return other_run
+
+    # Didn't find any?
+    return None
 
 
 def is_folder_maxxed_out(subdir, num_files):
@@ -497,16 +518,17 @@ def is_folder_maxxed_out(subdir, num_files):
         return False
 
 
-def move_fast5_files(subdir, fast5_files, run, is_mux):
+def move_fast5_files(subdir, subdir_as_standard_int, fast5_files, run):
+    subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
     if len(fast5_files) == 0:
         return
     mux = ""
-    if is_mux:
+    if run.mux:
         mux = "_mux_scan"
 
     # Create a folder in the reads directory.
-    subdir = READS_DIR + standardise_int_length(subdir.split("/")[-2])
-    new_dir = subdir + "_" + str(run) + mux
+    subdir = os.path.join(run.fast5_dir, subdir_as_standard_int)
+    new_dir = subdir + "_" + run.random + mux
     os.mkdir(new_dir)
 
     for fast5_file in fast5_files:
@@ -536,7 +558,7 @@ def tar_folders(subdir_prefix):
 def md5sum_tar_file(tar_file):
     # Change to parent directory,
     # this is so we have reads/0_12345.tar.gz in the checksums file.
-    os.chdir(PARENT_DIRECTORY)
+    os.chdir()
     print(PARENT_DIRECTORY)
     
     reads_dir = READS_DIR.split("/")[-2]
