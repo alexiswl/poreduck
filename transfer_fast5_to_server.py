@@ -53,7 +53,6 @@ SERVER_USERNAME = ""
 PASSWORD = ""
 DEST_DIRECTORY = ""
 TIMEOUT = 1800
-CSV_DIR = ""
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
@@ -315,18 +314,13 @@ def tar_up_last_folder(run):
 
 
 def check_directories():
-    global READS_DIR, CSV_DIR
+    global READS_DIR
     # Check if reads directory exists
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, reads directory, %s, does not exist" % READS_DIR)
     READS_DIR = os.path.abspath(READS_DIR) + "/"
     # We will now continue working from the reads directory.
     os.chdir(READS_DIR)
-
-    # Create CSV directory if it does not exist
-    CSV_DIR = READS_DIR + "csv/"
-    if not os.path.isdir(CSV_DIR):
-        os.mkdir(CSV_DIR)
 
     # Check if server is active using the ping command.
     ping_command = subprocess.Popen("ping -c 1 %s" % SERVER_NAME, shell=True,
@@ -483,7 +477,7 @@ def check_folder_status(subdir, run, full=True):
         # Ensure that csv directory exists
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
         return "moving files"
     # Is this a folder with mux scans, if so, we'll move the files over to the
     # actual sequencing run folder
@@ -500,15 +494,16 @@ def check_folder_status(subdir, run, full=True):
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
         # Generate csv
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + "_mux_scan" + ".csv"))
         delete_folder_if_empty(subdir)
+        return "moving files"
 
     if is_folder_maxxed_out(len(fast5_pd)):
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
         # Ensure that csv directory exists
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
         delete_folder_if_empty(subdir)
         return "moving files"
 
