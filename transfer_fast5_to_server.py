@@ -58,7 +58,7 @@ MINKNOW_RUNNING = True
 TRANSFER_LOCK_FILE = "TRANSFERRING"
 SAMPLE_NAME = ""
 RUNS = []
-MUX_PROCESSING_TIME = 600 # seconds
+MUX_PROCESSING_TIME = 600  # seconds
 
 
 class Run:
@@ -71,6 +71,7 @@ class Run:
         date, clock = name.split("_")[0:2]
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
+        self.fast5_dir_for_mux = os.path.join(READS_DIR, name, ".fast5")
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
@@ -486,7 +487,7 @@ def check_folder_status(subdir, run, full=True):
         if comp_run is None:
             # No complementary run, be patient will be there soon!
             return "still writing"
-        run.fast5_dir = comp_run.fast5_dir
+        run.fast5_dir_for_mux = comp_run.fast5_dir
         run.csv_dir = comp_run.csv_dir
         # Move fast5 files across to server.
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
@@ -546,7 +547,7 @@ def move_fast5_files(subdir, fast5_files, run):
         mux = "_mux_scan"
 
     # Create a folder in the reads directory.
-    new_dir = os.path.join(run.fast5_dir, subdir_as_standard_int) + "_" + run.random + mux
+    new_dir = os.path.join(run.fast5_dir_for_mux, subdir_as_standard_int) + "_" + run.random + mux
     os.mkdir(new_dir)
 
     for fast5_file in fast5_files:
