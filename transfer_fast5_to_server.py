@@ -238,6 +238,10 @@ def transfer_fast5_files(run):
     # Let's have a rest if no new folders have been created recently.
     if not new_folders:
         have_a_break()
+    else:
+        run_rsync_command(run)
+        copy_across_md5sum(run)
+        copy_across_csv_files(run)
 
 
 def get_arguments():
