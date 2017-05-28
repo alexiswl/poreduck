@@ -71,7 +71,7 @@ class Run:
         date, clock = name.split("_")[0:2]
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
-        self.fast5_dir_for_mux = os.path.join(READS_DIR, name, ".fast5")
+        self.fast5_dir_for_mux = os.path.join(READS_DIR, name, "fast5")
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
@@ -149,6 +149,9 @@ def get_run_details(run):
     # alexis_MacBookPro_20170518_FNFAF18353_MN19582_sequencing_run_...
     # PRAWN_P28_R9p4_11874_ch162_read134_strand.fast5
     # Or it's mux scan
+    if len(fast5_files) == 0:
+	return None, None, None
+
     try:
         sequencing_run_index = fast5_files[0].split("_").index("sequencing")
         mux = False
@@ -312,7 +315,7 @@ def tar_up_last_folder(run):
 
     run_rsync_command(run)
     while True:
-        if run.rsync_command.poll() is not None:
+        if run.rsync_proc.poll() is not None:
             break
         # Otherwise have a little rest and try again in 10 seconds.
         time.sleep(10)
