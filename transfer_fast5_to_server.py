@@ -71,7 +71,6 @@ class Run:
         date, clock = name.split("_")[0:2]
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
-        self.fast5_dir_for_mux = os.path.join(READS_DIR, name, "fast5")
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
@@ -368,9 +367,14 @@ def check_directories():
 def copy_across_md5sum(run):
     # Use the scp command to copy across the md5sum file into the
     # destination directory on the server
-    scp_command = "sshpass -p %s scp %s/checksum.md5 %s@%s:%s" % (
+    checksum_filename = "checksum.md5"
+    if run.mux:
+        checksum_filename = "checksum_mux_scan.md5"
+
+    scp_command = "sshpass -p %s scp %s/%s %s@%s:%s" % (
                                                      PASSWORD,
                                                      run.dir,
+                                                     checksum_filename,
                                                      SERVER_USERNAME,
                                                      SERVER_NAME,
                                                      DEST_DIRECTORY
@@ -494,8 +498,7 @@ def check_folder_status(subdir, run, full=True):
         if comp_run is None:
             # No complementary run, be patient will be there soon!
             return "still writing"
-        run.fast5_dir_for_mux = comp_run.fast5_dir
-        run.csv_dir = comp_run.csv_dir
+
         # Move fast5 files across to server.
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
         # Ensure that csv directory exists
@@ -554,7 +557,7 @@ def move_fast5_files(subdir, fast5_files, run):
         mux = "_mux_scan"
 
     # Create a folder in the reads directory.
-    new_dir = os.path.join(run.fast5_dir_for_mux, subdir_as_standard_int) + "_" + run.random + mux
+    new_dir = os.path.join(run.fast5_dir, subdir_as_standard_int) + "_" + run.random + mux
     os.mkdir(new_dir)
 
     for fast5_file in fast5_files:
@@ -587,10 +590,15 @@ def tar_folders(subdir_prefix, run):
 def md5sum_tar_file(tar_file, run):
     # Change to parent directory,
     # this is so we have fast5/0_12345.tar.gz in the checksums file.
+
+    checksum_filename = "checksum.md5"
+    if run.mux:
+        checksum_filename = "checksum_mux_scan.md5"
+
     os.chdir(run.dir)
     print(PARENT_DIRECTORY)
  
-    md5sum_command = "md5sum fast5/%s >> %s/checksum.md5" % (tar_file, run.dir)
+    md5sum_command = "md5sum fast5/%s >> %s/%s" % (tar_file, run.dir, checksum_filename)
     # Append the md5sum of the tar file to the list of md5sums.
     checksum_proc = subprocess.Popen(md5sum_command, shell=True,
                                      stderr=subprocess.PIPE, stdout=subprocess.PIPE)

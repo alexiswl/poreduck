@@ -33,13 +33,37 @@ CHOSEN_CONFIG = ""
 PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
-ALBACORE_QSUBJOB_BY_FOLDER = {}
-FASTQ_QSUBJOB_BY_FOLDER = {}
+SUBFOLDERS = []
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
            "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
            "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit.
+
+
+class Subfolder:
+    def __init__(self, name):
+        self.name = name
+        # Get the relative name of the tar file
+        self.tar_filename = name + ".tar.gz"
+        # Set personal directories up
+        self.reads_dir = os.path.join(READS_DIR, name)
+        self.albacore_dir = os.path.join(ALBACORE_DIR, name)
+        # Albacore related files
+        self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
+        self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
+        self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
+        self.fastq_file = name + ".fastq"
+        # Qsub related files / ids
+        self.albacore_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.o.log")
+        self.albacore_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.e.log")
+        self.albacore_jobid = -1
+        # Status related attributes
+        self.extracted = False
+        self.albacore_commenced = False
+        self.albacore_complete = False
+        self.folder_removed = False
+        self.fastq_moved = False
 
 
 def main():
@@ -51,40 +75,156 @@ def main():
 
     # While the transferring lock script exists.
     while TRANSFERRING:
-        tarred_read_sets = get_tarred_files()
+        get_subfolders()
 
-        for tarred_read_set in tarred_read_sets:
-            extract_tarred_read_set(tarred_read_set)
-            run_albacore(tarred_read_set)
+        # Have a break if no new subfolders
+        if not new_subfolders():
+            take_a_break()
+            continue
 
-        for folder, job in ALBACORE_QSUBJOB_BY_FOLDER.iteritems():
-            if is_job_complete(job):
-                perform_fastq_extraction(folder)
+        # Otherwise, extract tarballs
+        # and submit albacore job to SGE
+        for subfolder in SUBFOLDERS:
+            extract_tarred_read_set(subfolder)
+            run_albacore(subfolder)
 
+        # Check for complete jobs
+        for subfolder in SUBFOLDERS:
+            is_job_complete(subfolder)
+
+        # Once albacore is complete on a subfolder
+        # Remove folder from existence, leaving just the tarball again.
+        # Move the fastq file to FASTQ_DIR
+        for subfolder in SUBFOLDERS:
+            remove_folder(subfolder)
+            move_fastq_file(subfolder)
+
+        # Check that we're still transferring
         if not is_still_transferring():
             TRANSFERRING = False
 
-        if len(tarred_read_sets) == 0:
-            take_a_break()
-
-    # While albacore still running
+    # Transferring from laptop complete just wait for albacore
+    # to finish.
     albacore_processing = True
     while albacore_processing:
         albacore_processing = False
-        for folder, job in ALBACORE_QSUBJOB_BY_FOLDER.iteritems():
-            if not is_job_complete(job):
-                albacore_processing = True
-                continue
-            perform_fastq_extraction(folder)
+        have_break = True
 
-    # While fastq still running
-    fastq_processing = True
-    while fastq_processing:
-        fastq_processing = False
-        for folder, job in FASTQ_QSUBJOB_BY_FOLDER.iteritems():
-            if not is_job_complete(job):
-                fastq_processing = True
-                continue
+        # Check for complete jobs
+        for subfolder in SUBFOLDERS:
+            is_job_complete(subfolder)
+
+        # Still jobs in the works?
+        # If so we need to go around the loop again
+        for subfolder in SUBFOLDERS:
+            if not subfolder.albacore_complete:
+                albacore_processing = True  # basecalling still going
+            if subfolder.albacore_complete and not subfolder.fastq_moved:
+                have_break = False  # New directory completed but needs further action
+
+        # If no subfolders recently completed basecalling,
+        # have a break otherwise check for some more.
+        if have_break:
+            take_a_break()
+            continue
+
+        # Otherwise, new subfolders for removal and move fastq file
+        for subfolder in SUBFOLDERS:
+            remove_folder(subfolder)
+            move_fastq_file(subfolder)
+
+    # Merge fastq files at the end of the run.
+    merge_fastq_files()
+
+
+def new_subfolders():
+    """Any new subfolders that haven't commenced basecalling"""
+    for subfolder in SUBFOLDERS:
+        if not subfolder.albacore_commenced:
+            return True
+    return False
+
+
+def remove_folder(subfolder):
+    """ Remove subfolder, leave us just with the '.tar.gz' file"""
+
+    # Make sure that albacore has finished processing directory
+    if not subfolder.albacore_complete:
+        return
+
+    # Check the folder hasn't already been removed.
+    if subfolder.folder_removed:
+        return
+    else:  # Set this to true so that we don't try do it again!
+        subfolder.folder_removed = True
+
+    # Ensure that the tarred read set still exists
+    if not os.path.path.join(READS_DIR, subfolder.tar_filename + ".tar.gz"):
+        print("Um... the archive doesn't exist, I'm not going to delete the folder")
+        return
+
+    # Generate remove command
+    remove_command = "rm -rf %s" % os.path.join(READS_DIR, subfolder.name)
+
+    # Run remove command through subprocess
+    remove_proc = subprocess.Popen(remove_command, shell=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = remove_proc.communicate()
+    print("Output of deleting folder is", stdout, stderr)
+
+
+def move_fastq_file(subfolder):
+    """ Get the fastq file from the albacore workspace and merge into generic fastq file
+        As the fastq_file contains some weird run id info we can find using os.listdir
+        to first find the fastq file in the workspace directory.
+        Then we can move to the fastq folder and change name to subfolder.name + '.fastq'
+        We will combine all fastq files at the end.
+    """
+    # Check if this job hasn't already been completed
+    if subfolder.fastq_moved:
+        return  # Job has already been
+
+    # Get fastq files in the workspace directory
+    fastq_files = [fastq for fastq in subfolder.workspace_dir
+                   if fastq.endswith(".fastq")]
+    if len(fastq_files) > 1:
+        print("It seems like we have more than 1 file here", fastq_files)
+
+    fastq_file_index = 0
+    for fastq_file in fastq_files:
+        # Rename fastq to have a .0.fastq at the start
+        subfolder.fastq_file = subfolder.fastq_file.replace(".fastq", "") + str(fastq_file_index) + ".fastq"
+        # We will move and rename but make sure we're not overwriting anything
+        if os.path.isfile(subfolder.fastq_file):
+            fastq_file_index += 1
+            print("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
+            subfolder.fastq_file = subfolder.fastq_file.replace(".fastq", "") + str(fastq_file_index) + ".fastq"
+        # Create move command and run through subproces.
+        move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
+                                     os.path.join(FASTQ_DIR, subfolder.fastq_file))
+        move_proc = subprocess.Popen(move_command, shell=True,
+                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        stdout, stderr = move_proc.communicate()
+        if not stdout == "" or not stderr == "":
+            print("Output of mv command is:", stdout, stderr)
+
+    # Set as complete so we don't have to do it again.
+    subfolder.fastq_moved = True
+
+
+def merge_fastq_files():
+    """ Merge all of the fastq files in the fastq directory to all.fastq"""
+    concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
+    fastq_files = [os.path.join(FASTQ_DIR, fastq) for fastq in os.listdir(FASTQ_DIR)
+                   if fastq.endswith(".fastq") and not fastq == "all.fastq"]
+
+    for fastq_file in fastq_files:
+        concat_command = "cat %s >> %s" % (fastq_file, concatenated_fastq_file)
+        concat_proc = subprocess.Popen(concat_command, shell=True,
+                                       stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        stdout, stderr = concat_proc.communicate()
+        if not stdout == "" or not stderr == "":
+            print("Output of cat command is:", stdout, stderr)
 
 
 def get_arguments():
@@ -149,33 +289,54 @@ def check_directories():
         os.mkdir(FASTQ_DIR)
 
 
-def get_tarred_files():
-    # Get the tarred files, note, must not be already be being base called, vicious cycle!
-    tarred_files = [READS_DIR + tarred_file for tarred_file in os.listdir(READS_DIR)
-                    # If the file is a zip file and
-                    if tarred_file.endswith(".tar.gz")
-                    # albacore folder does not already exist
-                    and not os.path.isdir(ALBACORE_DIR +
-                                          tarred_file.replace(".tar.gz", ""))]
-    return tarred_files
+def get_subfolders():
+    """ New subfolders will emerge to the directory as tarballs.
+        Get a list of new tarballs then append them to the SUBFOLDERS
+        list
+    """
+    global SUBFOLDERS
+    # Get a list of tarballs
+    subfolders = [tarred_folder.replace(".tar.gz", "") for tarred_folder
+                  in os.listdir(READS_DIR) if tarred_folder.endswith(".tar.gz")]
+    for subfolder in subfolders:
+        is_initialised = False
+        for initialised_subfolder in SUBFOLDERS:
+            if subfolder == initialised_subfolder.name:
+                is_initialised = True
+                break
+        if not is_initialised:
+            SUBFOLDERS.append(Subfolder(subfolder))
 
 
-def extract_tarred_read_set(tar_file):
+def extract_tarred_read_set(subfolder):
     # Extract the tarred reads, we currently do not delete after extraction...
     # maybe a good idea?
-    tar_command = "tar -xf %s" % tar_file
+
+    # Has the dataset already been extracted?
+    if subfolder.extracted:
+        return
+    else:
+        subfolder.extracted = True  # It has been extracted now.
+
+    tar_command = "tar -xf %s" % os.path.join(READS_DIR, subfolder.tar_filename)
     tar_proc = subprocess.Popen(tar_command, shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
-    print("Output of tar command", stdout, stderr)
+    if not stdout == "" or not stderr == "":
+        print("Output of tar command", stdout, stderr, subfolder.name)
 
 
-def run_albacore(tarred_read_set):
-    # Combine albacore and qsub commands together to be run on one line.
-    folder = tarred_read_set.replace(".tar.gz", "/")
-    qsub_log_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.o.log"
-    qsub_error_file = QSUB_LOG_DIR + folder.split("/")[-2] + "albacore.e.log"
-    output_folder = ALBACORE_DIR + folder.split("/")[-2]
+def run_albacore(subfolder):
+    """ Generate read_fast5_basecaller command
+        And qsub command and pipe former into latter
+        This function also sets the jobid of a given folder.
+    """
+    if subfolder.albacore_commenced:
+        return   # Basecalling has already commenced on this directory
+    else:
+        # Commence basecalling on this directory
+        subfolder.albacore_commenced = True
+
     # Number of gigabytes required for a given qsub command
     memory_allocation = 4 + NUM_THREADS
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
@@ -185,15 +346,15 @@ def run_albacore(tarred_read_set):
                          "--worker_threads %s " \
                          "--save_path %s " \
                          "--config %s" \
-                         % (folder, NUM_THREADS, output_folder, CHOSEN_CONFIG)
+                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_CONFIG)
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (qsub_log_file,
-                                                                    qsub_error_file,
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (subfolder.albacore_qsub_output_log,
+                                                                    subfolder.albacore_qsub_error_log,
                                                                     memory_allocation)
 
     # Put these all together into one grand command
-    albacore_command = "echo \"%s\" | %s " % (basecaller_command, qsub_command)
+    albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
     print(albacore_command)
 
     # Execute qsub command via subprocess.
@@ -204,43 +365,15 @@ def run_albacore(tarred_read_set):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr) 
-    ALBACORE_QSUBJOB_BY_FOLDER[folder.split("/")[-2]] = stdout.rstrip().split()[2]
+    subfolder.albacore_jobid = stdout.rstrip().split()[2]
     print("Output of albacore_proc", stdout, stderr)
 
 
-def get_albacore_subfolders():
-    albacore_subfolders = [ALBACORE_DIR + subfolder + "/"
-                           for subfolder in os.listdir(ALBACORE_DIR)
-                           if os.path.isdir(ALBACORE_DIR + subfolder)]
-    return albacore_subfolders
-
-
-def perform_fastq_extraction(albacore_folder):
-    # If the albacore job has completed.
-    # Use subprocess to run the fastq extraction on the folder.
-
-    fastq_file = FASTQ_DIR + albacore_folder + ".fastq"
-    qsub_log_file = QSUB_LOG_DIR + albacore_folder + ".fastq.o.log"
-    qsub_error_file = QSUB_LOG_DIR + albacore_folder + ".fastq.e.log"
-
-    poretools_command = "poretools fastq %s > %s" % (ALBACORE_DIR + albacore_folder,
-                                                     fastq_file)
-    qsub_command = "echo \"%s\" | qsub -o %s -e %s -S /bin/bash" % \
-                   (poretools_command, qsub_log_file, qsub_error_file)
-
-    # Fastq command must not already be starting processing
-    if albacore_folder not in FASTQ_QSUBJOB_BY_FOLDER:
-        qsub_proc = subprocess.Popen(qsub_command, shell=True,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = qsub_proc.communicate()
-        # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
-        # So job equal to third element of the array.
-        FASTQ_QSUBJOB_BY_FOLDER[albacore_folder] = stdout.rstrip().split()[2]
-        print("Output of fastq command for ", albacore_folder, stdout, stderr)
-
-
 def is_still_transferring():
-    # Get list of files in dest directory.
+    """ Is data still coming from the laptop.
+        Get list of files in the destination directory
+        and if any of them are called TRANSFERRING then the answer is yes!
+    """
     transferring_file = [t_file for t_file in os.listdir(PARENT_DIRECTORY)
                          # Lock name is called TRANSFERRING.
                          if t_file == "TRANSFERRING"]
@@ -251,8 +384,14 @@ def is_still_transferring():
         return True
 
 
-def is_job_complete(job):
-    # Use qstat -u '*' to get all the jobs. We'll pass this into a pandas dataframe
+def is_job_complete(subfolder):
+    """ Use qstat -u '*' to get all the jobs.
+        We then split by \n, if any are equal to the job id assigned to the folder
+        then set albacore_complete attribute to true"""
+    if subfolder.albacore_complete:
+        return  # Albacore has already been set to complete.
+
+    # Run and get output of qstat -u command
     get_jobs_command = "qstat -u '*'"
     get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -263,11 +402,11 @@ def is_job_complete(job):
     for line in get_jobs_output.split("\n"):
         # Now split by space.
         first_column = line.split()[0]
-        if first_column == job:
-            return False  # Job still in queue
+        if first_column == subfolder.albacore_jobid:
+            return  # Job still in queue
 
     # Otherwise we haven't found the job so it must be complete
-    return True
+    subfolder.albacore_complete = True
 
 
 def take_a_break():
