@@ -293,7 +293,7 @@ def pick_up_from_previous_run():
             SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
             SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
             SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
-            # Now make sure none of the jobs have failed
+            # Now make sure none of the jobs have failed and reset if so
             if has_failed(SUBFOLDERS[subfolder].albacore_jobid):
                 SUBFOLDERS[subfolder].albacore_submitted = False
                 SUBFOLDERS[subfolder].albacore_commenced = False
