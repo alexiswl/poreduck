@@ -220,7 +220,7 @@ def get_arguments():
                              "Will be called 'fastq'" +
                              "and sit adjacent to reads folder if left blank.")
     parser.add_argument("--resume", type=str, required=False, default=None,
-                        help="Resume the albacore run, need a S_
+                        help="Resume the albacore run, need a csv file")
 
 
 def set_global_variables(args):
