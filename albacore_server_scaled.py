@@ -279,7 +279,7 @@ def extract_tarred_read_set(subfolder):
     else:
         subfolder.extracted_commenced = True
 
-    tar_command = "tar -xf %s" % os.path.join(READS_DIR, subfolder.tar_filename)
+    tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
     qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s" % (subfolder.extracted_qsub_output_log,
                                                              subfolder.extracted_qsub_error_log,
                                                              PARENT_DIRECTORY)
