@@ -83,21 +83,25 @@ def main():
             continue
 
         # Otherwise, extract tarballs
-        # and submit albacore job to SGE
-        for subfolder in SUBFOLDERS:
-            extract_tarred_read_set(subfolder)
-            run_albacore(subfolder)
+        [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
+         if not subfolder.extracted]
+
+        # Now run albacore
+        [run_albacore(subfolder) for subfolder in SUBFOLDERS
+         if not subfolder.albacore_commenced]
 
         # Check for complete jobs
-        for subfolder in SUBFOLDERS:
-            is_job_complete(subfolder)
+        [is_job_complete(subfolder) for subfolder in SUBFOLDERS
+         if not subfolder.albacore_complete]
 
         # Once albacore is complete on a subfolder
         # Remove folder from existence, leaving just the tarball again.
-        # Move the fastq file to FASTQ_DIR
-        for subfolder in SUBFOLDERS:
-            remove_folder(subfolder)
-            move_fastq_file(subfolder)
+        [remove_folder(subfolder) for subfolder in SUBFOLDERS
+         if subfolder.albacore_complete and not subfolder.folder_removed]
+
+        # Move the fastq file to the FASTQ_DIR
+        [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
+         if subfolder.albacore_complete and not subfolder.fastq_moved]
 
         # Check that we're still transferring
         if not is_still_transferring():
@@ -111,27 +115,34 @@ def main():
         have_break = True
 
         # Check for complete jobs
-        for subfolder in SUBFOLDERS:
-            is_job_complete(subfolder)
+        [is_job_complete(subfolder) for subfolder in SUBFOLDERS
+         if not subfolder.albacore_complete]
 
         # Still jobs in the works?
         # If so we need to go around the loop again
-        for subfolder in SUBFOLDERS:
-            if not subfolder.albacore_complete:
-                albacore_processing = True  # basecalling still going
-            if subfolder.albacore_complete and not subfolder.fastq_moved:
-                have_break = False  # New directory completed but needs further action
+        if len([subfolder for subfolder in SUBFOLDERS
+                if not subfolder.albacore_complete]) > 0:
+            albacore_processing = True  # basecalling still going
 
-        # If no subfolders recently completed basecalling,
+        # Remove any folders of completed jobs.
+        # Set have a break to be false if we find any subfolders to do this for
+        if len([remove_folder(subfolder) for subfolder in SUBFOLDERS
+                if subfolder.albacore_complete and not
+                subfolder.folder_removed]) > 0:
+            have_break = False
+
+        # Move fastq files of any completed jobs.
+        # Set have a break to be false if we find any subfolders to do this for
+        if len([move_fastq_file(subfolder) for subfolder in SUBFOLDERS
+                if subfolder.albacore_complete and not
+                subfolder.fastq_moved]) > 0:
+            have_break = False
+
+        # If no subfolders recently completed basecalling
         # have a break otherwise check for some more.
         if have_break:
             take_a_break()
             continue
-
-        # Otherwise, new subfolders for removal and move fastq file
-        for subfolder in SUBFOLDERS:
-            remove_folder(subfolder)
-            move_fastq_file(subfolder)
 
     # Merge fastq files at the end of the run.
     merge_fastq_files()
@@ -159,7 +170,7 @@ def remove_folder(subfolder):
         subfolder.folder_removed = True
 
     # Ensure that the tarred read set still exists
-    if not os.path.path.join(READS_DIR, subfolder.tar_filename + ".tar.gz"):
+    if not os.path.join(READS_DIR, subfolder.tar_filename + ".tar.gz"):
         print("Um... the archive doesn't exist, I'm not going to delete the folder")
         return
 
@@ -366,7 +377,6 @@ def run_albacore(subfolder):
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr) 
     subfolder.albacore_jobid = stdout.rstrip().split()[2]
-    print("Output of albacore_proc", stdout, stderr)
 
 
 def is_still_transferring():
@@ -399,7 +409,7 @@ def is_job_complete(subfolder):
 
     # job id is the first column of each row
     #  120882 0.55500 supernova  user...
-    for line in get_jobs_output.split("\n"):
+    for line in get_jobs_output.split("\n")[:-1]:
         # Now split by space.
         first_column = line.split()[0]
         if first_column == subfolder.albacore_jobid:
