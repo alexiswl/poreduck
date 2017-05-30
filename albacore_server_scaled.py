@@ -35,8 +35,7 @@ PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
-STATUS_DF = pd.DataFrame(columns=['name', 'extracted', 'albacore_commenced',
-                                  'albacore_complete', 'folder_removed', 'fastq_moved'])
+STATUS_DF = None
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
@@ -58,20 +57,47 @@ class Subfolder:
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
         self.fastq_file = name + ".fastq"
         # Qsub related files / ids
+        self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
+        self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
+        self.extracted_jobid = -1
         self.albacore_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.o.log")
         self.albacore_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.e.log")
         self.albacore_jobid = -1
         # Status related attributes
-        self.extracted = False
+        self.extracted_commenced = False
+        self.extracted_complete = False
         self.albacore_commenced = False
         self.albacore_complete = False
         self.folder_removed = False
         self.fastq_moved = False
 
     def to_series(self):
-        return pd.Series(data=[self.name, self.extracted,
+        return pd.Series(data=[self.name,
+                               self.extracted_commenced, self.extracted_complete,
                                self.albacore_commenced, self.albacore_complete,
                                self.folder_removed, self.fastq_moved])
+
+    def check_albacore_job_status(self):
+        get_jobs_command = "qstat -j %s" % self.albacore_jobid
+        get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
+
+        # If job doesn't exist error message comes up then the job is complete!
+        if get_jobs_output == "" and not get_jobs_stderr == "":
+            self.albacore_complete = True
+            generate_dataframe()
+
+    def check_extraction_job_status(self):
+        get_jobs_command = "qstat -j %s" % self.extracted_jobid
+        get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
+
+        # If job doesn't exist error message comes up then the job is complete!
+        if get_jobs_output == "" and not get_jobs_stderr == "":
+            self.extracted_complete = True
+            generate_dataframe()
 
 
 def main():
@@ -98,9 +124,15 @@ def main():
         [run_albacore(subfolder) for subfolder in SUBFOLDERS
          if not subfolder.albacore_commenced]
 
-        # Check for complete jobs
-        [is_job_complete(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.albacore_complete]
+        # Check for complete extraction jobs
+        [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
+         if subfolder.albacore_commenced and
+         not subfolder.albacore_complete]
+
+        # Check for complete albacore jobs
+        [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
+         if subfolder.albacore_commenced and
+         not subfolder.albacore_complete]
 
         # Once albacore is complete on a subfolder
         # Remove folder from existence, leaving just the tarball again.
@@ -123,8 +155,9 @@ def main():
         have_break = True
 
         # Check for complete jobs
-        [is_job_complete(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.albacore_complete]
+        [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
+         if subfolder.albacore_commenced and
+         not subfolder.albacore_complete]
 
         # Still jobs in the works?
         # If so we need to go around the loop again
@@ -156,23 +189,158 @@ def main():
     merge_fastq_files()
 
 
-def generate_dataframe():
-    global STATUS_DF
-    STATUS_DF = pd.DataFrame(columns=['name', 'extracted',
-                                      'albacore_commenced', 'albacore_complete',
-                                      'folder_removed', 'fastq_moved'])
-    for subfolder in SUBFOLDERS:
-        STATUS_DF.append(subfolder.to_series())
-
-    STATUS_DF.to_csv(file="status.csv", index=False)
+"""
+General script initialisation functions
+1. get_arguments
+2. set_global_variables
+3. check_directories
+"""
 
 
-def new_subfolders():
-    """Any new subfolders that haven't commenced basecalling"""
-    for subfolder in SUBFOLDERS:
-        if not subfolder.albacore_commenced:
-            return True
-    return False
+def get_arguments():
+    parser = argparse.ArgumentParser(
+        description="The albacore-server scaled command incorporates qsub to spread " +
+                    "the server load and rapidly " + "generate data off the MinION.")
+    parser.add_argument("--reads_dir", type=str, required=True,
+                        help="/path/to/reads, " +
+                             "should have a bunch of tar zipped files in it.")
+    parser.add_argument("--config", type=str, choices=CONFIGS.keys(),
+                        help="Pick a config")
+    parser.add_argument("--output_dir", type=str, required=False, default=None,
+                        help="Will be called 'albacore'" +
+                             " and sit adjacent to the reads folder if left blank.")
+    parser.add_argument("--num_threads", type=int, required=False, default=5,
+                        help="How many threads did you wish to use " +
+                             "per parallel output default is 5.")
+    parser.add_argument("--fastq_dir", type=str, required=False, default=None,
+                        help="Where should the fastq data be placed." +
+                             "Will be called 'fastq'" +
+                             "and sit adjacent to reads folder if left blank.")
+    return parser.parse_args()
+
+
+def set_global_variables(args):
+    # Global variables
+    global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
+    READS_DIR = args.reads_dir
+    if args.output_dir is not None:
+        ALBACORE_DIR = args.output_dir
+    CHOSEN_CONFIG = CONFIGS[args.config]
+    NUM_THREADS = args.num_threads
+    if args.fastq_dir is not None:
+        FASTQ_DIR = args.fastq_dir
+
+
+def check_directories():
+    # Make sure the directories exist, change to reads directory,
+    # Create any other necessary directories for the script to run.
+    global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
+    if not os.path.isdir(READS_DIR):
+        sys.exit("Error, %s does not exist" % READS_DIR)
+
+    READS_DIR = os.path.abspath(READS_DIR) + "/"
+    os.chdir(READS_DIR)
+
+    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir)) + "/"
+
+    if ALBACORE_DIR == "":
+        ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
+    if not os.path.isdir(ALBACORE_DIR):
+        os.mkdir(ALBACORE_DIR)
+
+    QSUB_LOG_DIR = PARENT_DIRECTORY + "qsub_log/"
+    if not os.path.isdir(QSUB_LOG_DIR):
+        os.mkdir(QSUB_LOG_DIR)
+   
+    if FASTQ_DIR == "":
+        FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+
+    if not os.path.isdir(FASTQ_DIR):
+        os.mkdir(FASTQ_DIR)
+
+
+"""
+Pipeline functions:
+1. extract_tarred_read_set
+2. run_albacore
+3. remove_folder
+4. move_fastq_file
+5. merge_fastq_files
+"""
+
+
+def extract_tarred_read_set(subfolder):
+    # Extract the tarred reads, we currently do not delete after extraction...
+    # maybe a good idea?
+
+    # Has the dataset already been set for extraction?
+    if subfolder.extracted_commenced:
+        return
+    else:
+        subfolder.extracted_commenced = True
+
+    tar_command = "tar -xf %s" % os.path.join(READS_DIR, subfolder.tar_filename)
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s" % (subfolder.extracted_qsub_output_log,
+                                                             subfolder.extracted_qsub_error_log,
+                                                             PARENT_DIRECTORY)
+    tar_proc = subprocess.Popen("echo \"%s\" | %s" % (tar_command, qsub_command), shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = tar_proc.communicate()
+
+    # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
+    # So job equal to third element of the array.
+    print("Output of extraction command", stdout, stderr)
+    subfolder.extracted_jobid = stdout.rstrip().split()[2]
+    generate_dataframe()
+
+
+def run_albacore(subfolder):
+    """ Generate read_fast5_basecaller command
+        And qsub command and pipe former into latter
+        This function also sets the jobid of a given folder.
+    """
+    if subfolder.albacore_commenced:
+        return   # Basecalling has already commenced on this directory
+    else:
+        # Commence basecalling on this directory
+        subfolder.albacore_commenced = True
+
+    # Number of gigabytes required for a given qsub command
+    memory_allocation = 4 + NUM_THREADS
+    # The read_fast5_basecaller is the algorithm that does the actual base calling,
+    # what would be run if we just had Ubuntu.
+    basecaller_command = "read_fast5_basecaller.py " \
+                         "--input %s " \
+                         "--worker_threads %s " \
+                         "--save_path %s " \
+                         "--config %s" \
+                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_CONFIG)
+
+    # These are both parsed into qsub which then determines what to do with it all.
+    qsub_command = "qsub " \
+                   "-o %s " \
+                   "-e %s " \
+                   "-S /bin/bash " \
+                   "-l h_vmem=%dG " \
+                   "-wd %s" \
+                   "-W depend=afterok:%d" \
+                   % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
+                      memory_allocation, PARENT_DIRECTORY, subfolder.extracted_jobid)
+
+    # Put these all together into one grand command
+    albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
+    print(albacore_command)
+
+    # Execute qsub command via subprocess.
+    albacore_proc = subprocess.Popen(albacore_command, shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    stdout, stderr = albacore_proc.communicate()
+    # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
+    # So job equal to third element of the array.
+    print("Output of albacore command", stdout, stderr) 
+    subfolder.albacore_jobid = stdout.rstrip().split()[2]
+    generate_dataframe()
 
 
 def remove_folder(subfolder):
@@ -259,66 +427,14 @@ def merge_fastq_files():
             print("Output of cat command is:", stdout, stderr)
 
 
-def get_arguments():
-    parser = argparse.ArgumentParser(
-        description="The albacore-server scaled command incorporates qsub to spread " +
-                    "the server load and rapidly " + "generate data off the MinION.")
-    parser.add_argument("--reads_dir", type=str, required=True,
-                        help="/path/to/reads, " +
-                             "should have a bunch of tar zipped files in it.")
-    parser.add_argument("--config", type=str, choices=CONFIGS.keys(),
-                        help="Pick a config")
-    parser.add_argument("--output_dir", type=str, required=False, default=None,
-                        help="Will be called 'albacore'" +
-                             " and sit adjacent to the reads folder if left blank.")
-    parser.add_argument("--num_threads", type=int, required=False, default=5,
-                        help="How many threads did you wish to use " +
-                             "per parallel output default is 5.")
-    parser.add_argument("--fastq_dir", type=str, required=False, default=None,
-                        help="Where should the fastq data be placed." +
-                             "Will be called 'fastq'" +
-                             "and sit adjacent to reads folder if left blank.")
-    return parser.parse_args()
-
-
-def set_global_variables(args):
-    # Global variables
-    global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    READS_DIR = args.reads_dir
-    if args.output_dir is not None:
-        ALBACORE_DIR = args.output_dir
-    CHOSEN_CONFIG = CONFIGS[args.config]
-    NUM_THREADS = args.num_threads
-    if args.fastq_dir is not None:
-        FASTQ_DIR = args.fastq_dir
-
-
-def check_directories():
-    # Make sure the directories exist, change to reads directory,
-    # Create any other necessary directories for the script to run.
-    global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
-    if not os.path.isdir(READS_DIR):
-        sys.exit("Error, %s does not exist" % READS_DIR)
-
-    READS_DIR = os.path.abspath(READS_DIR) + "/"
-    os.chdir(READS_DIR)
-
-    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir)) + "/"
-
-    if ALBACORE_DIR == "":
-        ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
-    if not os.path.isdir(ALBACORE_DIR):
-        os.mkdir(ALBACORE_DIR)
-
-    QSUB_LOG_DIR = PARENT_DIRECTORY + "qsub_log/"
-    if not os.path.isdir(QSUB_LOG_DIR):
-        os.mkdir(QSUB_LOG_DIR)
-   
-    if FASTQ_DIR == "":
-        FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
-
-    if not os.path.isdir(FASTQ_DIR):
-        os.mkdir(FASTQ_DIR)
+"""
+Miscellaneous pipeline non-core functions
+1. get_subfolders
+2. is_still_transferring
+3. take_a_break
+4. generate_dataframe
+5. new_directories
+"""
 
 
 def get_subfolders():
@@ -340,68 +456,6 @@ def get_subfolders():
             SUBFOLDERS.append(Subfolder(subfolder))
 
 
-def extract_tarred_read_set(subfolder):
-    # Extract the tarred reads, we currently do not delete after extraction...
-    # maybe a good idea?
-
-    # Has the dataset already been extracted?
-    if subfolder.extracted:
-        return
-    else:
-        subfolder.extracted = True  # It has been extracted now.
-
-    tar_command = "tar -xf %s" % os.path.join(READS_DIR, subfolder.tar_filename)
-    tar_proc = subprocess.Popen(tar_command, shell=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = tar_proc.communicate()
-    if not stdout == "" or not stderr == "":
-        print("Output of tar command", stdout, stderr, subfolder.name)
-    generate_dataframe()
-
-
-def run_albacore(subfolder):
-    """ Generate read_fast5_basecaller command
-        And qsub command and pipe former into latter
-        This function also sets the jobid of a given folder.
-    """
-    if subfolder.albacore_commenced:
-        return   # Basecalling has already commenced on this directory
-    else:
-        # Commence basecalling on this directory
-        subfolder.albacore_commenced = True
-
-    # Number of gigabytes required for a given qsub command
-    memory_allocation = 4 + NUM_THREADS
-    # The read_fast5_basecaller is the algorithm that does the actual base calling,
-    # what would be run if we just had Ubuntu.
-    basecaller_command = "read_fast5_basecaller.py " \
-                         "--input %s " \
-                         "--worker_threads %s " \
-                         "--save_path %s " \
-                         "--config %s" \
-                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_CONFIG)
-
-    # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -l h_vmem=%dG" % (subfolder.albacore_qsub_output_log,
-                                                                    subfolder.albacore_qsub_error_log,
-                                                                    memory_allocation)
-
-    # Put these all together into one grand command
-    albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
-    print(albacore_command)
-
-    # Execute qsub command via subprocess.
-    albacore_proc = subprocess.Popen(albacore_command, shell=True,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    stdout, stderr = albacore_proc.communicate()
-    # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
-    # So job equal to third element of the array.
-    print("Output of albacore command", stdout, stderr) 
-    subfolder.albacore_jobid = stdout.rstrip().split()[2]
-    generate_dataframe()
-
-
 def is_still_transferring():
     """ Is data still coming from the laptop.
         Get list of files in the destination directory
@@ -417,33 +471,28 @@ def is_still_transferring():
         return True
 
 
-def is_job_complete(subfolder):
-    """ Use qstat -u '*' to get all the jobs.
-        We then split by \n, if any are equal to the job id assigned to the folder
-        then set albacore_complete attribute to true"""
-    if subfolder.albacore_complete:
-        return  # Albacore has already been set to complete.
-
-    # Run and get output of qstat -u command
-    get_jobs_command = "qstat -u '*'"
-    get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
-
-    # job id is the first column of each row
-    #  120882 0.55500 supernova  user...
-    for line in get_jobs_output.split("\n")[:-1]:
-        # Now split by space.
-        first_column = line.split()[0]
-        if first_column == subfolder.albacore_jobid:
-            return  # Job still in queue
-
-    # Otherwise we haven't found the job so it must be complete
-    subfolder.albacore_complete = True
-
-
 def take_a_break():
     time.sleep(60)
+
+
+def generate_dataframe():
+    global STATUS_DF
+    STATUS_DF = pd.DataFrame(columns=['name',
+                                      'extracted_commenced', 'extracted_complete'
+                                      'albacore_commenced', 'albacore_complete',
+                                      'folder_removed', 'fastq_moved'])
+    for subfolder in SUBFOLDERS:
+        STATUS_DF.append(subfolder.to_series())
+
+    STATUS_DF.to_csv(file="status.csv", index=False)
+
+
+def new_subfolders():
+    """Any new subfolders that haven't commenced basecalling"""
+    for subfolder in SUBFOLDERS:
+        if not subfolder.albacore_commenced:
+            return True
+    return False
 
 
 main()
