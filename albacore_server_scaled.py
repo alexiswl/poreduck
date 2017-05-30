@@ -75,7 +75,10 @@ class Subfolder:
         return pd.Series(data=[self.name,
                                str(self.extracted_commenced), str(self.extracted_complete),
                                str(self.albacore_commenced), str(self.albacore_complete),
-                               str(self.folder_removed), str(self.fastq_moved)])
+                               str(self.folder_removed), str(self.fastq_moved)],
+			 index=['name', 'extracted_commenced', 'extracted_complete',
+                                'albacore_commenced', 'albacore_complete',
+                                'folder_removed', 'fastq_moved'])
 
     def check_albacore_job_status(self):
         get_jobs_command = "qstat -j %s" % self.albacore_jobid
@@ -127,7 +130,7 @@ def main():
 
         # Now run albacore
         [run_albacore(subfolder) for subfolder in SUBFOLDERS
-         if subfolder.extraction_complete and 
+         if subfolder.extracted_complete and 
          not subfolder.albacore_commenced] 
 
         # Check for complete albacore jobs
