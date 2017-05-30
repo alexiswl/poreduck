@@ -37,9 +37,11 @@ FASTQ_DIR = ""
 SUBFOLDERS = []
 STATUS_CSV = ""
 STATUS_DF = None
-STATUS_STANDARD_COLUMNS = ['name', 'extracted_commenced', 'extracted_jobid',
-                           'extracted_complete', 'albacore_commenced', 'albacore_jobid',
-                           'albacore_complete', 'folder_removed', 'fastq_moved']
+STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
+                           'extracted_commenced', 'extracted_complete',
+                           'albacore_submitted', 'albacore_jobid',
+                           'albacore_commenced', 'albacore_complete',
+                           'folder_removed', 'fastq_moved']
 
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
@@ -69,8 +71,10 @@ class Subfolder:
         self.albacore_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.e.log")
         self.albacore_jobid = -1
         # Status related attributes
+        self.extracted_submitted = False
         self.extracted_commenced = False
         self.extracted_complete = False
+        self.albacore_submitted = False
         self.albacore_commenced = False
         self.albacore_complete = False
         self.folder_removed = False
@@ -78,35 +82,29 @@ class Subfolder:
 
     def to_series(self):
         return pd.Series(data=[self.name,
-                               str(self.extracted_commenced), self.extracted_jobid
+                               str(self.extracted_commenced), self.extracted_jobid,
                                str(self.extracted_complete),
-                               str(self.albacore_commenced), 
-			       self.albacore_jobid, 
+                               str(self.albacore_commenced),
+                               self.albacore_jobid,
                                str(self.albacore_complete),
                                str(self.folder_removed), str(self.fastq_moved)],
-                         index=STATUS_STANDARD_COLUMNS 
-                        )
+                         index=STATUS_STANDARD_COLUMNS
+                         )
 
     def check_albacore_job_status(self):
-        get_jobs_command = "qstat -j %s" % self.albacore_jobid
-        get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
-                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
-
-        # If job doesn't exist error message comes up then the job is complete!
-        if get_jobs_output == "" and not get_jobs_stderr == "":
+        if has_commenced(self.albacore_jobid):
+            self.albacore_commenced = True
+            generate_dataframe()
+        if has_completed(self.albacore_jobid):
             self.albacore_complete = True
             generate_dataframe()
 
     def check_extraction_job_status(self):
-        get_jobs_command = "qstat -j %s" % self.extracted_jobid
-        get_jobs_proc = subprocess.Popen(get_jobs_command, shell=True,
-                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        get_jobs_output, get_jobs_stderr = get_jobs_proc.communicate()
-
-        # If job doesn't exist error message comes up then the job is complete!
-        if get_jobs_output == "" and not get_jobs_stderr == "":
-            self.extracted_complete = True
+        if has_commenced(self.extracted_jobid):
+            self.extracted_commenced = True
+            generate_dataframe()
+        if has_completed(self.extracted_jobid):
+            self.extracted_complete
             generate_dataframe()
 
 
@@ -123,7 +121,7 @@ def main():
     args = get_arguments()
     set_global_variables(args)
     check_directories()
-    
+
     # Pick up previous basecalling
     pick_up_from_previous_run()
 
@@ -164,32 +162,32 @@ def main():
 def run_pipeline():
     # Extract tarballs
     [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
-     if not subfolder.extracted_commenced]
+     if not subfolder.extracted_submitted]
 
     # Check for complete extraction jobs
     [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
-     if subfolder.extracted_commenced and
+     if subfolder.extracted_submitted and
      not subfolder.extracted_complete]
 
     # Now run albacore
     [run_albacore(subfolder) for subfolder in SUBFOLDERS
      if subfolder.extracted_complete and
-     not subfolder.albacore_commenced]
+     not subfolder.albacore_submitted]
 
     # Check for complete albacore jobs
     [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
-     if subfolder.albacore_commenced and
+     if subfolder.albacore_submitted and
      not subfolder.albacore_complete]
 
     # Once albacore is complete on a subfolder
     # Remove folder from existence, leaving just the tarball again.
     [remove_folder(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and 
+     if subfolder.albacore_complete and
      not subfolder.folder_removed]
 
     # Move the fastq file to the FASTQ_DIR
     [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and 
+     if subfolder.albacore_complete and
      not subfolder.fastq_moved]
 
 
@@ -222,7 +220,7 @@ def get_arguments():
                              "Will be called 'fastq'" +
                              "and sit adjacent to reads folder if left blank.")
     parser.add_argument("--resume", type=str, required=False, default=None,
-			help="Resume the albacore run, need a status.csv file")
+                        help="Resume the albacore run, need a status.csv file")
     return parser.parse_args()
 
 
@@ -238,13 +236,14 @@ def set_global_variables(args):
     if args.fastq_dir is not None:
         FASTQ_DIR = args.fastq_dir
     if args.resume is not None:
-	STATUS_CSV = args.resume
+        STATUS_CSV = args.resume
 
 
 def check_directories():
     # Make sure the directories exist, change to reads directory,
     # Create any other necessary directories for the script to run.
     global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
+    global STATUS_CSV
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, %s does not exist" % READS_DIR)
 
@@ -261,7 +260,7 @@ def check_directories():
     QSUB_LOG_DIR = PARENT_DIRECTORY + "qsub_log/"
     if not os.path.isdir(QSUB_LOG_DIR):
         os.mkdir(QSUB_LOG_DIR)
-   
+
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
 
@@ -269,27 +268,43 @@ def check_directories():
         os.mkdir(FASTQ_DIR)
 
     if not os.path.isfile(STATUS_CSV):
-	sys.exit("Resume csv specified but does not exist"
+        sys.exit("Resume csv specified but does not exist")
     else:
-	STATUS_CSV = os.path.join(PARENT_DIRECTORY, STATUS_CSV)
+        STATUS_CSV = os.path.join(PARENT_DIRECTORY, STATUS_CSV)
 
 
 def pick_up_from_previous_run():
-	if os.path.isfile(STATUS_CSV):
-	   previous_dataframe = pd.read_csv(STATUS_CSV, header=True)
+    if os.path.isfile(STATUS_CSV):
+        previous_dataframe = pd.read_csv(STATUS_CSV, header=True)
 
-	# Set subfolders and all the statuses
+        # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
-		subfolder = row['name']
-		SUBFOLDERS.append(Subfolder(subfolder))
-		SUBFOLDERS[subfolder].extracted_commenced = row['extracted_commenced']
-		SUBFOLDERS[subfolder].extracted_jobid = row['extracted_jobid']
-		SUBFOLDERS[subfolder].extracted_complete = row['extracted_completed']
-		SUBFOLDERS[subfolder].albacore_commenced = row['albacore_commenced']
-		SUBFOLDERS[subfolder].albacore_jobid = row['albacore_jobid']
-		SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
-		SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
-		SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
+            subfolder = row['name']
+            SUBFOLDERS.append(Subfolder(subfolder))
+
+        for subfolder in SUBFOLDERS:
+            SUBFOLDERS[subfolder].extracted_submitted = row['extracted_submitted']
+            SUBFOLDERS[subfolder].extracted_commenced = row['extracted_commenced']
+            SUBFOLDERS[subfolder].extracted_jobid = row['extracted_jobid']
+            SUBFOLDERS[subfolder].extracted_complete = row['extracted_completed']
+            SUBFOLDERS[subfolder].albacore_submitted = row['albacore_submitted']
+            SUBFOLDERS[subfolder].albacore_commenced = row['albacore_commenced']
+            SUBFOLDERS[subfolder].albacore_jobid = row['albacore_jobid']
+            SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
+            SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
+            SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
+            # Now make sure none of the jobs have failed
+            if has_failed(SUBFOLDERS[subfolder].albacore_jobid):
+                SUBFOLDERS[subfolder].albacore_submitted = False
+                SUBFOLDERS[subfolder].albacore_commenced = False
+                SUBFOLDERS[subfolder].albacore_jobid = -1
+                SUBFOLDERS[subfolder].albacore_complete = False
+            if has_failed(SUBFOLDERS[subfolder].extracted_jobid):
+                SUBFOLDERS[subfolder].extracted_submitted = False
+                SUBFOLDERS[subfolder].extracted_commenced = False
+                SUBFOLDERS[subfolder].extracted_jobid = -1
+                SUBFOLDERS[subfolder].extracted_complete = False
+
 
 """
 Pipeline functions:
@@ -306,10 +321,10 @@ def extract_tarred_read_set(subfolder):
     # maybe a good idea?
 
     # Has the dataset already been set for extraction?
-    if subfolder.extracted_commenced:
+    if subfolder.extracted_submitted:
         return
     else:
-        subfolder.extracted_commenced = True
+        subfolder.extracted_submitted = True
 
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
     qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s" % (subfolder.extracted_qsub_output_log,
@@ -331,11 +346,11 @@ def run_albacore(subfolder):
         And qsub command and pipe former into latter
         This function also sets the jobid of a given folder.
     """
-    if subfolder.albacore_commenced:
-        return   # Basecalling has already commenced on this directory
+    if subfolder.albacore_submitted:
+        return   # Basecalling has already queued for this directory
     else:
         # Commence basecalling on this directory
-        subfolder.albacore_commenced = True
+        subfolder.albacore_submitted = True
 
     # Number of gigabytes required for a given qsub command
     memory_allocation = 4 + NUM_THREADS
@@ -369,7 +384,7 @@ def run_albacore(subfolder):
     stdout, stderr = albacore_proc.communicate()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
-    print("Output of albacore command", stdout, stderr) 
+    print("Output of albacore command", stdout, stderr)
     subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
     generate_dataframe()
 
@@ -512,8 +527,8 @@ def take_a_break():
 
 def generate_dataframe():
     global STATUS_DF
-    STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)    
-                                 
+    STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
+
     for subfolder in SUBFOLDERS:
         STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
 
@@ -521,9 +536,9 @@ def generate_dataframe():
 
 
 def new_subfolders():
-    """Any new subfolders that haven't commenced basecalling"""
+    """Any new subfolders that haven't been added to the basecalling queue"""
     for subfolder in SUBFOLDERS:
-        if not subfolder.albacore_commenced:
+        if not subfolder.albacore_submitted:
             return True
     return False
 
@@ -532,9 +547,73 @@ def is_still_basecalling():
     """Any subfolders left to be basecalled?"""
     if len([subfolder for subfolder in SUBFOLDERS
             if not subfolder.albacore_complete]) == 0:
-            return False  # basecalling finished
+        return False  # basecalling finished
     else:  # Basecalling still going
         return True
+
+
+"""
+qsub specific functions
+1. has_commenced(job_id)
+2. has_completed(job_id)
+3. has_failed(job_id)
+"""
+
+
+def has_commenced(job_id):
+    """
+    Use the qacct command to see if there exists a start time
+    No start_time is represented as -/-
+    """
+    qacct_command = "qacct -j %s | grep start_time | grep -v '\-\/\-'"
+    qacct_proc = subprocess.Popen(qacct_command, shell=True,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
+    qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    if qacct_stdout == "":
+        # Start-time is non-existent
+        return False
+    if not qacct_stderr == "":
+        print("qacct stderr of %s", qacct_stderr)
+    return True
+
+
+def has_completed(job_id):
+    """
+    Use the qacct command to see if the job has finished.
+    No end_time is represented as -/-
+    """
+    qacct_command = "qacct -j %s | grep end_time | grep -v '\-\/\-'"
+    qacct_proc = subprocess.Popen(qacct_command, shell=True,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
+    qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    if qacct_stdout == "":
+        # Start-time is non-existent
+        return False
+    if not qacct_stderr == "":
+        print("qacct stderr of %s", qacct_stderr)
+    return True
+
+
+def has_failed(job_id):
+    """
+    Use the qacct command to see if the job has failed.
+    We pass the exit_status parameter into awk and sum it.
+    If it's any greater than zero then the command has failed
+    """
+    qacct_command = "qacct -j %s | grep exit_status | awk '{sum+=$2}' END '{print sum}'"
+    qacct_proc = subprocess.Popen(qacct_command, shell=True,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
+    qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    if int(qacct_stdout) > 0:
+        # Job has failed
+        return True
+    if not qacct_stderr == "":
+        print("qacct stderr of %s", qacct_stderr)
+    return False
+
 
 # Run the main function
 main()
