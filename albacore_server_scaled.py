@@ -73,9 +73,9 @@ class Subfolder:
 
     def to_series(self):
         return pd.Series(data=[self.name,
-                               self.extracted_commenced, self.extracted_complete,
-                               self.albacore_commenced, self.albacore_complete,
-                               self.folder_removed, self.fastq_moved])
+                               str(self.extracted_commenced), str(self.extracted_complete),
+                               str(self.albacore_commenced), str(self.albacore_complete),
+                               str(self.folder_removed), str(self.fastq_moved)])
 
     def check_albacore_job_status(self):
         get_jobs_command = "qstat -j %s" % self.albacore_jobid
@@ -120,14 +120,15 @@ def main():
         [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
          if not subfolder.extracted_commenced]
 
-        # Now run albacore
-        [run_albacore(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.albacore_commenced]
-
         # Check for complete extraction jobs
         [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
          if subfolder.albacore_commenced and
          not subfolder.albacore_complete]
+
+        # Now run albacore
+        [run_albacore(subfolder) for subfolder in SUBFOLDERS
+         if subfolder.extraction_complete and 
+         not subfolder.albacore_commenced] 
 
         # Check for complete albacore jobs
         [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
@@ -149,7 +150,7 @@ def main():
 
     # Transferring from laptop complete just wait for albacore
     # to finish.
-    albacore_processing = True
+    
     while albacore_processing:
         albacore_processing = False
         have_break = True
@@ -323,9 +324,8 @@ def run_albacore(subfolder):
                    "-S /bin/bash " \
                    "-l h_vmem=%dG " \
                    "-wd %s" \
-                   "-W depend=afterok:%d" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
-                      memory_allocation, PARENT_DIRECTORY, subfolder.extracted_jobid)
+                      memory_llocation, PARENT_DIRECTORY)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
