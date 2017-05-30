@@ -434,7 +434,7 @@ def move_fastq_file(subfolder):
         return  # Job has already been
 
     # Get fastq files in the workspace directory
-    fastq_files = [fastq for fastq in subfolder.workspace_dir
+    fastq_files = [fastq for fastq in os.listdir(subfolder.workspace_dir)
                    if fastq.endswith(".fastq")]
     if len(fastq_files) > 1:
         print("It seems like we have more than 1 file here", fastq_files)
