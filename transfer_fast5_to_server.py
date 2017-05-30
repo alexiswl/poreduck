@@ -149,7 +149,7 @@ def get_run_details(run):
     # PRAWN_P28_R9p4_11874_ch162_read134_strand.fast5
     # Or it's mux scan
     if len(fast5_files) == 0:
-	return None, None, None
+        return None, None, None
 
     try:
         sequencing_run_index = fast5_files[0].split("_").index("sequencing")

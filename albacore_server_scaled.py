@@ -76,7 +76,7 @@ class Subfolder:
                                str(self.extracted_commenced), str(self.extracted_complete),
                                str(self.albacore_commenced), str(self.albacore_complete),
                                str(self.folder_removed), str(self.fastq_moved)],
-			 index=['name', 'extracted_commenced', 'extracted_complete',
+                         index=['name', 'extracted_commenced', 'extracted_complete',
                                 'albacore_commenced', 'albacore_complete',
                                 'folder_removed', 'fastq_moved'])
 
@@ -103,6 +103,13 @@ class Subfolder:
             generate_dataframe()
 
 
+"""
+Main functions:
+1. main
+2. run_pipeline()
+"""
+
+
 def main():
     global TRANSFERRING
     # Basic house cleaning, get arguments, make sure they're legit.
@@ -112,6 +119,11 @@ def main():
 
     # While the transferring lock script exists.
     while TRANSFERRING:
+        # Check that we're still transferring
+        if not is_still_transferring():
+            TRANSFERRING = False
+
+        # Get all the subfolders currently in the fast5 directory
         get_subfolders()
 
         # Have a break if no new subfolders
@@ -119,92 +131,54 @@ def main():
             take_a_break()
             continue
 
-        # Otherwise, extract tarballs
-        [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.extracted_commenced]
+        # Otherwise run through the pipeline
+        run_pipeline()
 
-        # Check for complete extraction jobs
-        [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
-         if subfolder.albacore_commenced and
-         not subfolder.albacore_complete]
-
-        # Now run albacore
-        [run_albacore(subfolder) for subfolder in SUBFOLDERS
-         if subfolder.extracted_complete and 
-         not subfolder.albacore_commenced] 
-
-        # Check for complete albacore jobs
-        [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
-         if subfolder.albacore_commenced and
-         not subfolder.albacore_complete]
-
-        # Once albacore is complete on a subfolder
-        # Remove folder from existence, leaving just the tarball again.
-        [remove_folder(subfolder) for subfolder in SUBFOLDERS
-         if subfolder.albacore_complete and not subfolder.folder_removed]
-
-        # Move the fastq file to the FASTQ_DIR
-        [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
-         if subfolder.albacore_complete and not subfolder.fastq_moved]
-
-        # Check that we're still transferring
-        if not is_still_transferring():
-            TRANSFERRING = False
-
-    # Transferring from laptop complete just wait for albacore
-    # to finish.
-    processing = True  # Set off while command 
+    # Transferring from laptop complete just wait for albacore to finish.
+    processing = True  # Set while command
     while processing:
-        processing = False
-        have_break = True
-        
-        # Extract tarballs
-        [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.extracted_commenced]
+        # Can we make this the last time around?
+        if not is_still_basecalling():
+            processing = False
 
-        # Check for complete extraction jobs
-        [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
-         if subfolder.albacore_commenced and
-         not subfolder.albacore_complete]
+        # Otherwise run through the pipeline
+        run_pipeline()
 
-        # Now run albacore
-        [run_albacore(subfolder) for subfolder in SUBFOLDERS
-         if subfolder.extracted_complete and
-         not subfolder.albacore_commenced]
-
-        # Check for complete albacore jobs
-        [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
-         if subfolder.albacore_commenced and
-         not subfolder.albacore_complete]
-
-        # Still jobs in the works?
-        # If so we need to go around the loop again
-        if len([subfolder for subfolder in SUBFOLDERS
-                if not subfolder.albacore_complete]) > 0:
-                processing = True  # basecalling still going
-
-        # Remove any folders of completed jobs.
-        # Set have a break to be false if we find any subfolders to do this for
-        if len([remove_folder(subfolder) for subfolder in SUBFOLDERS
-                if subfolder.albacore_complete and not
-                subfolder.folder_removed]) > 0:
-            have_break = False
-
-        # Move fastq files of any completed jobs.
-        # Set have a break to be false if we find any subfolders to do this for
-        if len([move_fastq_file(subfolder) for subfolder in SUBFOLDERS
-                if subfolder.albacore_complete and not
-                subfolder.fastq_moved]) > 0:
-            have_break = False
-
-        # If no subfolders recently completed basecalling
-        # have a break otherwise check for some more.
-        if have_break:
-            take_a_break()
-            continue
+        # Have a 15 second break between iterations
+        take_a_break()
 
     # Merge fastq files at the end of the run.
     merge_fastq_files()
+
+
+def run_pipeline():
+    # Extract tarballs
+    [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
+     if not subfolder.extracted_commenced]
+
+    # Check for complete extraction jobs
+    [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
+     if subfolder.albacore_commenced and
+     not subfolder.albacore_complete]
+
+    # Now run albacore
+    [run_albacore(subfolder) for subfolder in SUBFOLDERS
+     if subfolder.extracted_complete and
+     not subfolder.albacore_commenced]
+
+    # Check for complete albacore jobs
+    [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
+     if subfolder.albacore_commenced and
+     not subfolder.albacore_complete]
+
+    # Once albacore is complete on a subfolder
+    # Remove folder from existence, leaving just the tarball again.
+    [remove_folder(subfolder) for subfolder in SUBFOLDERS
+     if subfolder.albacore_complete and not subfolder.folder_removed]
+
+    # Move the fastq file to the FASTQ_DIR
+    [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
+     if subfolder.albacore_complete and not subfolder.fastq_moved]
 
 
 """
@@ -342,7 +316,7 @@ def run_albacore(subfolder):
                    "-l h_vmem=%dG " \
                    "-wd %s" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
-                      memory_llocation, PARENT_DIRECTORY)
+                      memory_allocation, PARENT_DIRECTORY)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
@@ -451,6 +425,7 @@ Miscellaneous pipeline non-core functions
 3. take_a_break
 4. generate_dataframe
 5. new_directories
+6. is_still_basecalling
 """
 
 
@@ -489,7 +464,10 @@ def is_still_transferring():
 
 
 def take_a_break():
-    time.sleep(60)
+    """
+    Just a 15 second sleep ;)
+    """
+    time.sleep(15)
 
 
 def generate_dataframe():
@@ -512,4 +490,13 @@ def new_subfolders():
     return False
 
 
+def is_still_basecalling():
+    """Any subfolders left to be basecalled?"""
+    if len([subfolder for subfolder in SUBFOLDERS
+            if not subfolder.albacore_complete]) == 0:
+            return False  # basecalling finished
+    else:  # Basecalling still going
+        return True
+
+# Run the main function
 main()
