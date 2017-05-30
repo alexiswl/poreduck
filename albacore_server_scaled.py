@@ -158,8 +158,8 @@ def run_pipeline():
 
     # Check for complete extraction jobs
     [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
-     if subfolder.albacore_commenced and
-     not subfolder.albacore_complete]
+     if subfolder.extracted_commenced and
+     not subfolder.extracted_complete]
 
     # Now run albacore
     [run_albacore(subfolder) for subfolder in SUBFOLDERS
@@ -174,11 +174,13 @@ def run_pipeline():
     # Once albacore is complete on a subfolder
     # Remove folder from existence, leaving just the tarball again.
     [remove_folder(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and not subfolder.folder_removed]
+     if subfolder.albacore_complete and 
+     not subfolder.folder_removed]
 
     # Move the fastq file to the FASTQ_DIR
     [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and not subfolder.fastq_moved]
+     if subfolder.albacore_complete and 
+     not subfolder.fastq_moved]
 
 
 """
