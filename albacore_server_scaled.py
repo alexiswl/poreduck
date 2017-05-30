@@ -593,10 +593,14 @@ def has_completed(job_id):
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
     if qacct_stdout == "":
-        # Start-time is non-existent
+        # end_time is non-existent
         return False
     if not qacct_stderr == "":
         print("qacct stderr of %s", qacct_stderr)
+    if has_failed(job_id):
+	print("It appears that the job %d has failed" % job_id)
+        sys.exit("Failing because %d failed. Good one Dave" % job_id)
+
     return True
 
 
