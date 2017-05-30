@@ -82,11 +82,10 @@ class Subfolder:
 
     def to_series(self):
         return pd.Series(data=[self.name,
-                               str(self.extracted_commenced), self.extracted_jobid,
-                               str(self.extracted_complete),
-                               str(self.albacore_commenced),
-                               self.albacore_jobid,
-                               str(self.albacore_complete),
+                               str(self.extracted_submitted), self.extracted_jobid,
+                               str(self.extracted_commenced), str(self.extracted_complete),
+                               str(self.albacore_submitted), self.albacore_jobid,
+                               str(self.albacore_commenced), str(self.albacore_complete),
                                str(self.folder_removed), str(self.fastq_moved)],
                          index=STATUS_STANDARD_COLUMNS
                          )
@@ -222,6 +221,8 @@ def get_arguments():
     parser.add_argument("--resume", type=str, required=False, default=None,
                         help="Resume the albacore run, need a csv file")
 
+    return parser.parse_args()
+
 
 def set_global_variables(args):
     # Global variables
@@ -330,7 +331,7 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s" % (subfolder.extracted_qsub_output_log,
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s -l hostname=melb-compute06" % (subfolder.extracted_qsub_output_log,
                                                              subfolder.extracted_qsub_error_log,
                                                              READS_DIR)
     tar_proc = subprocess.Popen("echo \"%s\" | %s" % (tar_command, qsub_command), shell=True,
@@ -568,7 +569,7 @@ def has_commenced(job_id):
     Use the qacct command to see if there exists a start time
     No start_time is represented as -/-
     """
-    qacct_command = "qacct -j %s | grep start_time | grep -v '\-\/\-'"
+    qacct_command = "qacct -j %s | grep start_time | grep -v '\-\/\-'" % job_id
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -586,7 +587,7 @@ def has_completed(job_id):
     Use the qacct command to see if the job has finished.
     No end_time is represented as -/-
     """
-    qacct_command = "qacct -j %s | grep end_time | grep -v '\-\/\-'"
+    qacct_command = "qacct -j %s | grep end_time | grep -v '\-\/\-'" % job_id
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -605,7 +606,7 @@ def has_failed(job_id):
     We pass the exit_status parameter into awk and sum it.
     If it's any greater than zero then the command has failed
     """
-    qacct_command = "qacct -j %s | grep exit_status | awk '{sum+=$2}' END '{print sum}'"
+    qacct_command = "qacct -j %s | grep exit_status | awk '{sum+=$2}' END '{print sum}'" % job_id
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
