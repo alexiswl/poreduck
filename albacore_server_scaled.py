@@ -478,7 +478,7 @@ def take_a_break():
 def generate_dataframe():
     global STATUS_DF
     STATUS_DF = pd.DataFrame(columns=['name',
-                                      'extracted_commenced', 'extracted_complete'
+                                      'extracted_commenced', 'extracted_complete',
                                       'albacore_commenced', 'albacore_complete',
                                       'folder_removed', 'fastq_moved'])
     for subfolder in SUBFOLDERS:
