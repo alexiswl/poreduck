@@ -103,7 +103,7 @@ class Subfolder:
             self.extracted_commenced = True
             generate_dataframe()
         if has_completed(self.extracted_jobid):
-            self.extracted_complete
+            self.extracted_complete = True
             generate_dataframe()
 
 
@@ -606,7 +606,7 @@ def has_failed(job_id):
     We pass the exit_status parameter into awk and sum it.
     If it's any greater than zero then the command has failed
     """
-    qacct_command = "qacct -j %s | grep exit_status | awk '{sum+=$2}' END '{print sum}'" % job_id
+    qacct_command = "qacct -j {0} | grep exit_status | awk '{{sum+=$2}}' END '{print sum}'".format(job_id)
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
