@@ -118,7 +118,7 @@ def main():
 
         # Otherwise, extract tarballs
         [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
-         if not subfolder.extracted]
+         if not subfolder.extracted_commenced]
 
         # Now run albacore
         [run_albacore(subfolder) for subfolder in SUBFOLDERS
@@ -282,7 +282,7 @@ def extract_tarred_read_set(subfolder):
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
     qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s" % (subfolder.extracted_qsub_output_log,
                                                              subfolder.extracted_qsub_error_log,
-                                                             PARENT_DIRECTORY)
+                                                             READS_DIR)
     tar_proc = subprocess.Popen("echo \"%s\" | %s" % (tar_command, qsub_command), shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
@@ -482,9 +482,9 @@ def generate_dataframe():
                                       'albacore_commenced', 'albacore_complete',
                                       'folder_removed', 'fastq_moved'])
     for subfolder in SUBFOLDERS:
-        STATUS_DF.append(subfolder.to_series())
+        STATUS_DF.append(subfolder.to_series(), ignore_index=True)
 
-    STATUS_DF.to_csv(file="status.csv", index=False)
+    STATUS_DF.to_csv("status.csv", index=False)
 
 
 def new_subfolders():
