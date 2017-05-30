@@ -290,7 +290,7 @@ def extract_tarred_read_set(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     print("Output of extraction command", stdout, stderr)
-    subfolder.extracted_jobid = stdout.rstrip().split()[2]
+    subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
     generate_dataframe()
 
 
@@ -339,7 +339,7 @@ def run_albacore(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr) 
-    subfolder.albacore_jobid = stdout.rstrip().split()[2]
+    subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
     generate_dataframe()
 
 
@@ -482,7 +482,7 @@ def generate_dataframe():
                                       'albacore_commenced', 'albacore_complete',
                                       'folder_removed', 'fastq_moved'])
     for subfolder in SUBFOLDERS:
-        STATUS_DF.append(subfolder.to_series(), ignore_index=True)
+        STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
 
     STATUS_DF.to_csv("status.csv", index=False)
 
