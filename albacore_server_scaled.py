@@ -153,12 +153,26 @@ def main():
 
     # Transferring from laptop complete just wait for albacore
     # to finish.
-    
-    while albacore_processing:
-        albacore_processing = False
+    processing = True  # Set off while command 
+    while processing:
+        processing = False
         have_break = True
+        
+        # Extract tarballs
+        [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
+         if not subfolder.extracted_commenced]
 
-        # Check for complete jobs
+        # Check for complete extraction jobs
+        [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
+         if subfolder.albacore_commenced and
+         not subfolder.albacore_complete]
+
+        # Now run albacore
+        [run_albacore(subfolder) for subfolder in SUBFOLDERS
+         if subfolder.extracted_complete and
+         not subfolder.albacore_commenced]
+
+        # Check for complete albacore jobs
         [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
          if subfolder.albacore_commenced and
          not subfolder.albacore_complete]
@@ -167,7 +181,7 @@ def main():
         # If so we need to go around the loop again
         if len([subfolder for subfolder in SUBFOLDERS
                 if not subfolder.albacore_complete]) > 0:
-            albacore_processing = True  # basecalling still going
+                processing = True  # basecalling still going
 
         # Remove any folders of completed jobs.
         # Set have a break to be false if we find any subfolders to do this for
