@@ -373,7 +373,7 @@ def run_albacore(subfolder):
                    "-e %s " \
                    "-S /bin/bash -l hostname=melb-compute06 " \
                    "-l h_vmem=%dG " \
-                   "-wd %s" \
+                   "-wd %s -v OMP_NUM_THREADS=1" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
                       memory_allocation, PARENT_DIRECTORY)
 
