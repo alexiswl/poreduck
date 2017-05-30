@@ -35,7 +35,12 @@ PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
+STATUS_CSV = ""
 STATUS_DF = None
+STATUS_STANDARD_COLUMNS = ['name', 'extracted_commenced', 'extracted_jobid',
+                           'extracted_complete', 'albacore_commenced', 'albacore_jobid',
+                           'albacore_complete', 'folder_removed', 'fastq_moved']
+
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
@@ -73,12 +78,14 @@ class Subfolder:
 
     def to_series(self):
         return pd.Series(data=[self.name,
-                               str(self.extracted_commenced), str(self.extracted_complete),
-                               str(self.albacore_commenced), str(self.albacore_complete),
+                               str(self.extracted_commenced), self.extracted_jobid
+                               str(self.extracted_complete),
+                               str(self.albacore_commenced), 
+			       self.albacore_jobid, 
+                               str(self.albacore_complete),
                                str(self.folder_removed), str(self.fastq_moved)],
-                         index=['name', 'extracted_commenced', 'extracted_complete',
-                                'albacore_commenced', 'albacore_complete',
-                                'folder_removed', 'fastq_moved'])
+                         index=STATUS_STANDARD_COLUMNS 
+                        )
 
     def check_albacore_job_status(self):
         get_jobs_command = "qstat -j %s" % self.albacore_jobid
@@ -116,6 +123,9 @@ def main():
     args = get_arguments()
     set_global_variables(args)
     check_directories()
+    
+    # Pick up previous basecalling
+    pick_up_from_previous_run()
 
     # While the transferring lock script exists.
     while TRANSFERRING:
@@ -188,6 +198,7 @@ General script initialisation functions
 1. get_arguments
 2. set_global_variables
 3. check_directories
+4. pick_up_from_previous_run
 """
 
 
@@ -210,12 +221,15 @@ def get_arguments():
                         help="Where should the fastq data be placed." +
                              "Will be called 'fastq'" +
                              "and sit adjacent to reads folder if left blank.")
+    parser.add_argument("--resume", type=str, required=False, default=None,
+			help="Resume the albacore run, need a status.csv file")
     return parser.parse_args()
 
 
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
+    global STATUS_CSV
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -223,6 +237,8 @@ def set_global_variables(args):
     NUM_THREADS = args.num_threads
     if args.fastq_dir is not None:
         FASTQ_DIR = args.fastq_dir
+    if args.resume is not None:
+	STATUS_CSV = args.resume
 
 
 def check_directories():
@@ -252,6 +268,28 @@ def check_directories():
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
+    if not os.path.isfile(STATUS_CSV):
+	sys.exit("Resume csv specified but does not exist"
+    else:
+	STATUS_CSV = os.path.join(PARENT_DIRECTORY, STATUS_CSV)
+
+
+def pick_up_from_previous_run():
+	if os.path.isfile(STATUS_CSV):
+	   previous_dataframe = pd.read_csv(STATUS_CSV, header=True)
+
+	# Set subfolders and all the statuses
+        for index, row in previous_dataframe.iterrows():
+		subfolder = row['name']
+		SUBFOLDERS.append(Subfolder(subfolder))
+		SUBFOLDERS[subfolder].extracted_commenced = row['extracted_commenced']
+		SUBFOLDERS[subfolder].extracted_jobid = row['extracted_jobid']
+		SUBFOLDERS[subfolder].extracted_complete = row['extracted_completed']
+		SUBFOLDERS[subfolder].albacore_commenced = row['albacore_commenced']
+		SUBFOLDERS[subfolder].albacore_jobid = row['albacore_jobid']
+		SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
+		SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
+		SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
 
 """
 Pipeline functions:
@@ -314,7 +352,7 @@ def run_albacore(subfolder):
     qsub_command = "qsub " \
                    "-o %s " \
                    "-e %s " \
-                   "-S /bin/bash " \
+                   "-S /bin/bash -l hostname=melb-compute06 " \
                    "-l h_vmem=%dG " \
                    "-wd %s" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
@@ -474,14 +512,12 @@ def take_a_break():
 
 def generate_dataframe():
     global STATUS_DF
-    STATUS_DF = pd.DataFrame(columns=['name',
-                                      'extracted_commenced', 'extracted_complete',
-                                      'albacore_commenced', 'albacore_complete',
-                                      'folder_removed', 'fastq_moved'])
+    STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)    
+                                 
     for subfolder in SUBFOLDERS:
         STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
 
-    STATUS_DF.to_csv("status.csv", index=False)
+    STATUS_DF.to_csv(STATUS_CSV, index=False)
 
 
 def new_subfolders():
