@@ -22,6 +22,7 @@ import subprocess  # Executing each of the qsub commands.
 import argparse  # For allowing users to configure the arguments used.
 import sys  # For errors
 import time  # For schnoozing!
+import pandas as pd  # For the status.csv file
 
 # Set global and semi-global variables
 TRANSFERRING = True
@@ -34,6 +35,8 @@ PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
+STATUS_DF = pd.DataFrame(columns=['name', 'extracted', 'albacore_commenced',
+                                  'albacore_complete', 'folder_removed', 'fastq_moved'])
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
@@ -64,6 +67,11 @@ class Subfolder:
         self.albacore_complete = False
         self.folder_removed = False
         self.fastq_moved = False
+
+    def to_series(self):
+        return pd.Series(data=[self.name, self.extracted,
+                               self.albacore_commenced, self.albacore_complete,
+                               self.folder_removed, self.fastq_moved])
 
 
 def main():
@@ -148,6 +156,17 @@ def main():
     merge_fastq_files()
 
 
+def generate_dataframe():
+    global STATUS_DF
+    STATUS_DF = pd.DataFrame(columns=['name', 'extracted',
+                                      'albacore_commenced', 'albacore_complete',
+                                      'folder_removed', 'fastq_moved'])
+    for subfolder in SUBFOLDERS:
+        STATUS_DF.append(subfolder.to_series())
+
+    STATUS_DF.to_csv(file="status.csv", index=False)
+
+
 def new_subfolders():
     """Any new subfolders that haven't commenced basecalling"""
     for subfolder in SUBFOLDERS:
@@ -182,6 +201,7 @@ def remove_folder(subfolder):
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = remove_proc.communicate()
     print("Output of deleting folder is", stdout, stderr)
+    generate_dataframe()
 
 
 def move_fastq_file(subfolder):
@@ -221,6 +241,7 @@ def move_fastq_file(subfolder):
 
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
+    generate_dataframe()
 
 
 def merge_fastq_files():
@@ -335,6 +356,7 @@ def extract_tarred_read_set(subfolder):
     stdout, stderr = tar_proc.communicate()
     if not stdout == "" or not stderr == "":
         print("Output of tar command", stdout, stderr, subfolder.name)
+    generate_dataframe()
 
 
 def run_albacore(subfolder):
@@ -377,6 +399,7 @@ def run_albacore(subfolder):
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr) 
     subfolder.albacore_jobid = stdout.rstrip().split()[2]
+    generate_dataframe()
 
 
 def is_still_transferring():
