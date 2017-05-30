@@ -220,8 +220,7 @@ def get_arguments():
                              "Will be called 'fastq'" +
                              "and sit adjacent to reads folder if left blank.")
     parser.add_argument("--resume", type=str, required=False, default=None,
-                        help="Resume the albacore run, need a status.csv file")
-    return parser.parse_args()
+                        help="Resume the albacore run, need a S_
 
 
 def set_global_variables(args):
@@ -267,10 +266,14 @@ def check_directories():
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
 
-    if not os.path.isfile(STATUS_CSV):
-        sys.exit("Resume csv specified but does not exist")
+    if not STATUS_CSV == "":
+        if not os.path.isfile(STATUS_CSV):
+            sys.exit("Resume csv specified but does not exist")
     else:
-        STATUS_CSV = os.path.join(PARENT_DIRECTORY, STATUS_CSV)
+        STATUS_CSV = os.path.join(PARENT_DIRECTORY, "status.csv")
+        if os.path.isfile(STATUS_CSV):
+            print("Warning, STATUS_CSV not defined but still exists. Removing file %s" % STATUS_CSV)
+            os.remove(STATUS_CSV)
 
 
 def pick_up_from_previous_run():
