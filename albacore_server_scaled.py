@@ -597,6 +597,7 @@ def has_completed(job_id):
         return False
     if not qacct_stderr == "":
         print("qacct stderr of %s", qacct_stderr)
+    print(qacct_stdout)
     if has_failed(job_id):
 	print("It appears that the job %d has failed" % job_id)
         sys.exit("Failing because %d failed. Good one Dave" % job_id)
@@ -610,11 +611,13 @@ def has_failed(job_id):
     We pass the exit_status parameter into awk and sum it.
     If it's any greater than zero then the command has failed
     """
-    qacct_command = "qacct -j {0} | grep exit_status | awk '{{sum+=$2}}' END '{print sum}'".format(job_id)
+    qacct_command = "qacct -j {0} | grep exit_status | awk '{{sum+=$2}} END {{print sum}}'".format(job_id)
+    print(qacct_command)
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    print(qacct_stdout, qacct_stderr)
     if int(qacct_stdout) > 0:
         # Job has failed
         return True
