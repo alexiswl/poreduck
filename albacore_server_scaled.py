@@ -92,18 +92,18 @@ class Subfolder:
     def check_albacore_job_status(self):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
-            update_dataframe(SUBFOLDERS[self.name])
+            update_dataframe(get_current_subfolder(self.name))
         if has_completed(self.albacore_jobid):
             self.albacore_complete = True
-            update_dataframe(SUBFOLDERS[self.name])
+            update_dataframe(get_current_subfolder(self.name))
 
     def check_extraction_job_status(self):
         if has_commenced(self.extracted_jobid):
             self.extracted_commenced = True
-            update_dataframe(SUBFOLDERS[self.name])
+            update_dataframe(get_current_subfolder(self.name))
         if has_completed(self.extracted_jobid):
             self.extracted_complete = True
-            update_dataframe(SUBFOLDERS[self.name])
+            update_dataframe(get_current_subfolder(self.name))
 
 
 """
@@ -487,6 +487,7 @@ Miscellaneous pipeline non-core functions
 4. generate_dataframe
 5. new_directories
 6. is_still_basecalling
+7. get_current_subfolder
 """
 
 
@@ -549,7 +550,7 @@ def update_dataframe(subfolder):
     """
     Edits the STATUS_DF row of a given subfolder
     """
-    STATUS_DF.loc[STATUS_DF.index == subfolder, ] = subfolder.to_series().tolist()
+    STATUS_DF.loc[STATUS_DF.index == subfolder.name, ] = subfolder.to_series().tolist()
 
 
 def new_subfolders():
@@ -568,6 +569,10 @@ def is_still_basecalling():
     else:  # Basecalling still going
         return True
 
+
+def get_current_subfolder(subfolder_name):
+    return [subfolder for subfolder in SUBFOLDERS
+            if subfolder.name == subfolder_name][0]
 
 """
 qsub specific functions
