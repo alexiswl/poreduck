@@ -152,6 +152,9 @@ def main():
         # Otherwise run through the pipeline
         run_pipeline()
 
+        # Generate dataframe throughout each iteration of the pipeline
+        generate_dataframe()
+
         # Have a 15 second break between iterations
         take_a_break()
 
