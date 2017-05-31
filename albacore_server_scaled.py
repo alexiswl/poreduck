@@ -92,18 +92,18 @@ class Subfolder:
     def check_albacore_job_status(self):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
-            update_dataframe()
+            update_dataframe(self.name)
         if has_completed(self.albacore_jobid):
             self.albacore_complete = True
-            update_dataframe()
+            update_dataframe(self.name)
 
     def check_extraction_job_status(self):
         if has_commenced(self.extracted_jobid):
             self.extracted_commenced = True
-            update_dataframe()
+            update_dataframe(self.name)
         if has_completed(self.extracted_jobid):
             self.extracted_complete = True
-            update_dataframe()
+            update_dataframe(self.name)
 
 
 """
@@ -332,9 +332,10 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s -l hostname=melb-compute06" % (subfolder.extracted_qsub_output_log,
-                                                             subfolder.extracted_qsub_error_log,
-                                                             READS_DIR)
+    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s -l hostname=melb-compute06" % \
+                   (subfolder.extracted_qsub_output_log,
+                    subfolder.extracted_qsub_error_log,
+                    READS_DIR)
     tar_proc = subprocess.Popen("echo \"%s\" | %s" % (tar_command, qsub_command), shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
@@ -343,7 +344,7 @@ def extract_tarred_read_set(subfolder):
     # So job equal to third element of the array.
     print("Output of extraction command", stdout, stderr)
     subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
-    update_dataframe()
+    update_dataframe(subfolder)
 
 
 def run_albacore(subfolder):
@@ -391,7 +392,7 @@ def run_albacore(subfolder):
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr)
     subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
-    update_dataframe()
+    update_dataframe(subfolder)
 
 
 def remove_folder(subfolder):
@@ -420,7 +421,7 @@ def remove_folder(subfolder):
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = remove_proc.communicate()
     print("Output of deleting folder is", stdout, stderr)
-    update_dataframe()
+    update_dataframe(subfolder)
 
 
 def move_fastq_file(subfolder):
@@ -460,7 +461,7 @@ def move_fastq_file(subfolder):
 
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
-    update_dataframe()
+    update_dataframe(subfolder)
 
 
 def merge_fastq_files():
@@ -611,7 +612,7 @@ def has_completed(job_id):
         print("qacct stderr of %s", qacct_stderr)
     
     if has_failed(job_id):
-	print("It appears that the job %d has failed" % job_id)
+        print("It appears that the job %d has failed" % job_id)
         sys.exit("Failing because %d failed. Good one Dave" % job_id)
 
     return True
