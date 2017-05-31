@@ -539,7 +539,7 @@ def generate_dataframe():
     global STATUS_DF
 
     for subfolder in SUBFOLDERS:
-        if subfolder not in STATUS_DF.index.tolist():
+        if subfolder.name not in STATUS_DF.index.tolist():
             # Append row
             STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
             # Reset index
