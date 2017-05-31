@@ -92,18 +92,18 @@ class Subfolder:
     def check_albacore_job_status(self):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
-            update_dataframe(self.name)
+            update_dataframe(SUBFOLDERS[self.name])
         if has_completed(self.albacore_jobid):
             self.albacore_complete = True
-            update_dataframe(self.name)
+            update_dataframe(SUBFOLDERS[self.name])
 
     def check_extraction_job_status(self):
         if has_commenced(self.extracted_jobid):
             self.extracted_commenced = True
-            update_dataframe(self.name)
+            update_dataframe(SUBFOLDERS[self.name])
         if has_completed(self.extracted_jobid):
             self.extracted_complete = True
-            update_dataframe(self.name)
+            update_dataframe(SUBFOLDERS[self.name])
 
 
 """
