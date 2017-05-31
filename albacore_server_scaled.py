@@ -36,13 +36,12 @@ QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
 STATUS_CSV = ""
-STATUS_DF = None
 STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
                            'albacore_commenced', 'albacore_complete',
                            'folder_removed', 'fastq_moved']
-
+STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
@@ -93,18 +92,18 @@ class Subfolder:
     def check_albacore_job_status(self):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
-            generate_dataframe()
+            update_dataframe()
         if has_completed(self.albacore_jobid):
             self.albacore_complete = True
-            generate_dataframe()
+            update_dataframe()
 
     def check_extraction_job_status(self):
         if has_commenced(self.extracted_jobid):
             self.extracted_commenced = True
-            generate_dataframe()
+            update_dataframe()
         if has_completed(self.extracted_jobid):
             self.extracted_complete = True
-            generate_dataframe()
+            update_dataframe()
 
 
 """
@@ -132,6 +131,8 @@ def main():
 
         # Get all the subfolders currently in the fast5 directory
         get_subfolders()
+        # Make sure STATUS_DF has all of the subfolders present
+        generate_dataframe()
 
         # Have a break if no new subfolders
         if not new_subfolders():
@@ -342,7 +343,7 @@ def extract_tarred_read_set(subfolder):
     # So job equal to third element of the array.
     print("Output of extraction command", stdout, stderr)
     subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
-    generate_dataframe()
+    update_dataframe()
 
 
 def run_albacore(subfolder):
@@ -390,7 +391,7 @@ def run_albacore(subfolder):
     # So job equal to third element of the array.
     print("Output of albacore command", stdout, stderr)
     subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
-    generate_dataframe()
+    update_dataframe()
 
 
 def remove_folder(subfolder):
@@ -419,7 +420,7 @@ def remove_folder(subfolder):
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = remove_proc.communicate()
     print("Output of deleting folder is", stdout, stderr)
-    generate_dataframe()
+    update_dataframe()
 
 
 def move_fastq_file(subfolder):
@@ -459,7 +460,7 @@ def move_fastq_file(subfolder):
 
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
-    generate_dataframe()
+    update_dataframe()
 
 
 def merge_fastq_files():
@@ -531,12 +532,23 @@ def take_a_break():
 
 def generate_dataframe():
     global STATUS_DF
-    STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
 
     for subfolder in SUBFOLDERS:
-        STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
+        if subfolder not in STATUS_DF.index.tolist():
+            # Append row
+            STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
+            # Reset index
+            STATUS_DF.set_index('name', drop=False, inplace=True)
 
     STATUS_DF.to_csv(STATUS_CSV, index=False)
+
+
+def update_dataframe(subfolder):
+    global STATUS_DF
+    """
+    Edits the STATUS_DF row of a given subfolder
+    """
+    STATUS_DF.loc[STATUS_DF.index == subfolder, ] = subfolder.to_series().tolist()
 
 
 def new_subfolders():
