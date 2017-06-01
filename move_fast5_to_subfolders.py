@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 """
 This script is used to move fast5 files generate by MinKNOW 1.3 and below
