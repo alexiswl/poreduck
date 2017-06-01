@@ -75,6 +75,12 @@ class Run:
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
 
+"""
+Main run files:
+1. main
+2. transfer_fast5_files
+"""
+
 
 def main():
     # Get argument list, password for server and set directories.
@@ -103,6 +109,292 @@ def main():
 
     # Remove the lock file from the server.
     remove_transferring_lock_file()
+
+
+def transfer_fast5_files(run):
+    global MINKNOW_RUNNING
+    # Get list of sub-directories
+    subdirs = get_subdirs(run)
+    print(subdirs)
+
+    # Check if MinKNOW is still running
+    if not is_minknow_still_running():
+        MINKNOW_RUNNING = False
+
+    new_folders = False
+    # For any new folders.
+    for subdir in subdirs:
+        subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
+        # Is folder finished?
+        folder_status = check_folder_status(subdir, run)
+        if folder_status == "still writing":
+            continue
+        new_folders = True
+        # Tar up folder(s)
+        tar_folders(subdir_as_standard_int, run)
+
+    # Let's have a rest if no new folders have been created recently.
+    if not new_folders:
+        have_a_break()
+    else:
+        run_rsync_command(run)
+        copy_across_md5sum(run)
+        copy_across_csv_files(run)
+
+"""
+Transfer fast5 file subscripts
+1. get_subdirs
+2. check_folder_status
+3. tar folders
+4. run_rsync_command
+5. md5sum_tar_file
+6. copy_across_md5sum
+7. copy_across_csv_files
+8. tar_up_last_folder
+"""
+
+
+def get_subdirs(run):
+    subdirs = [os.path.join(run.fast5_dir, folder)
+               for folder in os.listdir(run.fast5_dir)
+               # Make sure that the subdirectory is a directory
+               if os.path.isdir(os.path.join(run.fast5_dir, folder))
+               # And not the tmp directory
+               and not folder == "tmp"
+               # And subdirectory is int
+               and is_int(folder)]
+
+    # Sort subdirectories by writing time.
+    return sorted(subdirs, key=os.path.getmtime)
+
+
+def check_folder_status(subdir, run, full=True):
+    subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
+    # Returns the folder status, also generates a little csv file
+    # for each of the corresponding folders for you take home.
+    fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
+                   if fast5_file.endswith(".fast5")]
+
+    # Create pandas data frame with each fast5 file as a row.
+    # Final columns will include:
+    #       fast5 file name       - name of fast5 file
+    #       Modification time - time of modification of file,
+    #                           useful for deciding if run has finished.
+    #       channel           - Channel ID of the run.
+    #       read number       - What number read is this.
+
+    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no'])
+    fast5_pd['filename'] = fast5_files
+    fast5_pd['ctime'] = [time.ctime(os.path.getmtime(os.path.join(subdir, fast5_file)))
+                         for fast5_file in fast5_files]
+    fast5_pd['channel'] = [fast5_file.split('_')[-3]
+                           for fast5_file in fast5_files]
+    fast5_pd['read_no'] = [fast5_file.split('_')[-2]
+                           for fast5_file in fast5_files]
+
+    # If this is the final folder, we will move regardless of if it is full:
+    if not full:
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        # Ensure that csv directory exists
+        if not os.path.isdir(run.csv_dir):
+            os.mkdir(run.csv_dir)
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
+        return "moving files"
+    # Is this a folder with mux scans, if so, we'll move the files over to the
+    # actual sequencing run folder
+    if run.mux:
+        comp_run = get_complementary_run_id(run)
+        if comp_run is None:
+            # No complementary run, be patient will be there soon!
+            return "still writing"
+
+        # Move fast5 files across to server.
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        # Ensure that csv directory exists
+        if not os.path.isdir(run.csv_dir):
+            os.mkdir(run.csv_dir)
+        # Generate csv
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + "_mux_scan" + ".csv"))
+        delete_folder_if_empty(subdir)
+        return "moving files"
+
+    if is_folder_maxxed_out(len(fast5_pd)):
+        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
+        # Ensure that csv directory exists
+        if not os.path.isdir(run.csv_dir):
+            os.mkdir(run.csv_dir)
+        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
+        delete_folder_if_empty(subdir)
+        return "moving files"
+
+    # Used for if we bother trying to tar up in the next step.
+    return "still writing"
+
+
+def tar_folders(subdir_prefix, run):
+    # Get the subdirectories that start with the initial subdirectory.
+    # So 0 may now be 0_12345 where 12345 is the rnumber.
+    print(subdir_prefix)
+    os.chdir(run.fast5_dir)
+    subdirs = [subdir for subdir in os.listdir(run.fast5_dir)
+               if subdir.startswith(subdir_prefix + "_")
+               and os.path.isdir(os.path.join(run.fast5_dir, subdir))]
+
+    # Now tar up each folder individually
+    for subdir in subdirs:
+        tar_file = "%s.tar.gz" % subdir
+        tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir,
+                                                                            tar_file)
+        tar_proc = subprocess.Popen(tar_command, shell=True,
+                                    stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        stdout, stderr = tar_proc.communicate()
+        md5sum_tar_file(tar_file, run)
+        if stderr is not None:
+            print(stderr)
+    os.chdir(READS_DIR)
+
+
+def run_rsync_command(run):
+    try:
+        if run.rsync_proc.poll() is None:
+            # Still running from previous run
+            print "It appears rsync is running"
+            return
+        else:
+            stdout, stderr = run.rsync_proc.communicate()
+            print("Rsync", stdout, stderr)
+    except AttributeError:
+        # Initial set up
+        print "Rsync is to be initialised"
+        pass
+
+    reads_dir = "fast5/"
+    # Generate list of rsync options to be used.
+    rsync_command_options = []
+    # Delete the tar.gz files from the laptop.
+    rsync_command_options.append("--remove-source-files")
+    rsync_command_options.append("--include='*.tar.gz'")
+    rsync_command_options.append("--exclude='*'")  # Exclude everything else!
+    rsync_command_options.append("--recursive")
+    rsync_command_options.append("--times")
+
+    # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST'
+    # permutation of the command
+
+    # The tar.gz files will be placed in the reads sub folder
+    rsync_command = "sshpass -p %s rsync %s %s/ %s@%s:%s/%s" % (
+                                                            PASSWORD,
+                                                            ' '.join(rsync_command_options),
+                                                            run.fast5_dir,
+                                                            SERVER_USERNAME,
+                                                            SERVER_NAME,
+                                                            DEST_DIRECTORY,
+                                                            reads_dir)
+    print(rsync_command)
+    run.rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE, shell=True)
+    print("polling run.rsync.proc", run.rsync_proc.poll())
+
+
+def md5sum_tar_file(tar_file, run):
+    # Change to parent directory,
+    # this is so we have fast5/0_12345.tar.gz in the checksums file.
+
+    checksum_filename = "checksum.md5"
+    if run.mux:
+        checksum_filename = "checksum_mux_scan.md5"
+
+    os.chdir(run.dir)
+    print(PARENT_DIRECTORY)
+
+    md5sum_command = "md5sum fast5/%s >> %s/%s" % (tar_file, run.dir, checksum_filename)
+    # Append the md5sum of the tar file to the list of md5sums.
+    checksum_proc = subprocess.Popen(md5sum_command, shell=True,
+                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    stdout, stderr = checksum_proc.communicate()
+    print("md5sum output", stdout, stderr)
+
+    os.chdir(READS_DIR)  # Change back out of parent directory
+
+
+def copy_across_md5sum(run):
+    # Use the scp command to copy across the md5sum file into the
+    # destination directory on the server
+    checksum_filename = "checksum.md5"
+    if run.mux:
+        checksum_filename = "checksum_mux_scan.md5"
+
+    scp_command = "sshpass -p %s scp %s/%s %s@%s:%s" % (
+                                                     PASSWORD,
+                                                     run.dir,
+                                                     checksum_filename,
+                                                     SERVER_USERNAME,
+                                                     SERVER_NAME,
+                                                     DEST_DIRECTORY
+                                                     )
+    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = scp_proc.communicate()
+    print("Output of md5sum command", stdout, stderr)
+
+
+def copy_across_csv_files(run):
+    # Use the scp command to copy across the csv files into the destination directory on the server.
+    scp_command = "sshpass -p %s scp -r %s %s@%s:%s" % (
+                                                        PASSWORD,
+                                                        run.csv_dir,
+                                                        SERVER_USERNAME,
+                                                        SERVER_NAME,
+                                                        DEST_DIRECTORY)
+    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = scp_proc.communicate()
+    print("Output of scp csv command", stdout, stderr)
+
+
+"""
+Initialisation scripts:
+1. get_arguments
+2. set_global_variables
+3. set_runs
+4. get_run_details
+5. create_transferring_lock_file
+6. remove_transferring_lock_file
+
+"""
+
+
+def get_arguments():
+    parser = argparse.ArgumentParser(
+        description="The transfer_fast5_to_server transfers MiNION data from a " +
+                    "laptop in realtime. The process will finish when the script " +
+                    "believes MinKNOW is no longer running.")
+    parser.add_argument("--reads_dir", type=str, required=True,
+                        help="/path/to/reads, " +
+                             "should have a bunch of runs labelled <YYYYMMDD_HHMM_SAMPLE_NAME>")
+    parser.add_argument("--server_name", type=str, required=True,
+                        help="If you were to ssh username@server, " +
+                             "please type in the server bit.")
+    parser.add_argument("--user_name", type=str, required=True,
+                        help="If you were to ssh username@server, " +
+                             "please type in the username bit")
+    parser.add_argument("--dest_directory", type=str, required=True,
+                        help="Where abouts on the server do you wish to place these files?")
+    parser.add_argument("--sample_name", type=str, required=True,
+                        help="Sample name that you typed into MinKNOW.")
+    return parser.parse_args()
+
+
+def set_global_variables(args):
+    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, \
+           DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME
+    READS_DIR = args.reads_dir
+    SERVER_NAME = args.server_name
+    SERVER_USERNAME = args.user_name
+    PASSWORD = get_password()
+    DEST_DIRECTORY = args.dest_directory
+    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
+    SAMPLE_NAME = args.sample_name
 
 
 def set_runs():
@@ -177,14 +469,6 @@ def get_run_details(run):
     return flowcell, random, mux
 
 
-def is_int(folder):
-    try:
-        int(folder)
-    except ValueError:
-        return False
-    return True
-
-
 def create_transferring_lock_file():
     s = pxssh.pxssh()
     print(PASSWORD)
@@ -215,68 +499,28 @@ def remove_transferring_lock_file():
     s.logout()  # Logout
 
 
-def transfer_fast5_files(run):
-    global MINKNOW_RUNNING
-    # Get list of sub-directories
-    subdirs = get_subdirs(run)
-    print(subdirs)
-
-    # Check if MinKNOW is still running
-    if not is_minknow_still_running():
-        MINKNOW_RUNNING = False
-
-    new_folders = False
-    # For any new folders.
-    for subdir in subdirs:
-        subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
-        # Is folder finished?
-        folder_status = check_folder_status(subdir, run)
-        if folder_status == "still writing":
-            continue
-        new_folders = True
-        # Tar up folder(s)
-        tar_folders(subdir_as_standard_int, run)
-
-    # Let's have a rest if no new folders have been created recently.
-    if not new_folders:
-        have_a_break()
-    else:
-        run_rsync_command(run)
-        copy_across_md5sum(run)
-        copy_across_csv_files(run)
+"""
+Miscellaneous functions
+1. is_int
+2. get_password
+3. is_minknow_still_running
+4. tar_up_last_folder
+5. check_directories
+6. have_a_break
+7. delete_folder_if_empty
+8. get_complementary_runid
+9. is_folder_maxxed_out
+10. move_fast5_files
+11. standardise_int_length
+"""
 
 
-def get_arguments():
-    parser = argparse.ArgumentParser(
-        description="The transfer_fast5_to_server transfers MiNION data from a " +
-                    "laptop in realtime. The process will finish when the script " +
-                    "believes MinKNOW is no longer running.")
-    parser.add_argument("--reads_dir", type=str, required=True,
-                        help="/path/to/reads, " +
-                             "should have a bunch of runs labelled <YYYYMMDD_HHMM_SAMPLE_NAME>")
-    parser.add_argument("--server_name", type=str, required=True,
-                        help="If you were to ssh username@server, " +
-                             "please type in the server bit.")
-    parser.add_argument("--user_name", type=str, required=True,
-                        help="If you were to ssh username@server, " +
-                             "please type in the username bit")
-    parser.add_argument("--dest_directory", type=str, required=True,
-                        help="Where abouts on the server do you wish to place these files?")
-    parser.add_argument("--sample_name", type=str, required=True,
-                        help="Sample name that you typed into MinKNOW.")
-    return parser.parse_args()
-
-
-def set_global_variables(args):
-    global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, \
-           DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME
-    READS_DIR = args.reads_dir
-    SERVER_NAME = args.server_name
-    SERVER_USERNAME = args.user_name
-    PASSWORD = get_password()
-    DEST_DIRECTORY = args.dest_directory
-    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
-    SAMPLE_NAME = args.sample_name
+def is_int(folder):
+    try:
+        int(folder)
+    except ValueError:
+        return False
+    return True
 
 
 def get_password():
@@ -364,162 +608,8 @@ def check_directories():
     print(output)
 
 
-def copy_across_md5sum(run):
-    # Use the scp command to copy across the md5sum file into the
-    # destination directory on the server
-    checksum_filename = "checksum.md5"
-    if run.mux:
-        checksum_filename = "checksum_mux_scan.md5"
-
-    scp_command = "sshpass -p %s scp %s/%s %s@%s:%s" % (
-                                                     PASSWORD,
-                                                     run.dir,
-                                                     checksum_filename,
-                                                     SERVER_USERNAME,
-                                                     SERVER_NAME,
-                                                     DEST_DIRECTORY
-                                                     )
-    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = scp_proc.communicate()
-    print("Output of md5sum command", stdout, stderr)
-
-
-def copy_across_csv_files(run):
-    # Use the scp command to copy across the csv files into the destination directory on the server.
-    scp_command = "sshpass -p %s scp -r %s %s@%s:%s" % (
-                                                        PASSWORD,
-                                                        run.csv_dir,
-                                                        SERVER_USERNAME,
-                                                        SERVER_NAME,
-                                                        DEST_DIRECTORY)
-    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = scp_proc.communicate()
-    print("Output of scp csv command", stdout, stderr)
-
-
-def run_rsync_command(run):
-    try:
-        if run.rsync_proc.poll() is None:
-            # Still running from previous run
-            print "It appears rsync is running"
-            return
-        else:
-            stdout, stderr = run.rsync_proc.communicate()
-            print("Rsync", stdout, stderr)
-    except AttributeError:
-        # Initial set up
-        print "Rsync is to be initialised"
-        pass
-
-    reads_dir = "fast5/"
-    # Generate list of rsync options to be used.
-    rsync_command_options = []
-    # Delete the tar.gz files from the laptop.
-    rsync_command_options.append("--remove-source-files")
-    rsync_command_options.append("--include='*.tar.gz'")
-    rsync_command_options.append("--exclude='*'")  # Exclude everything else!
-    rsync_command_options.append("--recursive")
-    rsync_command_options.append("--times")
-
-    # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST'
-    # permutation of the command
-
-    # The tar.gz files will be placed in the reads sub folder
-    rsync_command = "sshpass -p %s rsync %s %s/ %s@%s:%s/%s" % (
-                                                            PASSWORD,
-                                                            ' '.join(rsync_command_options),
-                                                            run.fast5_dir,
-                                                            SERVER_USERNAME,
-                                                            SERVER_NAME,
-                                                            DEST_DIRECTORY,
-                                                            reads_dir)
-    print(rsync_command)
-    run.rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, shell=True)
-    print("polling run.rsync.proc", run.rsync_proc.poll())
-
-
-def get_subdirs(run):
-    subdirs = [os.path.join(run.fast5_dir, folder)
-               for folder in os.listdir(run.fast5_dir)
-               # Make sure that the subdirectory is a directory
-               if os.path.isdir(os.path.join(run.fast5_dir, folder))
-               # And not the tmp directory
-               and not folder == "tmp"
-               # And subdirectory is int
-               and is_int(folder)]
-
-    # Sort subdirectories by writing time.
-    return sorted(subdirs, key=os.path.getmtime)
-
-
 def have_a_break():
     time.sleep(60)
-
-
-def check_folder_status(subdir, run, full=True):
-    subdir_as_standard_int = standardise_int_length(os.path.basename(os.path.normpath(subdir)))
-    # Returns the folder status, also generates a little csv file
-    # for each of the corresponding folders for you take home.
-    fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
-                   if fast5_file.endswith(".fast5")]
-
-    # Create pandas data frame with each fast5 file as a row.
-    # Final columns will include:
-    #       fast5 file name       - name of fast5 file
-    #       Modification time - time of modification of file,
-    #                           useful for deciding if run has finished.
-    #       channel           - Channel ID of the run.
-    #       read number       - What number read is this.
-
-    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no'])
-    fast5_pd['filename'] = fast5_files
-    fast5_pd['ctime'] = [time.ctime(os.path.getmtime(os.path.join(subdir, fast5_file)))
-                         for fast5_file in fast5_files]
-    fast5_pd['channel'] = [fast5_file.split('_')[-3]
-                           for fast5_file in fast5_files]
-    fast5_pd['read_no'] = [fast5_file.split('_')[-2]
-                           for fast5_file in fast5_files]
-
-    # If this is the final folder, we will move regardless of if it is full:
-    if not full:
-        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
-        # Ensure that csv directory exists
-        if not os.path.isdir(run.csv_dir):
-            os.mkdir(run.csv_dir)
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
-        return "moving files"
-    # Is this a folder with mux scans, if so, we'll move the files over to the
-    # actual sequencing run folder
-    if run.mux:
-        comp_run = get_complementary_run_id(run)
-        if comp_run is None:
-            # No complementary run, be patient will be there soon!
-            return "still writing"
-
-        # Move fast5 files across to server.
-        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
-        # Ensure that csv directory exists
-        if not os.path.isdir(run.csv_dir):
-            os.mkdir(run.csv_dir)
-        # Generate csv
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + "_mux_scan" + ".csv"))
-        delete_folder_if_empty(subdir)
-        return "moving files"
-
-    if is_folder_maxxed_out(len(fast5_pd)):
-        move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
-        # Ensure that csv directory exists
-        if not os.path.isdir(run.csv_dir):
-            os.mkdir(run.csv_dir)
-        fast5_pd.to_csv(os.path.join(run.csv_dir, subdir_as_standard_int + "_" + run.random + ".csv"))
-        delete_folder_if_empty(subdir)
-        return "moving files"
-
-    # Used for if we bother trying to tar up in the next step.
-    return "still writing"
 
 
 def delete_folder_if_empty(subdir):
@@ -562,50 +652,6 @@ def move_fast5_files(subdir, fast5_files, run):
 
     for fast5_file in fast5_files:
         subprocess.call("mv %s %s" % (os.path.join(subdir, fast5_file), new_dir), shell=True)
-
-
-def tar_folders(subdir_prefix, run):
-    # Get the subdirectories that start with the initial subdirectory.
-    # So 0 may now be 0_12345 where 12345 is the rnumber.
-    print(subdir_prefix)
-    os.chdir(run.fast5_dir)
-    subdirs = [subdir for subdir in os.listdir(run.fast5_dir)
-               if subdir.startswith(subdir_prefix + "_")
-               and os.path.isdir(os.path.join(run.fast5_dir, subdir))]
-
-    # Now tar up each folder individually
-    for subdir in subdirs:
-        tar_file = "%s.tar.gz" % subdir
-        tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir,
-                                                                            tar_file)
-        tar_proc = subprocess.Popen(tar_command, shell=True,
-                                    stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        stdout, stderr = tar_proc.communicate()
-        md5sum_tar_file(tar_file, run)
-        if stderr is not None:
-            print(stderr)
-    os.chdir(READS_DIR)
-
-
-def md5sum_tar_file(tar_file, run):
-    # Change to parent directory,
-    # this is so we have fast5/0_12345.tar.gz in the checksums file.
-
-    checksum_filename = "checksum.md5"
-    if run.mux:
-        checksum_filename = "checksum_mux_scan.md5"
-
-    os.chdir(run.dir)
-    print(PARENT_DIRECTORY)
- 
-    md5sum_command = "md5sum fast5/%s >> %s/%s" % (tar_file, run.dir, checksum_filename)
-    # Append the md5sum of the tar file to the list of md5sums.
-    checksum_proc = subprocess.Popen(md5sum_command, shell=True,
-                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    stdout, stderr = checksum_proc.communicate()
-    print("md5sum output", stdout, stderr)
-
-    os.chdir(READS_DIR)    # Change back out of parent directory
 
 
 def standardise_int_length(my_integer):
