@@ -253,7 +253,7 @@ def get_arguments():
                     "believes MinKNOW is no longer running.")
     parser.add_argument("--reads_dir", type=str, required=True,
                         help="/path/to/reads, " +
-                             "should have a bunch of subfolders from 0 to N")
+                             "should have a bunch of runs labelled <YYYYMMDD_HHMM_SAMPLE_NAME>")
     parser.add_argument("--server_name", type=str, required=True,
                         help="If you were to ssh username@server, " +
                              "please type in the server bit.")

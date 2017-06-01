@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+This script is used to move fast5 files generate by MinKNOW 1.3 and below
+into subfolders of 4000 as per MinKNOW 1.4+ which makes it easier data to handle.
+It uses a parallelisation technique to move the files more quickly into each of the subfolders.
+"""
+
 import argparse  # For importing arguments
 import os  # Get file lists, check directories
 import itertools  # Iterate through fast5file and mv commands
@@ -61,13 +67,13 @@ def move_fast5_files(args):
     subdirectories = fast5_df.subfolder.unique().tolist()
     print(subdirectories)
     for subdirectory in subdirectories:
-	# Create directory
-	if os.path.isdir(subdirectory):
-		# If directory already exists, make sure nothing is inside
-		if len(os.listdir(subdirectory)) > 0:
-			sys.exit("Directory '%s' exists with files inside" % subdirectory)
-        else:
-		os.mkdir(subdirectory)
+        # Create directory
+        if os.path.isdir(subdirectory):
+            # If directory already exists, make sure nothing is inside
+            if len(os.listdir(subdirectory)) > 0:
+                sys.exit("Directory '%s' exists with files inside" % subdirectory)
+            else:
+                os.mkdir(subdirectory)
 
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                  for cmd in fast5_df.mv_command.tolist())
@@ -106,7 +112,7 @@ def archive_folders(args, directory_list):
 
     # Multi-thread our tar command
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                                  for cmd in tar_commands)
+                 for cmd in tar_commands)
 
     # We use the islice command to split our commands into five smaller lists.
     running_processes = list(itertools.islice(processes, args.num_threads))
@@ -116,12 +122,12 @@ def archive_folders(args, directory_list):
             if process.poll() is not None:  # Means that the process is complete!
                 stdout, stderr = process.communicate()  # Get the output of the completed process
                 if not stderr == "":
-			        print stderr
+                    print stderr
                 running_processes[i] = next(processes, None)
                 # Run the next number in the list.
                 if running_processes[i] is None:  # No more commands waiting to be processed.
-                   del running_processes[i]  # Not a valid process.
-                   break
+                    del running_processes[i]  # Not a valid process.
+                    break
 
 
 def standardise_int_length(my_integer):
