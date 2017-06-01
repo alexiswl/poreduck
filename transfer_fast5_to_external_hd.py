@@ -253,14 +253,9 @@ def set_global_variables(args):
     global READS_DIR, PASSWORD, DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME
     READS_DIR = args.reads_dir
 
-    PASSWORD = get_password()
     DEST_DIRECTORY = args.dest_directory
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir))
     SAMPLE_NAME = args.sample_name
-
-
-def get_password():
-    return getpass.getpass('password: ')
 
 
 def is_minknow_still_running():
