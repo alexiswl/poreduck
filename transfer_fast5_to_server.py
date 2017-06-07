@@ -55,7 +55,7 @@ DEST_DIRECTORY = ""
 TIMEOUT = 1800
 PARENT_DIRECTORY = ""
 MINKNOW_RUNNING = True
-TRANSFER_LOCK_FILE = "TRANSFERRING"
+TRANSFER_LOCK_FILE = "TRANSFERRING_yet_again"
 SAMPLE_NAME = ""
 RUNS = []
 MUX_PROCESSING_TIME = 600  # seconds
@@ -115,6 +115,7 @@ def transfer_fast5_files(run):
     global MINKNOW_RUNNING
     # Get list of sub-directories
     subdirs = get_subdirs(run)
+    print('Transfering fast5 files')
     print(subdirs)
 
     # Check if MinKNOW is still running
@@ -135,6 +136,7 @@ def transfer_fast5_files(run):
 
     # Let's have a rest if no new folders have been created recently.
     if not new_folders:
+        print('Having a rest')
         have_a_break()
     else:
         run_rsync_command(run)
@@ -155,6 +157,7 @@ Transfer fast5 file subscripts
 
 
 def get_subdirs(run):
+    print('Executing get_subdirs')
     subdirs = [os.path.join(run.fast5_dir, folder)
                for folder in os.listdir(run.fast5_dir)
                # Make sure that the subdirectory is a directory
@@ -174,7 +177,7 @@ def check_folder_status(subdir, run, full=True):
     # for each of the corresponding folders for you take home.
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5")]
-
+    print("Executing check_folder_status")
     # Create pandas data frame with each fast5 file as a row.
     # Final columns will include:
     #       fast5 file name       - name of fast5 file
@@ -234,6 +237,7 @@ def check_folder_status(subdir, run, full=True):
 def tar_folders(subdir_prefix, run):
     # Get the subdirectories that start with the initial subdirectory.
     # So 0 may now be 0_12345 where 12345 is the rnumber.
+    print('Executing tar_folders')
     print(subdir_prefix)
     os.chdir(run.fast5_dir)
     subdirs = [subdir for subdir in os.listdir(run.fast5_dir)
@@ -242,7 +246,8 @@ def tar_folders(subdir_prefix, run):
 
     # Now tar up each folder individually
     for subdir in subdirs:
-        tar_file = "%s.tar.gz" % subdir
+        tar_file = subdir +'_'+ SAMPLE_NAME
+        tar_file = "%s.tar.gz" % tar_file
         tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir,
                                                                             tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True,
@@ -255,6 +260,7 @@ def tar_folders(subdir_prefix, run):
 
 
 def run_rsync_command(run):
+    print('Executing run_rsync_command')
     try:
         if run.rsync_proc.poll() is None:
             # Still running from previous run
@@ -272,7 +278,8 @@ def run_rsync_command(run):
     # Generate list of rsync options to be used.
     rsync_command_options = []
     # Delete the tar.gz files from the laptop.
-    rsync_command_options.append("--remove-source-files")
+    #keep tared up files for now
+    #rsync_command_options.append("--remove-source-files")
     rsync_command_options.append("--include='*.tar.gz'")
     rsync_command_options.append("--exclude='*'")  # Exclude everything else!
     rsync_command_options.append("--recursive")
@@ -297,6 +304,7 @@ def run_rsync_command(run):
 
 
 def md5sum_tar_file(tar_file, run):
+    print('Doing md5sum_tar_file')
     # Change to parent directory,
     # this is so we have fast5/0_12345.tar.gz in the checksums file.
 
@@ -318,6 +326,7 @@ def md5sum_tar_file(tar_file, run):
 
 
 def copy_across_md5sum(run):
+    print('Doing copy_across_md5sum')
     # Use the scp command to copy across the md5sum file into the
     # destination directory on the server
     checksum_filename = "checksum.md5"
@@ -402,7 +411,7 @@ def set_runs():
     runs = [run for run in os.listdir(READS_DIR)
             if os.path.isdir(os.path.join(READS_DIR, run))
             and run.endswith(SAMPLE_NAME)]
-
+    #print ("Executing set_runs")
     initialised_runs = []
     for initalised_run in RUNS:
         initialised_runs.append(initalised_run.name)
@@ -427,6 +436,7 @@ def get_run_details(run):
     subfolders = sorted([folder for folder in os.listdir(fast5_dir)
                          if os.path.isdir(os.path.join(fast5_dir, folder))
                          and is_int(folder)])
+    #print("Execting get_run_details")
     # Get the first subfolder we see.
     if len(subfolders) == 0:
         return None, None, None
@@ -472,7 +482,7 @@ def get_run_details(run):
 def create_transferring_lock_file():
     s = pxssh.pxssh()
     print(PASSWORD)
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD, original_prompt='pwd'):
         print("SSH failed on login")
     else:
         print("SSH passed")
@@ -487,7 +497,7 @@ def create_transferring_lock_file():
 def remove_transferring_lock_file():
     s = pxssh.pxssh()
 
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD, original_prompt='pwd'):
         print("SSH failed on login")
     else:
         print("SSH passed")
@@ -587,7 +597,7 @@ def check_directories():
     s = pxssh.pxssh()  
     
     print(repr(PASSWORD)) 
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD, original_prompt='pwd'):
         print("SSH failed on login")
     else:
         print("SSH passed")
