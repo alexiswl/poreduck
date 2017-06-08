@@ -258,6 +258,9 @@ def check_directories():
 
     if ALBACORE_DIR == "":
         ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
+    else:
+        ALBACORE_DIR = os.path.abspath(ALBACORE_DIR)
+
     if not os.path.isdir(ALBACORE_DIR):
         os.mkdir(ALBACORE_DIR)
 
@@ -267,6 +270,8 @@ def check_directories():
 
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+    else:
+        FASTQ_DIR = os.path.abspath(FASTQ_DIR)
 
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
