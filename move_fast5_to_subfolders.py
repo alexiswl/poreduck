@@ -72,8 +72,8 @@ def move_fast5_files(args):
             # If directory already exists, make sure nothing is inside
             if len(os.listdir(subdirectory)) > 0:
                 sys.exit("Directory '%s' exists with files inside" % subdirectory)
-            else:
-                os.mkdir(subdirectory)
+        else:
+            os.mkdir(subdirectory)
 
     processes = (subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                  for cmd in fast5_df.mv_command.tolist())
