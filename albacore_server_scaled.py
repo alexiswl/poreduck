@@ -224,6 +224,8 @@ def get_arguments():
                              "and sit adjacent to reads folder if left blank.")
     parser.add_argument("--resume", type=str, required=False, default=None,
                         help="Resume the albacore run, need a csv file")
+    parser.add_argument("--qsub_directory", type=str, required=False, default=None,
+                        help="Where would you like to place the qsub files?")
 
     return parser.parse_args()
 
@@ -231,7 +233,7 @@ def get_arguments():
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    global STATUS_CSV
+    global STATUS_CSV, QSUB_LOG_DIR
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -241,6 +243,8 @@ def set_global_variables(args):
         FASTQ_DIR = args.fastq_dir
     if args.resume is not None:
         STATUS_CSV = args.resume
+    if args.qsub_directory is not None:
+        QSUB_LOG_DIR = args.qsub_directory
 
 
 def check_directories():
@@ -258,6 +262,9 @@ def check_directories():
 
     if ALBACORE_DIR == "":
         ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
+    else:
+        ALBACORE_DIR = os.path.abspath(ALBACORE_DIR)
+
     if not os.path.isdir(ALBACORE_DIR):
         os.mkdir(ALBACORE_DIR)
 
@@ -267,6 +274,8 @@ def check_directories():
 
     if FASTQ_DIR == "":
         FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+    else:
+        FASTQ_DIR = os.path.abspath(FASTQ_DIR)
 
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
@@ -452,7 +461,8 @@ def move_fastq_file(subfolder):
         if os.path.isfile(subfolder.fastq_file):
             fastq_file_index += 1
             print("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
-            subfolder.fastq_file = subfolder.fastq_file.replace(".fastq", "") + "." + str(fastq_file_index) + ".fastq"
+            subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq", "") + \
+                                   "." + str(fastq_file_index) + ".fastq"
         # Create move command and run through subproces.
         move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
                                      os.path.join(FASTQ_DIR, subfolder.fastq_file))

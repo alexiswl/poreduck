@@ -101,7 +101,7 @@ def archive_folders(args, directory_list):
     """
     # Archive each of the subfolders
     # If we haven't selected archive then we return immediately.
-    if args.archive is None:
+    if not args.archive:
         return
 
     # Otherwise a simple tar command should do
