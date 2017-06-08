@@ -62,6 +62,7 @@ class Subfolder:
         self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
         self.fastq_file = name + ".fastq"
+        self.albacore_zip_file = self.albacore_dir + ".albacore.tar.gz"
         # Qsub related files / ids
         self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
         self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
@@ -190,6 +191,11 @@ def run_pipeline():
 
     # Move the fastq file to the FASTQ_DIR
     [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
+     if subfolder.albacore_complete and
+     not subfolder.fastq_moved]
+
+    # Tar albacore directory
+    [tar_albacore_folder(subfolder) for subfolder in SUBFOLDERS
      if subfolder.albacore_complete and
      not subfolder.fastq_moved]
 
@@ -329,7 +335,8 @@ Pipeline functions:
 2. run_albacore
 3. remove_folder
 4. move_fastq_file
-5. merge_fastq_files
+5. tar_albacore_folder
+6. merge_fastq_files
 """
 
 
@@ -475,6 +482,22 @@ def move_fastq_file(subfolder):
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
     update_dataframe(subfolder)
+
+
+def tar_albacore_folder(subfolder):
+    """
+    Tar up the albacore folder into .tar.gz files.
+    It's really just a bunch of metadata anyway
+    """
+    tar_command = "tar -cf - %s --remove_files | pigz -p 16 > %s" % \
+                  (subfolder.albacore_dir, subfolder.albacore_zip_file)
+
+    # Run tar_command through subprocess.
+    tar_proc = subprocess.Popen(tar_command, shell=True,
+                                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    stdout, stderr = tar_proc.communicate()
+    if not stdout == "" or not stderr == "":
+        print ("Output of tar albacore folder command is", stdout, stderr)
 
 
 def merge_fastq_files():
