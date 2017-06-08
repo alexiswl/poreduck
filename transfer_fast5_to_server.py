@@ -76,7 +76,7 @@ class Run:
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
-        self.suffix = suffix
+        self.suffix = sample_id
 
 """
 Main run files:
@@ -260,8 +260,8 @@ def tar_folders(subdir_prefix, run):
 
     # Now tar up each folder individually
     for subdir in subdirs:
-        tar_file = subdir +'_'+ SAMPLE_NAME
-        tar_file = "%s.tar.gz" % tar_file
+        #tar_file = subdir +'_'+ SAMPLE_NAME
+        tar_file = "%s.tar.gz" % subdir
         tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir,
                                                                             tar_file)
         tar_proc = subprocess.Popen(tar_command, shell=True,
@@ -407,7 +407,7 @@ def get_arguments():
                         help="Where abouts on the server do you wish to place these files?")
     parser.add_argument("--sample_name", type=str, required=True,
                         help="Sample name that you typed into MinKNOW.")
-    parser.add_argument("--suffix", type=str, required=True,
+    parser.add_argument("--suffix", type=str, required=False,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
     return parser.parse_args()
 
