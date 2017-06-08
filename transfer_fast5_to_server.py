@@ -398,7 +398,7 @@ def get_arguments():
                         help="Where abouts on the server do you wish to place these files?")
     parser.add_argument("--sample_name", type=str, required=True,
                         help="Sample name that you typed into MinKNOW.")
-    parser.add_argument("--suffix", type=str, requried=True,
+    parser.add_argument("--suffix", type=str, required=True,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
     return parser.parse_args()
 
