@@ -77,6 +77,7 @@ class Subfolder:
         self.albacore_submitted = False
         self.albacore_commenced = False
         self.albacore_complete = False
+        self.albacore_tarred = False
         self.folder_removed = False
         self.fastq_moved = False
 
@@ -197,7 +198,7 @@ def run_pipeline():
     # Tar albacore directory
     [tar_albacore_folder(subfolder) for subfolder in SUBFOLDERS
      if subfolder.albacore_complete and
-     not subfolder.fastq_moved]
+     not subfolder.albacore_tarred]
 
 
 """
@@ -498,6 +499,7 @@ def tar_albacore_folder(subfolder):
     stdout, stderr = tar_proc.communicate()
     if not stdout == "" or not stderr == "":
         print ("Output of tar albacore folder command is", stdout, stderr)
+    subfolder.albacore_tarred = True
 
 
 def merge_fastq_files():
