@@ -333,7 +333,7 @@ def md5sum_tar_file(tar_file, run):
 
     os.chdir(run.dir)
     print(PARENT_DIRECTORY)
-
+    print(md5sum_file_name)
     md5sum_command = "md5sum fast5/%s >> %s" % (tar_file, os.path.join(run.dir, md5sum_file_name))
     # Append the md5sum of the tar file to the list of md5sums.
     checksum_proc = subprocess.Popen(md5sum_command, shell=True,
@@ -352,7 +352,7 @@ def copy_across_md5sum(run):
     scp_command = "sshpass -p %s scp %s/%s %s@%s:%s" % (
                                                      PASSWORD,
                                                      run.dir,
-                                                     checksum_filename,
+                                                     checksum_suffix,
                                                      SERVER_USERNAME,
                                                      SERVER_NAME,
                                                      DEST_DIRECTORY
@@ -407,7 +407,7 @@ def get_arguments():
                         help="Where abouts on the server do you wish to place these files?")
     parser.add_argument("--sample_name", type=str, required=True,
                         help="Sample name that you typed into MinKNOW.")
-    parser.add_argument("--suffix", type=str, requried=True,
+    parser.add_argument("--suffix", type=str, required=True,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
     return parser.parse_args()
 
