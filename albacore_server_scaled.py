@@ -458,7 +458,7 @@ def move_fastq_file(subfolder):
         # Rename fastq to have a .0.fastq at the start
         subfolder.fastq_file = subfolder.fastq_file.replace(".fastq", "") + "." + str(fastq_file_index) + ".fastq"
         # We will move and rename but make sure we're not overwriting anything
-        if os.path.isfile(subfolder.fastq_file):
+        if os.path.isfile(os.path.join(FASTQ_DIR, subfolder.fastq_file)):
             fastq_file_index += 1
             print("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
             subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq", "") + \
