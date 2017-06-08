@@ -473,7 +473,7 @@ def move_fastq_file(subfolder):
             subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq",
                                                                 str(fastq_file_index) + ".fastq")
 
-        # Create move command and run through subproces.
+        # Create move command and run through subprocess.
         move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
                                      os.path.join(FASTQ_DIR, subfolder.fastq_file))
         move_proc = subprocess.Popen(move_command, shell=True,
