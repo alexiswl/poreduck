@@ -492,7 +492,7 @@ def tar_albacore_folder(subfolder):
     Tar up the albacore folder into .tar.gz files.
     It's really just a bunch of metadata anyway
     """
-    tar_command = "tar -cf - %s --remove_files | pigz -p 16 > %s" % \
+    tar_command = "tar -cf - %s --remove-files | pigz -p 16 > %s" % \
                   (subfolder.albacore_dir, subfolder.albacore_zip_file)
 
     # Run tar_command through subprocess.
