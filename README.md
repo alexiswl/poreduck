@@ -13,7 +13,7 @@ poreduck currently can be used for two key steps of handling MinION data:
 
 An examples of poreduck usage is shown below:
 
-`transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads --server_name super_nodes --user_name admin
---dest_dir /data/storage/MinION/sample_name`
+`transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
+--dest_dir /data/storage/MinION/my_MinION_run`
 
 `albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --config FC106_LSK108`
