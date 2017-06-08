@@ -224,6 +224,8 @@ def get_arguments():
                              "and sit adjacent to reads folder if left blank.")
     parser.add_argument("--resume", type=str, required=False, default=None,
                         help="Resume the albacore run, need a csv file")
+    parser.add_argument("--qsub_directory", type=str, required=False, default=None,
+                        help="Where would you like to place the qsub files?")
 
     return parser.parse_args()
 
@@ -231,7 +233,7 @@ def get_arguments():
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    global STATUS_CSV
+    global STATUS_CSV, QSUB_LOG_DIR
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -241,6 +243,8 @@ def set_global_variables(args):
         FASTQ_DIR = args.fastq_dir
     if args.resume is not None:
         STATUS_CSV = args.resume
+    if args.qsub_directory is not None:
+        QSUB_LOG_DIR = args.qsub_directory
 
 
 def check_directories():
