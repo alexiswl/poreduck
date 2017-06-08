@@ -467,13 +467,13 @@ def move_fastq_file(subfolder):
 
     for fastq_file in fastq_files:
         # We will move and rename but make sure we're not overwriting anything
-        if os.path.isfile(os.path.join(FASTQ_DIR, subfolder.fastq_file)):
+        while os.path.isfile(os.path.join(FASTQ_DIR, subfolder.fastq_file)):
             fastq_file_index += 1
             print("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
             subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq",
                                                                 str(fastq_file_index) + ".fastq")
 
-        # Create move command and run through subproces.
+        # Create move command and run through subprocess.
         move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
                                      os.path.join(FASTQ_DIR, subfolder.fastq_file))
         move_proc = subprocess.Popen(move_command, shell=True,
