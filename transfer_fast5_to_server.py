@@ -101,6 +101,9 @@ def main():
         set_runs()
         for run in RUNS:
             transfer_fast5_files(run)
+        # Check if MinKNOW is still running
+        if not is_minknow_still_running():
+            MINKNOW_RUNNING = False
 
     # Now we need to tar up the last folder.
     # create last folder.
@@ -121,10 +124,6 @@ def transfer_fast5_files(run):
     # Get list of sub-directories
     subdirs = get_subdirs(run)
     print(subdirs)
-
-    # Check if MinKNOW is still running
-    if not is_minknow_still_running():
-        MINKNOW_RUNNING = False
 
     new_folders = False
     # For any new folders.
@@ -208,6 +207,7 @@ def check_folder_status(subdir, run, full=True):
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
         fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered)))
+        delete_folder_if_empty(subdir)
         return "moving files"
     # Is this a folder with mux scans, if so, we'll move the files over to the
     # actual sequencing run folder
@@ -398,7 +398,7 @@ def get_arguments():
                         help="Where abouts on the server do you wish to place these files?")
     parser.add_argument("--sample_name", type=str, required=True,
                         help="Sample name that you typed into MinKNOW.")
-    parser.add_argument("--suffix", type=str, required=True,
+    parser.add_argument("--suffix", type=str, required=False, default=None,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
     return parser.parse_args()
 
