@@ -27,6 +27,7 @@ import pandas as pd  # For the status.csv file
 # Set global and semi-global variables
 TRANSFERRING = True
 READS_DIR = ""
+CW_DIR = ""
 ALBACORE_DIR = ""
 WORKING_DIR = ""
 NUM_THREADS = 0
@@ -240,7 +241,7 @@ def get_arguments():
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    global STATUS_CSV, QSUB_LOG_DIR
+    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -252,6 +253,7 @@ def set_global_variables(args):
         STATUS_CSV = args.resume
     if args.qsub_directory is not None:
         QSUB_LOG_DIR = args.qsub_directory
+    CW_DIR = os.getcwd()
 
 
 def check_directories():
@@ -288,7 +290,7 @@ def check_directories():
         os.mkdir(FASTQ_DIR)
 
     if not STATUS_CSV == "":
-        if not os.path.isfile(STATUS_CSV):
+        if not os.path.isfile(os.path.join(CW_DIR, STATUS_CSV)):
             sys.exit("Resume csv specified but does not exist")
     else:
         STATUS_CSV = os.path.join(PARENT_DIRECTORY, "status.csv")
