@@ -202,10 +202,10 @@ def check_folder_status(subdir, run, full=True):
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
         # Generate csv
-        csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix, ".csv"]
+        csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered)))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
         delete_folder_if_empty(subdir)
         return "moving files"
     # Is this a folder with mux scans, if so, we'll move the files over to the
@@ -222,10 +222,11 @@ def check_folder_status(subdir, run, full=True):
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
         # Generate csv
-        csv_path_name_as_list = [subdir_as_standard_int, run.random, "mux_scan", run.suffix, ".csv"]
+        csv_path_name_as_list = [subdir_as_standard_int, run.random, "mux_scan", run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered)))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
+        delete_folder_if_empty(subdir)
         return "moving files"
 
     if is_folder_maxxed_out(len(fast5_pd)):
@@ -234,10 +235,10 @@ def check_folder_status(subdir, run, full=True):
         if not os.path.isdir(run.csv_dir):
             os.mkdir(run.csv_dir)
         # Generate csv
-        csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix, ".csv"]
+        csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered)))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
         delete_folder_if_empty(subdir)
         return "moving files"
 
@@ -314,13 +315,13 @@ def md5sum_tar_file(tar_file, run):
     # this is so we have fast5/0_12345.tar.gz in the checksums file.
 
     # Create filename for checksum file
-    md5sum_file_name_as_list = ["checksum", run.random, run.suffix, ".md5"]
+    md5sum_file_name_as_list = ["checksum", run.random, run.suffix]
     if run.mux:
-        md5sum_file_name_as_list = ["checksum", run.random, "mux_scan", run.suffix, ".md5"]
+        md5sum_file_name_as_list = ["checksum", run.random, "mux_scan", run.suffix]
 
     # Remove any "" from list
     md5sum_path_name_as_list_filtered = [x.strip() for x in md5sum_file_name_as_list if x.strip()]
-    md5sum_file_name = "_".join(md5sum_path_name_as_list_filtered)
+    md5sum_file_name = "_".join(md5sum_path_name_as_list_filtered) + ".md5"
 
     os.chdir(run.dir)
 
