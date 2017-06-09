@@ -86,7 +86,7 @@ Main run files:
 
 
 def main():
-    global THE_COUNT
+    global THE_COUNT, MINKNOW_RUNNING
     # Get argument list, password for server and set directories.
     args = get_arguments()
     set_global_variables(args)
@@ -120,7 +120,6 @@ def main():
 
 
 def transfer_fast5_files(run):
-    global MINKNOW_RUNNING
     # Get list of sub-directories
     subdirs = get_subdirs(run)
     print(subdirs)
