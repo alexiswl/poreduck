@@ -492,8 +492,9 @@ def tar_albacore_folder(subfolder):
     Tar up the albacore folder into .tar.gz files.
     It's really just a bunch of metadata anyway
     """
+    os.chdir(ALBACORE_DIR)
     tar_command = "tar -cf - %s --remove-files | pigz -p 16 > %s" % \
-                  (subfolder.albacore_dir, subfolder.albacore_zip_file)
+                  (os.path.basename(os.path.normpath(subfolder.albacore_dir)), subfolder.albacore_zip_file)
 
     # Run tar_command through subprocess.
     tar_proc = subprocess.Popen(tar_command, shell=True,
@@ -502,6 +503,7 @@ def tar_albacore_folder(subfolder):
     if not stdout == "" or not stderr == "":
         print ("Output of tar albacore folder command is", stdout, stderr)
     subfolder.albacore_tarred = True
+    os.chdir(READS_DIR)
 
 
 def merge_fastq_files():
