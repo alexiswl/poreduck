@@ -22,9 +22,8 @@ An examples of poreduck usage is shown below:
 1. Install Cygwin.
 
 2.  Install sshpass:
-    a.  Re-run the setup of Cygwin, selecting for 'make' and 'gcc' as these don't seem to be in the default installation. then read through
-       the link below to install sshpass.
-       https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
+    *  Re-run the setup of Cygwin, selecting for 'make' and 'gcc' as these don't seem to be in the default installation. 
+    * Read through the link below to install sshpass. https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
 
 3.  Install pigz:
     a.  Download the pigz source file.
