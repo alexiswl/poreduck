@@ -17,3 +17,21 @@ An examples of poreduck usage is shown below:
 --dest_dir /data/storage/MinION/my_MinION_run`
 
 `albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --config FC106_LSK108`
+
+### Dependencies (Windows specific)
+1. Install Cygwin.
+
+2.  Install sshpass:
+    a. Re-run the setup of Cygwin, selecting for 'make' and 'gcc' as these don't seem to be in the default installation. then read through        the link below to install sshpass.
+        https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
+
+3.  Install pigz:
+    a. Download the pigz source file.
+    b. Type `make`.
+    c. You may need to install the zlib library if you get an error in b. This is done through the Cygwin setup.exe program.
+
+### Dependencies (important python modules)
+All of the python modules listed below can be installed through pip or conda.
+Non pre-installed python modules
+* pexpect 
+* getpass
