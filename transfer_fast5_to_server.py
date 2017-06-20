@@ -61,6 +61,8 @@ RUNS = []
 MUX_PROCESSING_TIME = 600  # seconds
 THE_COUNT = 0  # mwhahaha (as in the one from sesame street)
 SUFFIX = ""
+NO_SSHPASS = False
+SSHPASS_PREFIX = ""
 
 
 class Run:
@@ -296,8 +298,7 @@ def run_rsync_command(run):
     # permutation of the command
 
     # The tar.gz files will be placed in the reads sub folder
-    rsync_command = "sshpass -p %s rsync %s %s/ %s@%s:%s/%s" % (
-                                                            PASSWORD,
+    rsync_command = SSHPASS_PREFIX + "rsync %s %s/ %s@%s:%s/%s" % (
                                                             ' '.join(rsync_command_options),
                                                             run.fast5_dir,
                                                             SERVER_USERNAME,
@@ -340,14 +341,13 @@ def copy_across_md5sum(run):
     # destination directory on the server
     checksum_suffix = "*.md5"
 
-    scp_command = "sshpass -p %s scp %s/%s %s@%s:%s" % (
-                                                     PASSWORD,
-                                                     run.dir,
-                                                     checksum_suffix,
-                                                     SERVER_USERNAME,
-                                                     SERVER_NAME,
-                                                     DEST_DIRECTORY
-                                                     )
+    scp_command = SSHPASS_PREFIX + "scp %s/%s %s@%s:%s" % (
+                                                             run.dir,
+                                                             checksum_suffix,
+                                                             SERVER_USERNAME,
+                                                             SERVER_NAME,
+                                                             DEST_DIRECTORY
+                                                             )
     scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, shell=True)
     stdout, stderr = scp_proc.communicate()
@@ -356,8 +356,7 @@ def copy_across_md5sum(run):
 
 def copy_across_csv_files(run):
     # Use the scp command to copy across the csv files into the destination directory on the server.
-    scp_command = "sshpass -p %s scp -r %s %s@%s:%s" % (
-                                                        PASSWORD,
+    scp_command = SSHPASS_PREFIX + "scp -r %s %s@%s:%s" % (
                                                         run.csv_dir,
                                                         SERVER_USERNAME,
                                                         SERVER_NAME,
@@ -400,12 +399,17 @@ def get_arguments():
                         help="Sample name that you typed into MinKNOW.")
     parser.add_argument("--suffix", type=str, required=False, default=None,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
+    parser.add_argument("--no-sshpass", default=False, dest='no_sshpass', action='store_true',
+                        help="ssh-pass is rather poor practise and quite a security risk." +
+                             "Tick this option and set up an id_rsa key if you'd prefer." +
+                             "You will still be required to enter your password for set-up purposes.")
     return parser.parse_args()
 
 
 def set_global_variables(args):
     global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, \
-           DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME, SUFFIX
+           DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME, SUFFIX, \
+           NO_SSHPASS, SSHPASS_PREFIX
     READS_DIR = args.reads_dir
     SERVER_NAME = args.server_name
     SERVER_USERNAME = args.user_name
@@ -415,6 +419,9 @@ def set_global_variables(args):
     SAMPLE_NAME = args.sample_name
     if args.suffix is not None:
         SUFFIX = args.suffix
+    NO_SSHPASS = args.no_sshpass
+    if not NO_SSHPASS:
+        SSHPASS_PREFIX = "sshpass -p %s " % PASSWORD
 
 
 def set_runs():
