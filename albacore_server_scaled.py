@@ -37,6 +37,7 @@ QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
 STATUS_CSV = ""
+QSUB_HOST = ""
 STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
@@ -234,6 +235,8 @@ def get_arguments():
                         help="Resume the albacore run, need a csv file")
     parser.add_argument("--qsub_directory", type=str, required=False, default=None,
                         help="Where would you like to place the qsub files?")
+    parser.add_argument("--qsub_host", type=str, required=False, default=None,
+                        help="Where would you like the qsub jobs to be run?")
 
     return parser.parse_args()
 
@@ -241,7 +244,7 @@ def get_arguments():
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR
+    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -254,6 +257,8 @@ def set_global_variables(args):
     if args.qsub_directory is not None:
         QSUB_LOG_DIR = args.qsub_directory
     CW_DIR = os.getcwd()
+    if args.qsub_host is not None:
+        QSUB_HOST = args.qsub_host
 
 
 def check_directories():
@@ -319,6 +324,8 @@ def pick_up_from_previous_run():
             SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
             SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
             SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
+
+            print(SUBFOLDERS[subfolder])
             # Now make sure none of the jobs have failed and reset if so
             if has_failed(SUBFOLDERS[subfolder].albacore_jobid):
                 SUBFOLDERS[subfolder].albacore_submitted = False
@@ -395,11 +402,11 @@ def run_albacore(subfolder):
     qsub_command = "qsub " \
                    "-o %s " \
                    "-e %s " \
-                   "-S /bin/bash -l hostname=melb-compute06 " \
+                   "-S /bin/bash -l hostname=%s " \
                    "-l h_vmem=%dG " \
                    "-wd %s -v OMP_NUM_THREADS=1" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
-                      memory_allocation, PARENT_DIRECTORY)
+                      QSUB_HOST, memory_allocation, PARENT_DIRECTORY)
 
     # Put these all together into one grand command
     albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
