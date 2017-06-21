@@ -31,7 +31,8 @@ CW_DIR = ""
 ALBACORE_DIR = ""
 WORKING_DIR = ""
 NUM_THREADS = 0
-CHOSEN_CONFIG = ""
+CHOSEN_FLOWCELL = ""
+CHOSEN_KIT = ""
 PARENT_DIRECTORY = ""
 QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
@@ -49,6 +50,8 @@ CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
            "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
            "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit.
+FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
+KITS = ["LSK108"]  # More kits to come
 
 
 class Subfolder:
@@ -219,8 +222,10 @@ def get_arguments():
     parser.add_argument("--reads_dir", type=str, required=True,
                         help="/path/to/reads, " +
                              "should have a bunch of tar zipped files in it.")
-    parser.add_argument("--config", type=str, choices=CONFIGS.keys(),
-                        help="Pick a config")
+    parser.add_argument("--flowcell", type=str, choices=FLOWCELLS,
+                        help="Pick a flowcell version")
+    parser.add_argument("--kit", type=str, choices=KITS,
+                        help="Pick a kit type")
     parser.add_argument("--output_dir", type=str, required=False, default=None,
                         help="Will be called 'albacore'" +
                              " and sit adjacent to the reads folder if left blank.")
@@ -243,12 +248,13 @@ def get_arguments():
 
 def set_global_variables(args):
     # Global variables
-    global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_CONFIG, FASTQ_DIR
-    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST
+    global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
+    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
-    CHOSEN_CONFIG = CONFIGS[args.config]
+    CHOSEN_KIT = args.kit
+    CHOSEN_FLOWCELL = args.flowcell
     NUM_THREADS = args.num_threads
     if args.fastq_dir is not None:
         FASTQ_DIR = args.fastq_dir
@@ -395,8 +401,9 @@ def run_albacore(subfolder):
                          "--input %s " \
                          "--worker_threads %s " \
                          "--save_path %s " \
-                         "--config %s" \
-                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_CONFIG)
+                         "--flowcell %s" \
+			 "--kit %s" \
+                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
 
     # These are both parsed into qsub which then determines what to do with it all.
     qsub_command = "qsub " \
