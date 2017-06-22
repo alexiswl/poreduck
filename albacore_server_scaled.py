@@ -314,10 +314,11 @@ def check_directories():
 
 def pick_up_from_previous_run():
     if os.path.isfile(STATUS_CSV):
-        previous_dataframe = pd.read_csv(STATUS_CSV, header=True)
+        previous_dataframe = pd.read_csv(STATUS_CSV)
 
         # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
+	    print(index, row)
             subfolder = row['name']
             SUBFOLDERS.append(Subfolder(subfolder))
 
@@ -403,7 +404,7 @@ def run_albacore(subfolder):
                          "--input %s " \
                          "--worker_threads %s " \
                          "--save_path %s " \
-                         "--flowcell %s" \
+                         "--flowcell %s " \
 			 "--kit %s" \
                          % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
 
