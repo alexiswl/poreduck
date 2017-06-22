@@ -51,7 +51,7 @@ CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
            "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit.
 FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
-KITS = ["LSK108"]  # More kits to come
+KITS = ["SQK-LSK108"]  # More kits to come
 
 
 class Subfolder:
