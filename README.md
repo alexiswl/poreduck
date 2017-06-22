@@ -16,8 +16,9 @@ An examples of poreduck usage is shown below:
 `transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
 --dest_dir /data/storage/MinION/my_MinION_run`
 
-`albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --config FC106_LSK108`
+`albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
 
+## transfer_fast5_to_server.py dependencies
 ### Dependencies (Windows specific)
 1. Install Cygwin.
 
@@ -56,5 +57,15 @@ Copy across this key to the server
 You will be prompted to enter your password. Hopefully this is the last time you have to do so.
 Although it looks like I have copied the private key, this command is clever enough only
 to copy across the id_rsa.pub key.
+
+## Albacore_server_scaled dependencies
+### Albacore  
+Albacore can be easily installed using pip3.
+
+### Server (SGE)
+This script has been modified to run on a server with SGE (Sun Grid Engine) job scheduling system.
+You can test to see if you have SGE installed by running:
+`qconf -help`
+Please talk to your IT team to enusre that 'h_vmem' and 'hostname' options can be modified by the user.
 
 Please let me know of any errors that you come across in this script.
