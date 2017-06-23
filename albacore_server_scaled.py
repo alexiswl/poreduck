@@ -326,7 +326,7 @@ def pick_up_from_previous_run():
             SUBFOLDERS[subfolder].extracted_submitted = row['extracted_submitted']
             SUBFOLDERS[subfolder].extracted_commenced = row['extracted_commenced']
             SUBFOLDERS[subfolder].extracted_jobid = row['extracted_jobid']
-            SUBFOLDERS[subfolder].extracted_complete = row['extracted_completed']
+            SUBFOLDERS[subfolder].extracted_complete = row['extracted_complete']
             SUBFOLDERS[subfolder].albacore_submitted = row['albacore_submitted']
             SUBFOLDERS[subfolder].albacore_commenced = row['albacore_commenced']
             SUBFOLDERS[subfolder].albacore_jobid = row['albacore_jobid']
