@@ -648,8 +648,8 @@ def num_current_jobs():
     """Returns the number of subfolders that have either an extraction job submitted and not complete
     or an albacore job submitted and not complete"""
     return len([subfolder for subfolder in SUBFOLDERS
-                   if subfolder.extraction_submitted
-                   and not subfolder.extraction_complete
+                   if subfolder.extracted_submitted
+                   and not subfolder.extracted_complete
                    or subfolder.albacore_submitted
                    and not subfolder.albacore_complete])
 
