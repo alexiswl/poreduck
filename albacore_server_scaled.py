@@ -324,10 +324,6 @@ def pick_up_from_previous_run():
 
         # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
-<<<<<<< HEAD
-            print(index, row)
-=======
->>>>>>> 1c32100a905623ba439dc39923c6cee833d30ccf
             subfolder = row['name']
             SUBFOLDERS.append(Subfolder(subfolder))
             print(row['extracted_submitted'])
