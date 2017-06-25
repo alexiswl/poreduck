@@ -313,39 +313,39 @@ def check_directories():
 
 
 def pick_up_from_previous_run():
+    global SUBFOLDERS
     if os.path.isfile(STATUS_CSV):
         previous_dataframe = pd.read_csv(STATUS_CSV)
 
         # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
-	    print(index, row)
+            print(index, row)
             subfolder = row['name']
             SUBFOLDERS.append(Subfolder(subfolder))
+            print(row['extracted_submitted'])
+            SUBFOLDERS[-1].extracted_submitted = row['extracted_submitted']
+            SUBFOLDERS[-1].extracted_commenced = row['extracted_commenced']
+            SUBFOLDERS[-1].extracted_jobid = row['extracted_jobid']
+            SUBFOLDERS[-1].extracted_complete = row['extracted_complete']
+            SUBFOLDERS[-1].albacore_submitted = row['albacore_submitted']
+            SUBFOLDERS[-1].albacore_commenced = row['albacore_commenced']
+            SUBFOLDERS[-1].albacore_jobid = row['albacore_jobid']
+            SUBFOLDERS[-1].albacore_complete = row['albacore_complete']
+            SUBFOLDERS[-1].folder_removed = row['folder_removed']
+            SUBFOLDERS[-1].fastq_moved = row['fastq_moved']
 
-        for subfolder in SUBFOLDERS:
-            SUBFOLDERS[subfolder].extracted_submitted = row['extracted_submitted']
-            SUBFOLDERS[subfolder].extracted_commenced = row['extracted_commenced']
-            SUBFOLDERS[subfolder].extracted_jobid = row['extracted_jobid']
-            SUBFOLDERS[subfolder].extracted_complete = row['extracted_complete']
-            SUBFOLDERS[subfolder].albacore_submitted = row['albacore_submitted']
-            SUBFOLDERS[subfolder].albacore_commenced = row['albacore_commenced']
-            SUBFOLDERS[subfolder].albacore_jobid = row['albacore_jobid']
-            SUBFOLDERS[subfolder].albacore_complete = row['albacore_complete']
-            SUBFOLDERS[subfolder].folder_removed = row['folder_removed']
-            SUBFOLDERS[subfolder].fastq_moved = row['fastq_moved']
-
-            print(SUBFOLDERS[subfolder])
+            print(SUBFOLDERS[-1])
             # Now make sure none of the jobs have failed and reset if so
-            if has_failed(SUBFOLDERS[subfolder].albacore_jobid):
-                SUBFOLDERS[subfolder].albacore_submitted = False
-                SUBFOLDERS[subfolder].albacore_commenced = False
-                SUBFOLDERS[subfolder].albacore_jobid = -1
-                SUBFOLDERS[subfolder].albacore_complete = False
-            if has_failed(SUBFOLDERS[subfolder].extracted_jobid):
-                SUBFOLDERS[subfolder].extracted_submitted = False
-                SUBFOLDERS[subfolder].extracted_commenced = False
-                SUBFOLDERS[subfolder].extracted_jobid = -1
-                SUBFOLDERS[subfolder].extracted_complete = False
+            if has_failed(SUBFOLDERS[-1].albacore_jobid):
+                SUBFOLDERS[-1].albacore_submitted = False
+                SUBFOLDERS[-1].albacore_commenced = False
+                SUBFOLDERS[-1].albacore_jobid = -1
+                SUBFOLDERS[-1].albacore_complete = False
+            if has_failed(SUBFOLDERS[-1].extracted_jobid):
+                SUBFOLDERS[-1].extracted_submitted = False
+                SUBFOLDERS[-1].extracted_commenced = False
+                SUBFOLDERS[-1].extracted_jobid = -1
+                SUBFOLDERS[-1].extracted_complete = False
 
 
 """
@@ -405,7 +405,7 @@ def run_albacore(subfolder):
                          "--worker_threads %s " \
                          "--save_path %s " \
                          "--flowcell %s " \
-			 "--kit %s" \
+             "--kit %s" \
                          % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
 
     # These are both parsed into qsub which then determines what to do with it all.
@@ -696,7 +696,9 @@ def has_failed(job_id):
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
-   
+    if qacct_stdout.strip() == "":
+        return True 
+    print((qacct_stdout))
     if int(qacct_stdout) > 0:
         # Job has failed
         return True
