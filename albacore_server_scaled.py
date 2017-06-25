@@ -31,6 +31,7 @@ CW_DIR = ""
 ALBACORE_DIR = ""
 WORKING_DIR = ""
 NUM_THREADS = 0
+MAX_PROCESSES = 0
 CHOSEN_FLOWCELL = ""
 CHOSEN_KIT = ""
 PARENT_DIRECTORY = ""
@@ -244,14 +245,17 @@ def get_arguments():
                         help="Where would you like to place the qsub files?")
     parser.add_argument("--qsub_host", type=str, required=False, default=None,
                         help="Where would you like the qsub jobs to be run?")
-
+    parser.add_argument("--max_processes", type=int, required=False, default=None,
+                        help="Limit the number of jobs that can be processed at any given moment." +
+                             "This command will prevent extraction/albacore jobs from being submitted while" +
+                             "there exists 'max_processes' jobs running / in the queue.")
     return parser.parse_args()
 
 
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
-    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL
+    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -267,7 +271,8 @@ def set_global_variables(args):
     CW_DIR = os.getcwd()
     if args.qsub_host is not None:
         QSUB_HOST = args.qsub_host
-
+    if args.max_processes is not None:
+        MAX_PROCESSES = args.max_processes
 
 def check_directories():
     # Make sure the directories exist, change to reads directory,
@@ -318,7 +323,6 @@ def pick_up_from_previous_run():
 
         # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
-	    print(index, row)
             subfolder = row['name']
             SUBFOLDERS.append(Subfolder(subfolder))
 
@@ -366,6 +370,8 @@ def extract_tarred_read_set(subfolder):
     # Has the dataset already been set for extraction?
     if subfolder.extracted_submitted:
         return
+    elif num_current_jobs() > MAX_PROCESSES and not MAX_PROCESSES == 0:
+        return
     else:
         subfolder.extracted_submitted = True
 
@@ -392,6 +398,8 @@ def run_albacore(subfolder):
     """
     if subfolder.albacore_submitted:
         return   # Basecalling has already queued for this directory
+    elif num_current_jobs() > MAX_PROCESSES and not MAX_PROCESSES == 0:
+        return
     else:
         # Commence basecalling on this directory
         subfolder.albacore_submitted = True
@@ -549,6 +557,7 @@ Miscellaneous pipeline non-core functions
 5. new_directories
 6. is_still_basecalling
 7. get_current_subfolder
+8. num_current_jobs
 """
 
 
@@ -634,6 +643,15 @@ def is_still_basecalling():
 def get_current_subfolder(subfolder_name):
     return [subfolder for subfolder in SUBFOLDERS
             if subfolder.name == subfolder_name][0]
+
+def num_current_jobs():
+    """Returns the number of subfolders that have either an extraction job submitted and not complete
+    or an albacore job submitted and not complete"""
+    return length([subfolder for subfolder in SUBFOLDERS
+                   if subfolder.extraction_submitted
+                   and not subfolder.extraction_complete
+                   or subfolder.albacore_submitted
+                   and not subfolder.albacore_complete])
 
 """
 qsub specific functions
