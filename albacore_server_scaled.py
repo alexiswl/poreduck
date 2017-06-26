@@ -23,6 +23,8 @@ import argparse  # For allowing users to configure the arguments used.
 import sys  # For errors
 import time  # For schnoozing!
 import pandas as pd  # For the status.csv file
+import logging
+from datetime import datetime
 
 # Set global and semi-global variables
 TRANSFERRING = True
@@ -55,6 +57,9 @@ FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
 KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "SQK-LWB001",
         "SQK-RNA001", "SQK-RLI001", "SQK-RAD002", "SQK-RLB001", "SQK-RAB201", "SQK-LSK208", 
         "SQK-LSK108", "SQK-RAD003", "SQK-DCS108", "SQK-PCS108", "SQK-LSK308"]  # More kits to come
+LOGGER = None
+LOGGER_DIR = ""
+LOGGER_PATH = ""
 
 
 class Subfolder:
@@ -99,19 +104,19 @@ class Subfolder:
                          index=STATUS_STANDARD_COLUMNS
                          )
 
-    def check_albacore_job_status(self):
+    def check_albacore_job_status(self, check_failed=True):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
             update_dataframe(get_current_subfolder(self.name))
-        if has_completed(self.albacore_jobid):
+        if has_completed(self.albacore_jobid, check_failed):
             self.albacore_complete = True
             update_dataframe(get_current_subfolder(self.name))
 
-    def check_extraction_job_status(self):
+    def check_extraction_job_status(self, check_failed=True):
         if has_commenced(self.extracted_jobid):
             self.extracted_commenced = True
             update_dataframe(get_current_subfolder(self.name))
-        if has_completed(self.extracted_jobid):
+        if has_completed(self.extracted_jobid, check_failed):
             self.extracted_complete = True
             update_dataframe(get_current_subfolder(self.name))
 
@@ -127,9 +132,10 @@ def main():
     global TRANSFERRING
     # Basic house cleaning, get arguments, make sure they're legit.
     args = get_arguments()
-    set_global_variables(args)
+    set_global_variables(args) 
     check_directories()
-
+    set_logger()
+    
     # Pick up previous basecalling
     pick_up_from_previous_run()
 
@@ -169,6 +175,7 @@ def main():
         take_a_break()
 
     # Merge fastq files at the end of the run.
+    generate_dataframe()    
     merge_fastq_files()
 
 
@@ -214,6 +221,7 @@ General script initialisation functions
 1. get_arguments
 2. set_global_variables
 3. check_directories
+4. set_logger
 4. pick_up_from_previous_run
 """
 
@@ -249,6 +257,9 @@ def get_arguments():
                         help="Limit the number of jobs that can be processed at any given moment." +
                              "This command will prevent extraction/albacore jobs from being submitted while" +
                              "there exists 'max_processes' jobs running / in the queue.")
+    parser.add_argument("--log_directory", type=str, required=False, default=None,
+                        help="Where do you wish to store the poreduck logs? " +
+                             "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
     return parser.parse_args()
 
 
@@ -256,6 +267,7 @@ def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
+    global LOGGER_DIR
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -273,12 +285,15 @@ def set_global_variables(args):
         QSUB_HOST = args.qsub_host
     if args.max_processes is not None:
         MAX_PROCESSES = args.max_processes
+    if args.log_directory is not None:
+       LOGGER_DIR = args.log_directory
+
 
 def check_directories():
     # Make sure the directories exist, change to reads directory,
     # Create any other necessary directories for the script to run.
     global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
-    global STATUS_CSV
+    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH
     if not os.path.isdir(READS_DIR):
         sys.exit("Error, %s does not exist" % READS_DIR)
 
@@ -306,6 +321,13 @@ def check_directories():
 
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
+    if LOGGER_DIR == "":
+        LOGGER_DIR = PARENT_DIRECTORY + "poreduck_logs/"
+    else:
+        LOGGER_DIR = os.path.abspath(LOGGER_DIR)
+    if not os.path.isdir(LOGGER_DIR):
+        os.mkdir(LOGGER_DIR)
+    LOGGER_PATH = os.path.join(LOGGER_DIR, '.'.join([str(datetime.now().date()), str(datetime.now().time()), "albacore_pipeline.log"]))
 
     if not STATUS_CSV == "":
         if not os.path.isfile(os.path.join(CW_DIR, STATUS_CSV)):
@@ -317,16 +339,22 @@ def check_directories():
             os.remove(STATUS_CSV)
 
 
+def set_logger():
+    global LOGGER
+    logging.basicConfig(filename=LOGGER_PATH, level=logging.INFO, format='%(asctime)s::\t%(message)s', datefmt='%Y/%m/%d %I:%M:%S %p')
+    LOGGER = logging.getLogger() 
+
+
 def pick_up_from_previous_run():
     global SUBFOLDERS
     if os.path.isfile(STATUS_CSV):
         previous_dataframe = pd.read_csv(STATUS_CSV)
+        LOGGER.info('Found %s. Putting run back on track.' % STATUS_CSV)
 
         # Set subfolders and all the statuses
         for index, row in previous_dataframe.iterrows():
             subfolder = row['name']
-            SUBFOLDERS.append(Subfolder(subfolder))
-            print(row['extracted_submitted'])
+            SUBFOLDERS.append(Subfolder(subfolder)) 
             SUBFOLDERS[-1].extracted_submitted = row['extracted_submitted']
             SUBFOLDERS[-1].extracted_commenced = row['extracted_commenced']
             SUBFOLDERS[-1].extracted_jobid = row['extracted_jobid']
@@ -337,15 +365,24 @@ def pick_up_from_previous_run():
             SUBFOLDERS[-1].albacore_complete = row['albacore_complete']
             SUBFOLDERS[-1].folder_removed = row['folder_removed']
             SUBFOLDERS[-1].fastq_moved = row['fastq_moved']
-
-            print(SUBFOLDERS[-1])
+            
+            # Check to see if the jobs may have finished after the run crashed
+            SUBFOLDERS[-1].check_extraction_job_status(check_failed=False) 
+            SUBFOLDERS[-1].check_albacore_job_status(check_failed=False)
+              
             # Now make sure none of the jobs have failed and reset if so
             if has_failed(SUBFOLDERS[-1].albacore_jobid):
+                LOGGER.info("It appears %s has failed albacore processing. " \
+                            "Reverting albacore submitted, commenced to false. " \
+                            "Removing job id. %s" % (SUBFOLDERS[-1].name, SUBFOLDERS[-1].albacore_jobid))
                 SUBFOLDERS[-1].albacore_submitted = False
                 SUBFOLDERS[-1].albacore_commenced = False
                 SUBFOLDERS[-1].albacore_jobid = -1
                 SUBFOLDERS[-1].albacore_complete = False
             if has_failed(SUBFOLDERS[-1].extracted_jobid):
+                LOGGER.info("It appears %s has failed to extract. " \
+                            "Reverting albacore submitted, commenced to false. " \
+                            "Removing job id. %s" % (SUBFOLDERS[-1].name, SUBFOLDERS[-1].extracted_jobid))
                 SUBFOLDERS[-1].extracted_submitted = False
                 SUBFOLDERS[-1].extracted_commenced = False
                 SUBFOLDERS[-1].extracted_jobid = -1
@@ -366,7 +403,6 @@ Pipeline functions:
 def extract_tarred_read_set(subfolder):
     # Extract the tarred reads, we currently do not delete after extraction...
     # maybe a good idea?
-
     # Has the dataset already been set for extraction?
     if subfolder.extracted_submitted:
         return
@@ -376,17 +412,19 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
-    qsub_command = "qsub -o %s -e %s -S /bin/bash -wd %s -l hostname=melb-compute06" % \
+    qsub_command = "qsub -o %s -e %s -N PIGZ -S /bin/bash -wd %s -l hostname=melb-compute06" % \
                    (subfolder.extracted_qsub_output_log,
                     subfolder.extracted_qsub_error_log,
                     READS_DIR)
-    tar_proc = subprocess.Popen("echo \"%s\" | %s" % (tar_command, qsub_command), shell=True,
+    tar2qsub_command = "echo \"%s\" | %s" % (tar_command, qsub_command)
+    LOGGER.info("Submitting the following extraction job to sge:\n \"%s\"" % tar2qsub_command)
+    tar_proc = subprocess.Popen(tar2qsub_command, shell=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
 
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
-    print("Output of extraction command", stdout, stderr)
+    LOGGER.info("Output of pigz sge submission \nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
     subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
     update_dataframe(subfolder)
 
@@ -405,7 +443,7 @@ def run_albacore(subfolder):
         subfolder.albacore_submitted = True
 
     # Number of gigabytes required for a given qsub command
-    memory_allocation = 4 + NUM_THREADS
+    memory_allocation = 4 + 2*NUM_THREADS
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
     basecaller_command = "read_fast5_basecaller.py " \
@@ -413,7 +451,7 @@ def run_albacore(subfolder):
                          "--worker_threads %s " \
                          "--save_path %s " \
                          "--flowcell %s " \
-             "--kit %s" \
+                         "--kit %s" \
                          % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
 
     # These are both parsed into qsub which then determines what to do with it all.
@@ -422,13 +460,14 @@ def run_albacore(subfolder):
                    "-e %s " \
                    "-S /bin/bash -l hostname=%s " \
                    "-l h_vmem=%dG " \
-                   "-wd %s -v OMP_NUM_THREADS=1" \
+                   "-N ALBACORE " \
+                   "-wd %s -v OMP_NUM_THREADS=1 -v PYTHONPATH=\"\"" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
                       QSUB_HOST, memory_allocation, PARENT_DIRECTORY)
 
     # Put these all together into one grand command
-    albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command)
-    print(albacore_command)
+    albacore_command = "echo \"%s\" | %s" % (basecaller_command, qsub_command) 
+    LOGGER.info("Submitting the following job to SGE:\n\"%s\"" % albacore_command)    
 
     # Execute qsub command via subprocess.
     albacore_proc = subprocess.Popen(albacore_command, shell=True,
@@ -437,7 +476,7 @@ def run_albacore(subfolder):
     stdout, stderr = albacore_proc.communicate()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
-    print("Output of albacore command", stdout, stderr)
+    LOGGER.info("Output of albacore sge submission \nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
     subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
     update_dataframe(subfolder)
 
@@ -457,7 +496,7 @@ def remove_folder(subfolder):
 
     # Ensure that the tarred read set still exists
     if not os.path.join(READS_DIR, subfolder.tar_filename + ".tar.gz"):
-        print("Um... the archive doesn't exist, I'm not going to delete the folder")
+        LOGGER.info("Um... the archive doesn't exist, I'm not going to delete the folder")
         return
 
     # Generate remove command
@@ -467,7 +506,8 @@ def remove_folder(subfolder):
     remove_proc = subprocess.Popen(remove_command, shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = remove_proc.communicate()
-    print("Output of deleting folder is", stdout, stderr)
+    if not stdout=="" or stderr=="":
+        LOGGER.info("Output of deleting folder command is\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
     update_dataframe(subfolder)
 
 
@@ -486,7 +526,7 @@ def move_fastq_file(subfolder):
     fastq_files = [fastq for fastq in os.listdir(subfolder.workspace_dir)
                    if fastq.endswith(".fastq")]
     if len(fastq_files) > 1:
-        print("It seems like we have more than 1 file here", fastq_files)
+        LOGGER.info("It seems like we have more than 1 file here", fastq_files)
 
     fastq_file_index = 0
     # Rename fastq to have a .0.fastq at the start
@@ -496,18 +536,19 @@ def move_fastq_file(subfolder):
         # We will move and rename but make sure we're not overwriting anything
         while os.path.isfile(os.path.join(FASTQ_DIR, subfolder.fastq_file)):
             fastq_file_index += 1
-            print("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
+            LOGGER.info("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
             subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq",
                                                                 str(fastq_file_index) + ".fastq")
 
         # Create move command and run through subprocess.
         move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
                                      os.path.join(FASTQ_DIR, subfolder.fastq_file))
+        LOGGER.info("Moving fastq files in %s to %s" % (subfolder.workspace_dir, FASTQ_DIR))
         move_proc = subprocess.Popen(move_command, shell=True,
                                      stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = move_proc.communicate()
         if not stdout == "" or not stderr == "":
-            print("Output of mv command is:", stdout, stderr)
+            LOGGER.info("Output of mv command is:\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
 
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
@@ -528,7 +569,7 @@ def tar_albacore_folder(subfolder):
                                 stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
     if not stdout == "" or not stderr == "":
-        print ("Output of tar albacore folder command is", stdout, stderr)
+        LOGGER.info("Output of tar albacore folder command is:\n\"%s\"\n\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
     subfolder.albacore_tarred = True
     os.chdir(READS_DIR)
 
@@ -536,6 +577,7 @@ def tar_albacore_folder(subfolder):
 def merge_fastq_files():
     """ Merge all of the fastq files in the fastq directory to all.fastq"""
     concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
+    LOGGER.info("Concatenating all of the fastq files in %s to %s" % (FASTQ_DIR, concatenated_fastq_file))
     fastq_files = [os.path.join(FASTQ_DIR, fastq) for fastq in os.listdir(FASTQ_DIR)
                    if fastq.endswith(".fastq") and not fastq == "all.fastq"]
 
@@ -545,7 +587,7 @@ def merge_fastq_files():
                                        stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = concat_proc.communicate()
         if not stdout == "" or not stderr == "":
-            print("Output of cat command is:", stdout, stderr)
+            LOGGER.info("Output of cat command is:\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
 
 
 """
@@ -675,11 +717,11 @@ def has_commenced(job_id):
         # Start-time is non-existent
         return False
     if not qacct_stderr == "":
-        print("qacct stderr of %s", qacct_stderr)
+        LOGGER.info("qacct stderr of %s", qacct_stderr)
     return True
 
 
-def has_completed(job_id):
+def has_completed(job_id, check_failed):
     """
     Use the qacct command to see if the job has finished.
     No end_time is represented as -/-
@@ -693,10 +735,10 @@ def has_completed(job_id):
         # end_time is non-existent
         return False
     if not qacct_stderr == "":
-        print("qacct stderr of %s", qacct_stderr)
+        LOGGER.info("qacct stderr of %s", qacct_stderr)
     
-    if has_failed(job_id):
-        print("It appears that the job %d has failed" % job_id)
+    if check_failed and has_failed(job_id):
+        LOGGER.info("It appears that the job %d has failed" % job_id)
         sys.exit("Failing because %d failed. Good one Dave" % job_id)
 
     return True
@@ -715,13 +757,13 @@ def has_failed(job_id):
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
     if qacct_stdout.strip() == "":
-        return True 
-    print((qacct_stdout))
+        return True  
     if int(qacct_stdout) > 0:
+        LOGGER.info((qacct_stdout))
         # Job has failed
         return True
     if not qacct_stderr == "":
-        print("qacct stderr of %s", qacct_stderr)
+        LOGGER.info("qacct stderr of %s", qacct_stderr)
     return False
 
 
