@@ -566,14 +566,14 @@ def is_minknow_still_running():
 
     is_running = False  # Now to disprove this.
 
-    psef_command = "ps -ef | grep MinKNOW"
+    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing"
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
     # Split stdout by line, should be a bunch of MinKNOW commands running
     for line in stdout.split("\n"):
-        if line.endswith(".py") and "python" in line:
-            is_running = True  # The nc python script is presently active.
+        if 'MinKNOW' in line:
+		is_running=True
 
     # Now return what we found.
     return is_running
