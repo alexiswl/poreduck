@@ -63,6 +63,7 @@ THE_COUNT = 0  # mwhahaha (as in the one from sesame street)
 SUFFIX = ""
 NO_SSHPASS = False
 SSHPASS_PREFIX = ""
+LOCAL = False  # Local basecalling
 
 
 class Run:
@@ -76,6 +77,8 @@ class Run:
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
+	if LOCAL:
+		self.fast5_dir = os.path.join(self.fast5_dir, "pass")
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
         self.suffix = suffix
@@ -403,13 +406,16 @@ def get_arguments():
                         help="ssh-pass is rather poor practise and quite a security risk." +
                              "Tick this option and set up an id_rsa key if you'd prefer." +
                              "You will still be required to enter your password for set-up purposes.")
+    parser.add_argument("--local", default=False, dest='local', action='store_true',
+			help="Has local basecalling been used, changes directory from fast5 to fast5/pass")
+
     return parser.parse_args()
 
 
 def set_global_variables(args):
     global READS_DIR, SERVER_NAME, SERVER_USERNAME, PASSWORD, \
            DEST_DIRECTORY, TIMEOUT, PARENT_DIRECTORY, SAMPLE_NAME, SUFFIX, \
-           NO_SSHPASS, SSHPASS_PREFIX
+           NO_SSHPASS, SSHPASS_PREFIX, LOCAL
     READS_DIR = args.reads_dir
     SERVER_NAME = args.server_name
     SERVER_USERNAME = args.user_name
@@ -422,6 +428,7 @@ def set_global_variables(args):
     NO_SSHPASS = args.no_sshpass
     if not NO_SSHPASS:
         SSHPASS_PREFIX = "sshpass -p %s " % PASSWORD
+    LOCAL = args.local
 
 
 def set_runs():
@@ -453,7 +460,9 @@ def set_runs():
 
 
 def get_run_details(run):
-    fast5_dir = READS_DIR + run + "/fast5/"
+    fast5_dir = os.path.join(READS_DIR, run, "fast5")
+    if LOCAL:
+	fast5_dir = os.path.join(fast5_dir, "pass")	
     # Get list of files in the first directory we come across.
     subfolders = sorted([folder for folder in os.listdir(fast5_dir)
                          if os.path.isdir(os.path.join(fast5_dir, folder))
@@ -566,14 +575,13 @@ def is_minknow_still_running():
 
     is_running = False  # Now to disprove this.
 
-    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing"
+    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | wc -l"
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
     # Split stdout by line, should be a bunch of MinKNOW commands running
-    for line in stdout.split("\n"):
-        if 'MinKNOW' in line:
-		is_running=True
+    if int(stdout.rstrip()) > 0:
+	is_running = True
 
     # Now return what we found.
     return is_running
