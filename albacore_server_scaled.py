@@ -60,6 +60,7 @@ KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "S
 LOGGER = None
 LOGGER_DIR = ""
 LOGGER_PATH = ""
+BARCODING = False
 
 
 class Subfolder:
@@ -260,14 +261,18 @@ def get_arguments():
     parser.add_argument("--log_directory", type=str, required=False, default=None,
                         help="Where do you wish to store the poreduck logs? " +
                              "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
+    parser.add_argument("--barcoding", default=False, dest='barcoded', action='store_true',
+                        help="Use this option to demultiplex library?")
+
     return parser.parse_args()
+
 
 
 def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
-    global LOGGER_DIR
+    global LOGGER_DIR, BARCODING
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -287,6 +292,7 @@ def set_global_variables(args):
         MAX_PROCESSES = args.max_processes
     if args.log_directory is not None:
        LOGGER_DIR = args.log_directory
+    BARCODING = args.barcoding
 
 
 def check_directories():
@@ -522,33 +528,49 @@ def move_fastq_file(subfolder):
     if subfolder.fastq_moved:
         return  # Job has already been
 
-    # Get fastq files in the workspace directory
-    fastq_files = [fastq for fastq in os.listdir(subfolder.workspace_dir)
-                   if fastq.endswith(".fastq")]
-    if len(fastq_files) > 1:
-        LOGGER.info("It seems like we have more than 1 file here", fastq_files)
+    fastq_files_dict = {}  # Dict where index is barcode or just "unbarcoded" and value is a list of paths
+                           # Generally just one item in the list of paths
+    if BARCODING:
+        barcodes = [barcode for barcode in os.listdir(subfolder.workspace_dir),
+                    if os.path.isdir(barcode) and barcode.startswith("barcode")
+                    or os.path.isdir(barcode) and barcode == "unclassified"]
+        for barcode in barcodes:
+            # Get fastq files in the workspace directory
+            fastq_files_list = [fastq for fastq in (os.listdir(os.path.join(subfolder.workspace_dir, barcode)))
+                                if fastq.endswith(".fastq")]
+            fastq_files_dict[barcode] = fastq_files_list
+    else:
+        fastq_files_list = [fastq for fastq in os.listdir(subfolder.workspace_dir)
+                            if fastq.endswith(".fastq")]
+        fastq_files_dict["unbarcoded"] = fastq_files_list
 
-    fastq_file_index = 0
-    # Rename fastq to have a .0.fastq at the start
-    subfolder.fastq_file = subfolder.fastq_file.replace(".fastq", "." + str(fastq_file_index) + ".fastq")
+    for barcode, fastq_files in fastq_files_dict.iteritems():
+        if len(fastq_files) > 1:
+            LOGGER.info("It seems like we have more than 1 file here", fastq_files)
 
-    for fastq_file in fastq_files:
-        # We will move and rename but make sure we're not overwriting anything
-        while os.path.isfile(os.path.join(FASTQ_DIR, subfolder.fastq_file)):
+        fastq_file_index = -1
+
+        for fastq_file in fastq_files:
             fastq_file_index += 1
-            LOGGER.info("Hmmm, looks like we might accidentally overwrite something here, adding 1 to the index")
-            subfolder.fastq_file = subfolder.fastq_file.replace(str(fastq_file_index-1) + ".fastq",
-                                                                str(fastq_file_index) + ".fastq")
+            if BARCODING:
+                new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
+                                                                                  barcode,
+                                                                                  str(fastq_file_index),
+                                                                                  "fastq"]))
+            else:
+                new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
+                                                                                  str(fastq_file_index),
+                                                                                  "fastq"]))
 
-        # Create move command and run through subprocess.
-        move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
-                                     os.path.join(FASTQ_DIR, subfolder.fastq_file))
-        LOGGER.info("Moving fastq files in %s to %s" % (subfolder.workspace_dir, FASTQ_DIR))
-        move_proc = subprocess.Popen(move_command, shell=True,
-                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        stdout, stderr = move_proc.communicate()
-        if not stdout == "" or not stderr == "":
-            LOGGER.info("Output of mv command is:\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
+            # Create move command and run through subprocess.
+            move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
+                                         os.path.join(FASTQ_DIR, subfolder.fastq_file))
+            LOGGER.info("Moving fastq files in %s to %s" % (subfolder.workspace_dir, FASTQ_DIR))
+            move_proc = subprocess.Popen(move_command, shell=True,
+                                         stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            stdout, stderr = move_proc.communicate()
+            if not stdout == "" or not stderr == "":
+                LOGGER.info("Output of mv command is:\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
 
     # Set as complete so we don't have to do it again.
     subfolder.fastq_moved = True
