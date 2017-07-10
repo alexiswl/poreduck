@@ -11,12 +11,16 @@ poreduck currently can be used for two key steps of handling MinION data:
 1.  Transferring of reads from a laptop to a local server or hard-drive in real-time.
 2.  Running of a local-basecalling algorithm with
 
+## Examples
 An examples of poreduck usage is shown below:
 
 `transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
 --dest_dir /data/storage/MinION/my_MinION_run`
 
 `albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
+
+## MinKNOW version compatibility
+Last tested on MinKNOW version 1.7.7
 
 ## transfer_fast5_to_server.py dependencies
 ### Dependencies (Windows specific)
