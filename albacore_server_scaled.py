@@ -803,7 +803,7 @@ def has_failed(job_id):
     if qacct_stdout.strip() == "":
         return True  
     if int(qacct_stdout) > 0:
-        LOGGER.info((qacct_stdout))
+        LOGGER.info(qacct_stdout)
         # Job has failed
         return True
     if not qacct_stderr == "":
