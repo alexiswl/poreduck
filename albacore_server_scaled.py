@@ -177,7 +177,7 @@ def main():
 
     # Merge fastq files at the end of the run.
     generate_dataframe()    
-    merge_fastq_files()
+    merge_fastq_files_wrapper()
 
 
 def run_pipeline():
@@ -265,7 +265,6 @@ def get_arguments():
                         help="Use this option to demultiplex library?")
 
     return parser.parse_args()
-
 
 
 def set_global_variables(args):
@@ -402,7 +401,7 @@ Pipeline functions:
 3. remove_folder
 4. move_fastq_file
 5. tar_albacore_folder
-6. merge_fastq_files
+6. merge_fastq_files_wrapper
 """
 
 
@@ -596,13 +595,36 @@ def tar_albacore_folder(subfolder):
     os.chdir(READS_DIR)
 
 
-def merge_fastq_files():
+def merge_fastq_files_wrapper():
     """ Merge all of the fastq files in the fastq directory to all.fastq"""
-    concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
-    LOGGER.info("Concatenating all of the fastq files in %s to %s" % (FASTQ_DIR, concatenated_fastq_file))
-    fastq_files = [os.path.join(FASTQ_DIR, fastq) for fastq in os.listdir(FASTQ_DIR)
-                   if fastq.endswith(".fastq") and not fastq == "all.fastq"]
 
+    if BARCODING:
+        # fastq_file: 0003_49335_plasmids.barcode07.0.fastq
+        # Get list of final fastq files
+        fastq_files = [fastq_file for fastq_file in os.listdir(FASTQ_DIR),
+                       if (fastq_file.split(".")[-3].startswith("barcode")
+                       or fastq_file.split(".")[-3] == "unclassified")
+                       and "all" not in fastq_file]
+        # Group fastq files by barcode
+        fastq_by_barcodes = {}
+        for fastq_file in fastq_files:
+            barcode = fastq_file.split(".")[-3]
+            if barcode not in fastq_by_barcodes:
+                fastq_by_barcodes[barcode] = [fastq_file]
+            else:
+                fastq_by_barcodes[barcode].append(fastq_file)
+        for barcode, fastq_files in fastq_by_barcodes.iteritems():
+            concatenated_fastq_file = os.path.join(FASTQ_DIR, barcode + "all.fastq")
+            merge_fastq_files(fastq_files, concatenated_fastq_file)
+    else:
+        concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
+        fastq_files = [os.path.join(FASTQ_DIR, fastq) for fastq in os.listdir(FASTQ_DIR)
+                       if fastq.endswith(".fastq") and not fastq == "all.fastq"]
+        merge_fastq_files(fastq_files, concatenated_fastq_file)
+
+
+def merge_fastq_files(fastq_files, concatenated_fastq_file):
+    LOGGER.info("Concatenating all of the fastq files in %s to %s" % (FASTQ_DIR, concatenated_fastq_file))
     for fastq_file in fastq_files:
         concat_command = "cat %s >> %s" % (fastq_file, concatenated_fastq_file)
         concat_proc = subprocess.Popen(concat_command, shell=True,
@@ -610,7 +632,6 @@ def merge_fastq_files():
         stdout, stderr = concat_proc.communicate()
         if not stdout == "" or not stderr == "":
             LOGGER.info("Output of cat command is:\nStdout:\"%s\"\nStderr:\"%s\"" % (stdout.rstrip(), stderr.rstrip()))
-
 
 """
 Miscellaneous pipeline non-core functions
@@ -707,6 +728,7 @@ def is_still_basecalling():
 def get_current_subfolder(subfolder_name):
     return [subfolder for subfolder in SUBFOLDERS
             if subfolder.name == subfolder_name][0]
+
 
 def num_current_jobs():
     """Returns the number of subfolders that have either an extraction job submitted and not complete
