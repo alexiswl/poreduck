@@ -61,6 +61,7 @@ LOGGER = None
 LOGGER_DIR = ""
 LOGGER_PATH = ""
 BARCODING = False
+QSUB_SOURCE_STRING = ""
 
 
 class Subfolder:
@@ -261,8 +262,10 @@ def get_arguments():
     parser.add_argument("--log_directory", type=str, required=False, default=None,
                         help="Where do you wish to store the poreduck logs? " +
                              "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
-    parser.add_argument("--barcoding", default=False, dest='barcoded', action='store_true',
+    parser.add_argument("--barcoding", default=False, dest='barcoding', action='store_true',
                         help="Use this option to demultiplex library?")
+    parser.add_argument("--qsub_source_string", type=str, required=False, default=None,
+                        help="Anything that is required to be sourced prior to read_fast5_basecaller on qsub host?")
 
     return parser.parse_args()
 
@@ -271,7 +274,7 @@ def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
-    global LOGGER_DIR, BARCODING
+    global LOGGER_DIR, BARCODING, QSUB_SOURCE_STRING
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -292,6 +295,8 @@ def set_global_variables(args):
     if args.log_directory is not None:
        LOGGER_DIR = args.log_directory
     BARCODING = args.barcoding
+    if args.qsub_source_string is not None:
+        QSUB_SOURCE_STRING = args.qsub_source_string
 
 
 def check_directories():
@@ -417,10 +422,10 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = "pigz -dc %s | tar -xf -" % os.path.join(READS_DIR, subfolder.tar_filename)
-    qsub_command = "qsub -o %s -e %s -N PIGZ -S /bin/bash -wd %s -l hostname=melb-compute06" % \
+    qsub_command = "qsub -o %s -e %s -N PIGZ -S /bin/bash -wd %s -l hostname=%s" % \
                    (subfolder.extracted_qsub_output_log,
                     subfolder.extracted_qsub_error_log,
-                    READS_DIR)
+                    READS_DIR, QSUB_HOST)
     tar2qsub_command = "echo \"%s\" | %s" % (tar_command, qsub_command)
     LOGGER.info("Submitting the following extraction job to sge:\n \"%s\"" % tar2qsub_command)
     tar_proc = subprocess.Popen(tar2qsub_command, shell=True,
@@ -458,6 +463,11 @@ def run_albacore(subfolder):
                          "--flowcell %s " \
                          "--kit %s" \
                          % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
+    if BARCODING:
+        basecaller_command += " --barcoding"
+
+    if not QSUB_SOURCE_STRING == "":
+        basecaller_command = QSUB_SOURCE_STRING + ' && ' + basecaller_command
 
     # These are both parsed into qsub which then determines what to do with it all.
     qsub_command = "qsub " \
@@ -466,7 +476,7 @@ def run_albacore(subfolder):
                    "-S /bin/bash -l hostname=%s " \
                    "-l h_vmem=%dG " \
                    "-N ALBACORE " \
-                   "-wd %s -v OMP_NUM_THREADS=1 -v PYTHONPATH=\"\"" \
+                   "-wd %s -v OMP_NUM_THREADS=1" \
                    % (subfolder.albacore_qsub_output_log, subfolder.albacore_qsub_error_log,
                       QSUB_HOST, memory_allocation, PARENT_DIRECTORY)
 
@@ -530,16 +540,16 @@ def move_fastq_file(subfolder):
     fastq_files_dict = {}  # Dict where index is barcode or just "unbarcoded" and value is a list of paths
                            # Generally just one item in the list of paths
     if BARCODING:
-        barcodes = [barcode for barcode in os.listdir(subfolder.workspace_dir),
-                    if os.path.isdir(barcode) and barcode.startswith("barcode")
-                    or os.path.isdir(barcode) and barcode == "unclassified"]
+        barcodes = [barcode for barcode in os.listdir(subfolder.workspace_dir)
+                    if os.path.isdir(os.path.join(subfolder.workspace_dir, barcode)) and barcode.startswith("barcode")
+                    or os.path.isdir(os.path.join(subfolder.workspace_dir, barcode)) and barcode == "unclassified"]
         for barcode in barcodes:
             # Get fastq files in the workspace directory
-            fastq_files_list = [fastq for fastq in (os.listdir(os.path.join(subfolder.workspace_dir, barcode)))
+            fastq_files_list = [os.path.join(subfolder.workspace_dir, barcode, fastq) for fastq in os.listdir(os.path.join(subfolder.workspace_dir, barcode))
                                 if fastq.endswith(".fastq")]
             fastq_files_dict[barcode] = fastq_files_list
     else:
-        fastq_files_list = [fastq for fastq in os.listdir(subfolder.workspace_dir)
+        fastq_files_list = [os.path.join(subfolder.workspace_dir, fastq) for fastq in os.listdir(subfolder.workspace_dir)
                             if fastq.endswith(".fastq")]
         fastq_files_dict["unbarcoded"] = fastq_files_list
 
@@ -562,8 +572,8 @@ def move_fastq_file(subfolder):
                                                                                   "fastq"]))
 
             # Create move command and run through subprocess.
-            move_command = "mv %s %s" % (os.path.join(subfolder.workspace_dir, fastq_file),
-                                         os.path.join(FASTQ_DIR, subfolder.fastq_file))
+            move_command = "mv %s %s" % (fastq_file,
+                                         os.path.join(FASTQ_DIR, new_fastq_file))
             LOGGER.info("Moving fastq files in %s to %s" % (subfolder.workspace_dir, FASTQ_DIR))
             move_proc = subprocess.Popen(move_command, shell=True,
                                          stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -601,7 +611,7 @@ def merge_fastq_files_wrapper():
     if BARCODING:
         # fastq_file: 0003_49335_plasmids.barcode07.0.fastq
         # Get list of final fastq files
-        fastq_files = [fastq_file for fastq_file in os.listdir(FASTQ_DIR),
+        fastq_files = [fastq_file for fastq_file in os.listdir(FASTQ_DIR)
                        if (fastq_file.split(".")[-3].startswith("barcode")
                        or fastq_file.split(".")[-3] == "unclassified")
                        and "all" not in fastq_file]
@@ -614,7 +624,7 @@ def merge_fastq_files_wrapper():
             else:
                 fastq_by_barcodes[barcode].append(fastq_file)
         for barcode, fastq_files in fastq_by_barcodes.iteritems():
-            concatenated_fastq_file = os.path.join(FASTQ_DIR, barcode + "all.fastq")
+            concatenated_fastq_file = os.path.join(FASTQ_DIR, barcode + ".all.fastq")
             merge_fastq_files(fastq_files, concatenated_fastq_file)
     else:
         concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
