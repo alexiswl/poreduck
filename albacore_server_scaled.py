@@ -612,8 +612,9 @@ def merge_fastq_files_wrapper():
         # fastq_file: 0003_49335_plasmids.barcode07.0.fastq
         # Get list of final fastq files
         fastq_files = [os.path.join(FASTQ_DIR, fastq_file) for fastq_file in os.listdir(FASTQ_DIR)
-                       if (fastq_file.split(".")[-3].startswith("barcode")
-                       or fastq_file.split(".")[-3] == "unclassified")
+                       if len(fastq_file.split(".")) >= 3  
+                       and (fastq_file.split(".")[-3].startswith("barcode")
+                            or fastq_file.split(".")[-3] == "unclassified")
                        and "all" not in fastq_file]
         # Group fastq files by barcode
         fastq_by_barcodes = {}
