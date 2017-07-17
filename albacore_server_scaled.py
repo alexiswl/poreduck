@@ -416,7 +416,7 @@ def extract_tarred_read_set(subfolder):
     # Has the dataset already been set for extraction?
     if subfolder.extracted_submitted:
         return
-    elif num_current_jobs() > MAX_PROCESSES and not MAX_PROCESSES == 0:
+    elif num_current_jobs() >= MAX_PROCESSES and not MAX_PROCESSES == 0:
         return
     else:
         subfolder.extracted_submitted = True
@@ -446,7 +446,7 @@ def run_albacore(subfolder):
     """
     if subfolder.albacore_submitted:
         return   # Basecalling has already queued for this directory
-    elif num_current_jobs() > MAX_PROCESSES and not MAX_PROCESSES == 0:
+    elif num_current_jobs() >= MAX_PROCESSES and not MAX_PROCESSES == 0:
         return
     else:
         # Commence basecalling on this directory
