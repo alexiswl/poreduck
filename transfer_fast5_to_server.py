@@ -39,16 +39,18 @@ import sys  # For stopping in the event of errors.
 import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
 import getpass  # Prompts user for password, just a one off to runt he script.
+# destination folder is there.
+import time  # For snoozing and for adding time of generation in csv output.
+import pandas as pd  # Create data frame of list of files with attributes for each.
+from datetime import datetime  # For figuring out if mux and sequencing run are from the same run.
+
 MYOS = str(os.name)
 if MYOS == "nt":
     # We import paramiko for cygwin users
     import paramiko
 else:
     from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the
-# destination folder is there.
-import time  # For snoozing and for adding time of generation in csv output.
-import pandas as pd  # Create data frame of list of files with attributes for each.
-from datetime import datetime  # For figuring out if mux and sequencing run are from the same run.
+
 
 # Set global variables that aren't actually global,
 # Just easier than piping them into everything.
