@@ -82,8 +82,8 @@ class Run:
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
-	    if LOCAL:
-		    self.fast5_dir = os.path.join(self.fast5_dir, "pass")
+        if LOCAL:
+            self.fast5_dir = os.path.join(self.fast5_dir, "pass")
             self.csv_dir = os.path.join(READS_DIR, name, 'csv')
             self.rsync_proc = ""
             self.suffix = suffix
@@ -412,7 +412,7 @@ def get_arguments():
                              "Tick this option and set up an id_rsa key if you'd prefer." +
                              "You will still be required to enter your password for set-up purposes.")
     parser.add_argument("--local", default=False, dest='local', action='store_true',
-			help="Has local basecalling been used, changes directory from fast5 to fast5/pass")
+            help="Has local basecalling been used, changes directory from fast5 to fast5/pass")
 
     return parser.parse_args()
 
@@ -467,7 +467,7 @@ def set_runs():
 def get_run_details(run):
     fast5_dir = os.path.join(READS_DIR, run, "fast5")
     if LOCAL:
-	fast5_dir = os.path.join(fast5_dir, "pass")	
+    fast5_dir = os.path.join(fast5_dir, "pass")
     # Get list of files in the first directory we come across.
     subfolders = sorted([folder for folder in os.listdir(fast5_dir)
                          if os.path.isdir(os.path.join(fast5_dir, folder))
@@ -606,7 +606,7 @@ def is_minknow_still_running():
     stdout, stderr = psef_proc.communicate()
     # Split stdout by line, should be a bunch of MinKNOW commands running
     if int(stdout.rstrip()) > 0:
-	is_running = True
+    is_running = True
 
     # Now return what we found.
     return is_running
