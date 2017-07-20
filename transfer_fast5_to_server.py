@@ -39,7 +39,12 @@ import sys  # For stopping in the event of errors.
 import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
 import getpass  # Prompts user for password, just a one off to runt he script.
-from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the
+MYOS = str(os.name)
+if MYOS == "nt":
+    # We import paramiko for cygwin users
+    import paramiko
+else:
+    from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the
 # destination folder is there.
 import time  # For snoozing and for adding time of generation in csv output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
@@ -77,11 +82,11 @@ class Run:
         self.start_time = datetime.strptime(date + clock, "%Y%m%d%H%M")
         self.dir = os.path.join(READS_DIR, name)
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
-	if LOCAL:
-		self.fast5_dir = os.path.join(self.fast5_dir, "pass")
-        self.csv_dir = os.path.join(READS_DIR, name, 'csv')
-        self.rsync_proc = ""
-        self.suffix = suffix
+	    if LOCAL:
+		    self.fast5_dir = os.path.join(self.fast5_dir, "pass")
+            self.csv_dir = os.path.join(READS_DIR, name, 'csv')
+            self.rsync_proc = ""
+            self.suffix = suffix
 
 """
 Main run files:
@@ -510,32 +515,52 @@ def get_run_details(run):
 
 
 def create_transferring_lock_file():
-    s = pxssh.pxssh()
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-        print("SSH failed on login. Please try ssh through a terminal first then try again.")
+    if MYOS == "nt":
+        s = paramiko.SSHClient()
+        s.load_system_host_keys()
+        s.connect(SERVER_NAME, SERVER_USERNAME, PASSWORD)
     else:
-        print("SSH passed")
+        s = pxssh.pxssh()
+        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+            print("SSH failed on login. Please try ssh through a terminal first then try again.")
+        else:
+            print("SSH passed")
 
     # Command to check if folder is there.
-    s.sendline('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
-    s.prompt()  # match the prompt
-    output = s.before  # Gets the `output of the send line command
-    s.logout()  # Logout
+    cd_and_touch_command = ('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
+    if MYOS == "nt":
+        stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
+        print(stdout.read())
+        s.close()
+    else:
+        s.sendline(cd_and_touch_command)
+        s.prompt()  # match the prompt
+        output = s.before  # Gets the `output of the send line command
+        s.logout()  # Logout
 
 
 def remove_transferring_lock_file():
-    s = pxssh.pxssh()
-
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-        print("SSH failed on login")
+    if MYOS == "nt":
+        s = paramiko.SSHClient()
+        s.load_system_host_keys()
+        s.connect(SERVER_NAME, SERVER_USERNAME, PASSWORD)
     else:
-        print("SSH passed")
-
+        s = pxssh.pxssh()
+        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+            print("SSH failed on login. Please try ssh through a terminal first then try again.")
+        else:
+            print("SSH passed")
     # Command to check if folder is there.
-    s.sendline('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
-    s.prompt()  # match the prompt
-    output = s.before  # Gets the `output of the send line command
-    s.logout()  # Logout
+    cd_and_remove_command = ('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
+    if MYOS == "nt":
+        stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
+        print(stdout.read())
+        s.close()
+    else:
+        s.sendline(cd_and_remove_command)
+        s.prompt()  # match the prompt
+        output = s.before  # Gets the `output of the send line command
+        s.logout()  # Logout
 
 
 """
@@ -623,28 +648,44 @@ def check_directories():
     # Check if folder on server is present.
     # Log into server, then check for folder.
     dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-2])
-    
-    s = pxssh.pxssh()  
-    
-    if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-        print("SSH failed on login")
+
+    if MYOS == "nt":
+        s = paramiko.SSHClient()
+        s.load_system_host_keys()
+        s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
     else:
-        print("SSH passed")
-
+        s = pxssh.pxssh()
+        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
+            print("SSH failed on login")
+        else:
+            print("SSH passed")
     # Command to check if folder is there.
-    s.sendline('if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent)
-    s.prompt()  # match the prompt
-    output = s.before  # Gets the `output of the send line command
-    print(dest_parent, output)
-    if not output.rstrip().split('\n')[-1] == "PRESENT":
-        # Parent folder is not present. Exit.
-        sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
+    check_dest_parent_exists_command = 'if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent
+    if MYOS == "nt":
+        stdin, stdout, stderr = s.exec_command(check_dest_parent_exists_command)
+        if not "PRESENT" in stdout.read().split("\n"):
+            sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
+    else:
+        s.sendline(check_dest_parent_exists_command)
+        s.prompt()  # match the prompt
+        output = s.before  # Gets the `output of the send line command
+        print(dest_parent, output)
+        if not "PRESENT" in output.split('\n'):
+            # Parent folder is not present. Exit.
+            sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
 
-    # Otherwise create the DEST_DIRECTORY
-    s.sendline('if [ ! -d %s ]; then mkdir %s; fi' % (DEST_DIRECTORY, DEST_DIRECTORY))
-    s.prompt()
-    output = s.before
-    print(output)
+    # Command to create DEST_DIRECTORY
+    create_dest_directory_command = 'if [ ! -d %s ]; then mkdir %s; fi' % (DEST_DIRECTORY, DEST_DIRECTORY)
+    if MYOS == "nt":
+        stdin, stdout, stderr = s.exec_command(create_dest_directory_command)
+        print(stdout.read())
+        s.close()
+    else:
+        s.sendline(create_dest_directory_command)
+        s.prompt()  # match the prompt
+        output = s.before  # Gets the `output of the send line command
+        s.logout()
+        print(output)
 
 
 def have_a_break():
