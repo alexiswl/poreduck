@@ -529,7 +529,7 @@ def create_transferring_lock_file():
             print("SSH passed")
 
     # Command to check if folder is there.
-    cd_and_touch_command = ('cd %s && touch %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
+    cd_and_touch_command = ("bash -c \"cd %s && touch %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
     if MYOS == "nt":
         stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
         print(stdout.read())
@@ -553,7 +553,7 @@ def remove_transferring_lock_file():
         else:
             print("SSH passed")
     # Command to check if folder is there.
-    cd_and_remove_command = ('cd %s && rm %s' % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
+    cd_and_remove_command = ("bash -c \"cd %s && rm %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
     if MYOS == "nt":
         stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
         print(stdout.read())
@@ -662,7 +662,7 @@ def check_directories():
         else:
             print("SSH passed")
     # Command to check if folder is there.
-    check_dest_parent_exists_command = 'if [ -d %s ]; then echo "PRESENT"; fi' % dest_parent
+    check_dest_parent_exists_command = "bash -c \"if [ -d %s ]; then echo 'PRESENT'; fi\"" % dest_parent
     if MYOS == "nt":
         stdin, stdout, stderr = s.exec_command(check_dest_parent_exists_command)
         if not "PRESENT" in stdout.read().split("\n"):
@@ -677,7 +677,7 @@ def check_directories():
             sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
 
     # Command to create DEST_DIRECTORY
-    create_dest_directory_command = 'if [ ! -d %s ]; then mkdir %s; fi' % (DEST_DIRECTORY, DEST_DIRECTORY)
+    create_dest_directory_command = " bash -c \"if [ ! -d %s ]; then mkdir %s; fi\"" % (DEST_DIRECTORY, DEST_DIRECTORY)
     if MYOS == "nt":
         stdin, stdout, stderr = s.exec_command(create_dest_directory_command)
         print(stdout.read())
