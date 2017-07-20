@@ -467,7 +467,7 @@ def set_runs():
 def get_run_details(run):
     fast5_dir = os.path.join(READS_DIR, run, "fast5")
     if LOCAL:
-    fast5_dir = os.path.join(fast5_dir, "pass")
+        fast5_dir = os.path.join(fast5_dir, "pass")
     # Get list of files in the first directory we come across.
     subfolders = sorted([folder for folder in os.listdir(fast5_dir)
                          if os.path.isdir(os.path.join(fast5_dir, folder))
@@ -606,7 +606,7 @@ def is_minknow_still_running():
     stdout, stderr = psef_proc.communicate()
     # Split stdout by line, should be a bunch of MinKNOW commands running
     if int(stdout.rstrip()) > 0:
-    is_running = True
+        is_running = True
 
     # Now return what we found.
     return is_running
