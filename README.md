@@ -16,11 +16,14 @@ An examples of poreduck usage is shown below:
 
 `transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
 --dest_dir /data/storage/MinION/my_MinION_run`
+where `/var/lib/MinKNOW/data/reads` contains a list of runs in `YYYYMMDD_HHMM_SAMPLE_NAME` format.
+This then exports each of the fast5 files into `/data/storage/MinION/my_MinION_run/fast5` in .tar.gz format.
 
 `albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
+where `/data/storage/MinION/sample_name/fast5` contains a list of .tar.gz files each comprising 4000 fast5 files within them.
 
 ## MinKNOW version compatibility
-Last tested on MinKNOW version 1.7.7
+Last tested on MinKNOW version 1.7.10
 
 ## transfer_fast5_to_server.py dependencies
 ### Dependencies (Windows specific)
