@@ -86,9 +86,10 @@ class Run:
         self.fast5_dir = os.path.join(READS_DIR, name, 'fast5')
         if LOCAL:
             self.fast5_dir = os.path.join(self.fast5_dir, "pass")
-            self.csv_dir = os.path.join(READS_DIR, name, 'csv')
-            self.rsync_proc = ""
-            self.suffix = suffix
+        self.csv_dir = os.path.join(READS_DIR, name, 'csv')
+        self.rsync_proc = ""
+        self.suffix = suffix
+	
 
 """
 Main run files:
@@ -607,6 +608,7 @@ def is_minknow_still_running():
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
     # Split stdout by line, should be a bunch of MinKNOW commands running
+    print("MinKNOW running output %s:" % stdout.rstrip())
     if int(stdout.rstrip()) > 0:
         is_running = True
 
@@ -665,14 +667,16 @@ def check_directories():
     check_dest_parent_exists_command = "bash -c \"if [ -d %s ]; then echo 'PRESENT'; fi\"" % dest_parent
     if MYOS == "nt":
         stdin, stdout, stderr = s.exec_command(check_dest_parent_exists_command)
-        if not "PRESENT" in stdout.read().split("\n"):
+        if not len([pres for pres in output.split('\n')
+		    if pres.rstrip() == "PRESENT"])>0:
             sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
     else:
         s.sendline(check_dest_parent_exists_command)
         s.prompt()  # match the prompt
         output = s.before  # Gets the `output of the send line command
-        print(dest_parent, output)
-        if not "PRESENT" in output.split('\n'):
+        print(dest_parent, output.split("\n"))
+        if not len([pres for pres in output.split('\n') 
+		    if pres.rstrip() == "PRESENT"])>0:
             # Parent folder is not present. Exit.
             sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
 
