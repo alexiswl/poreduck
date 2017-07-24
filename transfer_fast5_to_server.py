@@ -603,7 +603,7 @@ def is_minknow_still_running():
 
     is_running = False  # Now to disprove this.
 
-    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | wc -l"
+    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
