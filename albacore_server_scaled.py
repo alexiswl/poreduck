@@ -73,6 +73,8 @@ class Subfolder:
         self.reads_dir = os.path.join(READS_DIR, name)
         self.albacore_dir = os.path.join(ALBACORE_DIR, name)
         # Albacore related files
+        if CHOSEN_KIT == "SQK-LSK308":
+            self.albacore_dir = os.path.join(self.albacore_dir, "1dsq_analysis")
         self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
         self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
@@ -454,18 +456,23 @@ def run_albacore(subfolder):
 
     # Number of gigabytes required for a given qsub command
     memory_allocation = 4 + 2*NUM_THREADS
+    # Need to ramp up memory requirements if using the 1D^2 protocol
+    if CHOSEN_KIT == "SQK-LSK308":
+        memory_allocation = 4 + 4*NUM_THREADS
+        basecaller_command_options = ["full_1dsq_basecaller.py"]
+    else:
+        memory_allocation = 4 + 2*NUM_THREADS
+        basecaller_command_options = ["read_fast5_basecaller.py"]
     # The read_fast5_basecaller is the algorithm that does the actual base calling,
     # what would be run if we just had Ubuntu.
-    basecaller_command = "read_fast5_basecaller.py " \
-                         "--input %s " \
-                         "--worker_threads %s " \
-                         "--save_path %s " \
-                         "--flowcell %s " \
-                         "--kit %s" \
-                         % (subfolder.reads_dir, NUM_THREADS, subfolder.albacore_dir, CHOSEN_FLOWCELL, CHOSEN_KIT)
+    basecaller_command_options.append("--input %s " % subfolder.reads_dir)
+    basecaller_command_options.append("--worker_threads %s " % NUM_THREADS)
+    basecaller_command_options.append("--save_path %s " % subfolder.albacore_dir)
+    basecaller_command_options.append("--flowcell %s " % CHOSEN_FLOWCELL)
+    basecaller_command_options.append("--kit %s" % CHOSEN_KIT)
     if BARCODING:
-        basecaller_command += " --barcoding"
-
+        basecaller_command_options.append("--barcoding")
+    basecaller_command = ' '.join(basecaller_command_options)
     if not QSUB_SOURCE_STRING == "":
         basecaller_command = QSUB_SOURCE_STRING + ' && ' + basecaller_command
 
