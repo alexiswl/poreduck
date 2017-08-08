@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 """
 
@@ -33,24 +33,24 @@ This script is designed to:
 We use the ps -ef command to search for an active MinKNOW session.
 """
 
+
 # Import necessary modules,
 import os  # list directories and path checking
 import sys  # For stopping in the event of errors.
 import subprocess  # Running rsync and tar functions.
 import argparse  # Allow users to set commandline arguments and show help
-import getpass  # Prompts user for password, just a one off to runt he script.
-# destination folder is there.
+import getpass  # Prompts user for password, just a one off to run the script.
+# and check that the destination folder is there.
 import time  # For snoozing and for adding time of generation in csv output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
 from datetime import datetime  # For figuring out if mux and sequencing run are from the same run.
+import paramiko
 
-MYOS = str(os.name)
-if MYOS == "nt":
-    # We import paramiko for cygwin users
-    import paramiko
-else:
-    from pexpect import pxssh, spawn  # Connecting via ssh to make sure that the parent of the
-
+# Before we begin, are we using python 3.6 or greater?
+try:
+    assert sys.version_info >= (3, 6)
+except AssertionError:
+    sys.exit("Error: Python version out of date. Require 3.6 or higher.")
 
 # Set global variables that aren't actually global,
 # Just easier than piping them into everything.
@@ -89,7 +89,7 @@ class Run:
         self.csv_dir = os.path.join(READS_DIR, name, 'csv')
         self.rsync_proc = ""
         self.suffix = suffix
-	
+
 
 """
 Main run files:
@@ -126,7 +126,7 @@ def main():
         THE_COUNT = 0
         tar_up_last_folder(run)
         copy_across_md5sum(run)
-        copy_across_csv_files(run)
+        rsync_across_csv_files(run)
 
     # Remove the lock file from the server.
     remove_transferring_lock_file()
@@ -155,7 +155,7 @@ def transfer_fast5_files(run):
     else:
         run_rsync_command(run)
         copy_across_md5sum(run)
-        copy_across_csv_files(run)
+        rsync_across_csv_files(run)
 
 """
 Transfer fast5 file subscripts
@@ -177,7 +177,7 @@ def get_subdirs(run):
                if os.path.isdir(os.path.join(run.fast5_dir, folder))
                # And not the tmp directory
                and not folder == "tmp"
-               # And subdirectory is int
+               # And subdirectory is an integer
                and is_int(folder)]
 
     # Sort subdirectories by writing time.
@@ -218,7 +218,7 @@ def check_folder_status(subdir, run, full=True):
         csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"), index=False)
         delete_folder_if_empty(subdir)
         return "moving files"
     # Is this a folder with mux scans, if so, we'll move the files over to the
@@ -238,7 +238,7 @@ def check_folder_status(subdir, run, full=True):
         csv_path_name_as_list = [subdir_as_standard_int, run.random, "mux_scan", run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"), index=False)
         delete_folder_if_empty(subdir)
         return "moving files"
 
@@ -251,7 +251,7 @@ def check_folder_status(subdir, run, full=True):
         csv_path_name_as_list = [subdir_as_standard_int, run.random, run.suffix]
         # Remove any "" from list
         csv_path_name_as_list_filtered = [x.strip() for x in csv_path_name_as_list if x.strip()]
-        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"))
+        fast5_pd.to_csv(os.path.join(run.csv_dir, "_".join(csv_path_name_as_list_filtered) + ".csv"), index=False)
         delete_folder_if_empty(subdir)
         return "moving files"
 
@@ -269,9 +269,8 @@ def tar_folders(subdir_prefix, run):
 
     # Now tar up each folder individually
     for subdir in subdirs:
-        tar_file = "%s.tar.gz" % subdir
-        tar_command = "tar -cf - %s --remove-files | pigz -9 -p 16 > %s" % (subdir,
-                                                                            tar_file)
+        tar_file = f"{subdir}.tar.gz"
+        tar_command = f"tar -cf - {subdir} --remove-files | pigz -9 -p 16 > {tar_file}"
         tar_proc = subprocess.Popen(tar_command, shell=True,
                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
@@ -285,19 +284,19 @@ def run_rsync_command(run):
     try:
         if run.rsync_proc.poll() is None:
             # Still running from previous run
-            print "It appears rsync is running"
+            print("It appears rsync is running")
             return
         else:
             stdout, stderr = run.rsync_proc.communicate()
             print("Rsync", stdout, stderr)
     except AttributeError:
         # Initial set up
-        print "Rsync is to be initialised"
+        print("Rsync is to be initialised")
         pass
 
     reads_dir = "fast5/"
     # Generate list of rsync options to be used.
-    rsync_command_options = []
+    rsync_command_options = ["rsync"]
     # Delete the tar.gz files from the laptop.
     rsync_command_options.append("--remove-source-files")
     rsync_command_options.append("--include='*.tar.gz'")
@@ -309,13 +308,8 @@ def run_rsync_command(run):
     # permutation of the command
 
     # The tar.gz files will be placed in the reads sub folder
-    rsync_command = SSHPASS_PREFIX + "rsync %s %s/ %s@%s:%s/%s" % (
-                                                            ' '.join(rsync_command_options),
-                                                            run.fast5_dir,
-                                                            SERVER_USERNAME,
-                                                            SERVER_NAME,
-                                                            DEST_DIRECTORY,
-                                                            reads_dir)
+    rsync_command = SSHPASS_PREFIX + ' '.join(rsync_command_options) +\
+        f"{run.fast5_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/{reads_dir}"
     print(rsync_command)
     run.rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, shell=True)
@@ -337,7 +331,7 @@ def md5sum_tar_file(tar_file, run):
 
     os.chdir(run.dir)
 
-    md5sum_command = "md5sum fast5/%s >> %s" % (tar_file, os.path.join(run.dir, md5sum_file_name))
+    md5sum_command = f"md5sum fast5/{tar_file} >> {os.path.join(run.dir, md5sum_file_name)}"
     # Append the md5sum of the tar file to the list of md5sums.
     checksum_proc = subprocess.Popen(md5sum_command, shell=True,
                                      stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -352,30 +346,34 @@ def copy_across_md5sum(run):
     # destination directory on the server
     checksum_suffix = "*.md5"
 
-    scp_command = SSHPASS_PREFIX + "scp %s/%s %s@%s:%s" % (
-                                                             run.dir,
-                                                             checksum_suffix,
-                                                             SERVER_USERNAME,
-                                                             SERVER_NAME,
-                                                             DEST_DIRECTORY
-                                                             )
+    scp_command = SSHPASS_PREFIX + f"scp {run.dir}/{checksum_suffix} " + \
+        f"{SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}"
     scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, shell=True)
     stdout, stderr = scp_proc.communicate()
     print("Output of md5sum command", stdout, stderr)
 
 
-def copy_across_csv_files(run):
-    # Use the scp command to copy across the csv files into the destination directory on the server.
-    scp_command = SSHPASS_PREFIX + "scp -r %s %s@%s:%s" % (
-                                                        run.csv_dir,
-                                                        SERVER_USERNAME,
-                                                        SERVER_NAME,
-                                                        DEST_DIRECTORY)
-    scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = scp_proc.communicate()
-    print("Output of scp csv command", stdout, stderr)
+def rsync_across_csv_files(run):
+    # Use the rsync command to copy across the csv files into the destination directory on the server.
+    # Generate list of rsync options to be used.
+    rsync_command_options = ["rsync"]
+    rsync_command_options.append("--include='*.csv'")
+    rsync_command_options.append("--exclude='*'")  # Exclude everything else!
+    rsync_command_options.append("--recursive")
+    rsync_command_options.append("--times")
+
+    # Using the 'rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST'
+    # permutation of the command
+
+    # The csv files will be placed in the csv folder
+    rsync_command = SSHPASS_PREFIX + ' '.join(rsync_command_options) + \
+        f"{run.csv_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/csv/"
+
+    rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = rsync_proc.communicate()
+    print("Output of rsync csv command", stdout, stderr)
 
 
 """
@@ -415,7 +413,7 @@ def get_arguments():
                              "Tick this option and set up an id_rsa key if you'd prefer." +
                              "You will still be required to enter your password for set-up purposes.")
     parser.add_argument("--local", default=False, dest='local', action='store_true',
-            help="Has local basecalling been used, changes directory from fast5 to fast5/pass")
+                        help="Has local basecalling been used, changes directory from fast5 to fast5/pass")
 
     return parser.parse_args()
 
@@ -518,52 +516,33 @@ def get_run_details(run):
 
 
 def create_transferring_lock_file():
-    if MYOS == "nt":
-        s = paramiko.SSHClient()
-        s.load_system_host_keys()
-        s.connect(SERVER_NAME, SERVER_USERNAME, PASSWORD)
-    else:
-        s = pxssh.pxssh()
-        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-            print("SSH failed on login. Please try ssh through a terminal first then try again.")
-        else:
-            print("SSH passed")
+    s = paramiko.SSHClient()
+    s.load_system_host_keys()
+    s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
 
     # Command to check if folder is there.
-    cd_and_touch_command = ("bash -c \"cd %s && touch %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
-    if MYOS == "nt":
-        stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
-        print(stdout.read())
-        s.close()
-    else:
-        s.sendline(cd_and_touch_command)
-        s.prompt()  # match the prompt
-        output = s.before  # Gets the `output of the send line command
-        s.logout()  # Logout
+    cd_and_touch_command = "bash -c \"cd %s && touch %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
+    static_stdout = stdout.read().decode()
+    static_stderr = stderr.read().decode()
+    if not static_stderr == "":
+        print(static_stdout, static_stderr)
+    s.close()
 
 
 def remove_transferring_lock_file():
-    if MYOS == "nt":
-        s = paramiko.SSHClient()
-        s.load_system_host_keys()
-        s.connect(SERVER_NAME, SERVER_USERNAME, PASSWORD)
-    else:
-        s = pxssh.pxssh()
-        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-            print("SSH failed on login. Please try ssh through a terminal first then try again.")
-        else:
-            print("SSH passed")
+    s = paramiko.SSHClient()
+    s.load_system_host_keys()
+    s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
+
     # Command to check if folder is there.
-    cd_and_remove_command = ("bash -c \"cd %s && rm %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE))
-    if MYOS == "nt":
-        stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
-        print(stdout.read())
-        s.close()
-    else:
-        s.sendline(cd_and_remove_command)
-        s.prompt()  # match the prompt
-        output = s.before  # Gets the `output of the send line command
-        s.logout()  # Logout
+    cd_and_remove_command = "bash -c \"cd %s && rm %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
+    static_stdout = stdout.read().decode()
+    static_stderr = stderr.read().decode()
+    if not static_stderr == "":
+        print(static_stdout, static_stderr)
+    s.close()
 
 
 """
@@ -637,13 +616,13 @@ def check_directories():
     global READS_DIR
     # Check if reads directory exists
     if not os.path.isdir(READS_DIR):
-        sys.exit("Error, reads directory, %s, does not exist" % READS_DIR)
+        sys.exit(f"Error, reads directory, {READS_DIR}, does not exist")
     READS_DIR = os.path.abspath(READS_DIR) + "/"
     # We will now continue working from the reads directory.
     os.chdir(READS_DIR)
 
     # Check if server is active using the ping command.
-    ping_command = subprocess.Popen("ping -c 1 %s" % SERVER_NAME, shell=True,
+    ping_command = subprocess.Popen(f"ping -c 1 {SERVER_NAME}", shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ping_command.wait()
     out, error = ping_command.communicate()
@@ -651,47 +630,28 @@ def check_directories():
 
     # Check if folder on server is present.
     # Log into server, then check for folder.
-    dest_parent = '/'.join(DEST_DIRECTORY.split("/")[:-2])
+    dest_parent = os.path.dirname(os.path.normpath(DEST_DIRECTORY))
 
-    if MYOS == "nt":
-        s = paramiko.SSHClient()
-        s.load_system_host_keys()
-        s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
-    else:
-        s = pxssh.pxssh()
-        if not s.login(SERVER_NAME, SERVER_USERNAME, PASSWORD):
-            print("SSH failed on login")
-        else:
-            print("SSH passed")
+    s = paramiko.SSHClient()
+    s.load_system_host_keys()
+    s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
+
     # Command to check if folder is there.
-    check_dest_parent_exists_command = "bash -c \"if [ -d %s ]; then echo 'PRESENT'; fi\"" % dest_parent
-    if MYOS == "nt":
-        stdin, stdout, stderr = s.exec_command(check_dest_parent_exists_command)
-        if not len([pres for pres in output.split('\n')
-		    if pres.rstrip() == "PRESENT"])>0:
-            sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
-    else:
-        s.sendline(check_dest_parent_exists_command)
-        s.prompt()  # match the prompt
-        output = s.before  # Gets the `output of the send line command
-        print(dest_parent, output.split("\n"))
-        if not len([pres for pres in output.split('\n') 
-		    if pres.rstrip() == "PRESENT"])>0:
-            # Parent folder is not present. Exit.
-            sys.exit("Error, parent directory of %s does not exist" % DEST_DIRECTORY)
+    check_dest_parent_exists_command = f"bash -c \"if [ -d {dest_parent} ]; then echo 'PRESENT'; fi\""
+    stdin, stdout, stderr = s.exec_command(check_dest_parent_exists_command)
+    stdout_static = stdout.read().decode().rstrip()
+    if not stdout_static == "PRESENT":
+        sys.exit("Error, parent directory of {DEST_DIRECTORY} does not exist")
 
     # Command to create DEST_DIRECTORY
-    create_dest_directory_command = " bash -c \"if [ ! -d %s ]; then mkdir %s; fi\"" % (DEST_DIRECTORY, DEST_DIRECTORY)
-    if MYOS == "nt":
-        stdin, stdout, stderr = s.exec_command(create_dest_directory_command)
-        print(stdout.read())
-        s.close()
-    else:
-        s.sendline(create_dest_directory_command)
-        s.prompt()  # match the prompt
-        output = s.before  # Gets the `output of the send line command
-        s.logout()
-        print(output)
+    create_dest_directory_command = "bash -c \"if [ ! -d {DEST_DIRECTORY} ]; then mkdir {DEST_DIRECTORY}; fi\""
+    stdin, stdout, stderr = s.exec_command(create_dest_directory_command)
+
+    static_stdout = stdout.read().decode()
+    static_stderr = stderr.read().decode()
+    if not static_stderr == "":
+        print(static_stdout, static_stderr)
+    s.close()
 
 
 def have_a_break():
@@ -703,7 +663,7 @@ def delete_folder_if_empty(subdir):
     fast5_files = [fast5_file for fast5_file in os.listdir(subdir)
                    if fast5_file.endswith(".fast5")]
     if len(fast5_files) == 0:
-        subprocess.call("rm -r %s" % subdir, shell=True)
+        subprocess.call(f"rm -r {subdir}", shell=True)
 
 
 def get_complementary_run_id(run):
@@ -739,11 +699,11 @@ def move_fast5_files(subdir, fast5_files, run):
     os.mkdir(new_dir)
 
     for fast5_file in fast5_files:
-        subprocess.call("mv %s %s" % (os.path.join(subdir, fast5_file), new_dir), shell=True)
+        subprocess.call(f"mv {(os.path.join(subdir, fast5_file))} {new_dir}", shell=True)
 
 
 def standardise_int_length(my_integer):
     # Input of 15 returns 0015
-    return "%04d" % int(my_integer)
+    return f"{int(my_integer):04}"
 
 main()
