@@ -449,10 +449,10 @@ def extract_tarred_read_set(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    if QSUB_TYPE=="SGE":
+    if QSUB_TYPE == "SGE":
         subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
-    elif QSUB_TYPE=="TORQUE":
-        subfolder.extracted_jobid = int(stdout.rstrip().split(".")[0])
+    elif QSUB_TYPE == "TORQUE":
+        subfolder.extracted_jobid = int(stdout.rstrip().split('.')[0])
     update_dataframe(subfolder)
 
 
@@ -502,7 +502,7 @@ def run_albacore(subfolder):
         qsub_command_options.append(f"-d {PARENT_DIRECTORY})")
     qsub_command_options.append(f"-N ALBACORE")
     qsub_command_options.append(f" -v OMP_NUM_THREADS=1")
-
+    qsub_command = ' '.join(qsub_command_options)
     # Put these all together into one grand command
     albacore_command = f"echo \"{basecaller_command}\" | {qsub_command}"
     LOGGER.info(f"Submitting the following job to SGE:\n\"{albacore_command}\"")
@@ -789,12 +789,16 @@ def has_commenced(job_id):
     Use the qacct command to see if there exists a start time
     No start_time is represented as -/-
     """
-    qacct_command = f"qacct -j {job_id} | grep start_time | grep -v '\-\/\-'"
+    if QSUB_TYPE == "SGE":
+        qacct_command = f"qacct -j {job_id} | grep start_time | grep -v '\-\/\-'"
+    elif QSUB_TYPE == "TORQUE":
+        qacct_command = f"tracejob {job_id} | grep QUEUED | wc -l"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
-    if qacct_stdout == "":
+    if QSUB_TYPE == "SGE" and qacct_stdout == "" \
+            or QSUB_TYPE == "TORQUE" and int(qacct_stdout) > 1:
         # Start-time is non-existent
         return False
     if not qacct_stderr == "":
@@ -807,7 +811,10 @@ def has_completed(job_id, check_failed):
     Use the qacct command to see if the job has finished.
     No end_time is represented as -/-
     """
-    qacct_command = f"qacct -j {job_id} | grep end_time | grep -v '\-\/\-'"
+    if QSUB_TYPE=="SGE":
+        qacct_command = f"qacct -j {job_id} | grep end_time | grep -v '\-\/\-'"
+    elif QSUB_TYPE=="TORQUE":
+        qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status "
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -832,7 +839,8 @@ def has_failed(job_id):
     If it's any greater than zero then the command has failed
     """
     qacct_command = f"qacct -j {job_id} | grep exit_status | awk '{{sum+=$2}} END {{print sum}}'"
-    
+    qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status | grep - v preparing |" + \
+                    f" cut - d' ' - f7 | cut - d'=' -f2"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
