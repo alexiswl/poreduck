@@ -48,6 +48,7 @@ FASTQ_DIR = ""
 SUBFOLDERS = []
 STATUS_CSV = ""
 QSUB_HOST = ""
+QSUB_TYPE = ""
 STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
@@ -63,6 +64,7 @@ FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
 KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "SQK-LWB001",
         "SQK-RNA001", "SQK-RLI001", "SQK-RAD002", "SQK-RLB001", "SQK-RAB201", "SQK-LSK208", 
         "SQK-LSK108", "SQK-RAD003", "SQK-DCS108", "SQK-PCS108", "SQK-LSK308"]  # More kits to come
+QSUB_TYPES = ["SGE", "TORQUE"]
 LOGGER = None
 LOGGER_DIR = ""
 LOGGER_PATH = ""
@@ -274,6 +276,8 @@ def get_arguments():
                         help="Use this option to demultiplex library?")
     parser.add_argument("--qsub_source_string", type=str, required=False, default=None,
                         help="Anything that is required to be sourced prior to read_fast5_basecaller on qsub host?")
+    parser.add_argument("--qsub_type", choices=QSUB_TYPES, default="SGE",
+                        help="What qsub system are you using?")
 
     return parser.parse_args()
 
@@ -282,7 +286,7 @@ def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
-    global LOGGER_DIR, BARCODING, QSUB_SOURCE_STRING
+    global LOGGER_DIR, BARCODING, QSUB_SOURCE_STRING, QSUB_TYPE
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -305,13 +309,14 @@ def set_global_variables(args):
     BARCODING = args.barcoding
     if args.qsub_source_string is not None:
         QSUB_SOURCE_STRING = args.qsub_source_string
+    QSUB_TYPE = args.qsub_type
 
 
 def check_directories():
     # Make sure the directories exist, change to reads directory,
     # Create any other necessary directories for the script to run.
     global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
-    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH
+    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH, QSUB_TYPE
     if not os.path.isdir(READS_DIR):
         sys.exit(f"Error, {READS_DIR} does not exist")
 
@@ -444,7 +449,10 @@ def extract_tarred_read_set(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
+    if QSUB_TYPE=="SGE":
+        subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
+    elif QSUB_TYPE=="TORQUE":
+        subfolder.extracted_jobid = int(stdout.rstrip().split(".")[0])
     update_dataframe(subfolder)
 
 
@@ -482,13 +490,18 @@ def run_albacore(subfolder):
         basecaller_command = QSUB_SOURCE_STRING + ' && ' + basecaller_command
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command = "qsub " + \
-                   f"-o {subfolder.albacore_qsub_output_log} " + \
-                   f"-e {subfolder.albacore_qsub_error_log} " + \
-                   f"-S /bin/bash -l hostname={QSUB_HOST} " + \
-                   f"-l h_vmem={memory_allocation}G " + \
-                   f"-N ALBACORE " + \
-                   f"-wd {PARENT_DIRECTORY} -v OMP_NUM_THREADS=1"
+    qsub_command_options = ["qsub"]
+    qsub_command_options.append(f"-o {subfolder.albacore_qsub_output_log}")
+    qsub_command_options.append(f"-e {subfolder.albacore_qsub_error_log}")
+    qsub_command_options.append(f"-S /bin/bash -l hostname={QSUB_HOST}")
+    if QSUB_TYPE == "SGE":
+        qsub_command_options.append(f"-l h_vmem={memory_allocation}G")
+        qsub_command_options.append(f"-wd {PARENT_DIRECTORY})")
+    elif QSUB_TYPE == "TORQUE":
+        qsub_command_options.append(f"-l mem={memory_allocation}G")
+        qsub_command_options.append(f"-d {PARENT_DIRECTORY})")
+    qsub_command_options.append(f"-N ALBACORE")
+    qsub_command_options.append(f" -v OMP_NUM_THREADS=1")
 
     # Put these all together into one grand command
     albacore_command = f"echo \"{basecaller_command}\" | {qsub_command}"
