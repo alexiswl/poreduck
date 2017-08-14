@@ -49,6 +49,7 @@ import paramiko
 # Before we begin, are we using python 3.6 or greater?
 try:
     assert sys.version_info >= (3, 6)
+    print(sys.version_info)
 except AssertionError:
     sys.exit("Error: Python version out of date. Require 3.6 or higher.")
 
@@ -309,7 +310,7 @@ def run_rsync_command(run):
 
     # The tar.gz files will be placed in the reads sub folder
     rsync_command = SSHPASS_PREFIX + ' '.join(rsync_command_options) +\
-        f"{run.fast5_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/{reads_dir}"
+        f" {run.fast5_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/{reads_dir}"
     print(rsync_command)
     run.rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, shell=True)
@@ -368,7 +369,7 @@ def rsync_across_csv_files(run):
 
     # The csv files will be placed in the csv folder
     rsync_command = SSHPASS_PREFIX + ' '.join(rsync_command_options) + \
-        f"{run.csv_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/csv/"
+        f" {run.csv_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/csv/"
 
     rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, shell=True)
@@ -644,7 +645,7 @@ def check_directories():
         sys.exit("Error, parent directory of {DEST_DIRECTORY} does not exist")
 
     # Command to create DEST_DIRECTORY
-    create_dest_directory_command = "bash -c \"if [ ! -d {DEST_DIRECTORY} ]; then mkdir {DEST_DIRECTORY}; fi\""
+    create_dest_directory_command = f"bash -c \"if [ ! -d {DEST_DIRECTORY} ]; then mkdir {DEST_DIRECTORY}; fi\""
     stdin, stdout, stderr = s.exec_command(create_dest_directory_command)
 
     static_stdout = stdout.read().decode()
