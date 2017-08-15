@@ -163,16 +163,15 @@ def main():
 
         # Get all the subfolders currently in the fast5 directory
         get_subfolders()
+
         # Make sure STATUS_DF has all of the subfolders present
         generate_dataframe()
 
-        # Have a break if no new subfolders
-        if not new_subfolders():
-            take_a_break()
-            continue
-
         # Otherwise run through the pipeline
         run_pipeline()
+
+        # Have a break
+        take_a_break()
 
     # Transferring from laptop complete just wait for albacore to finish.
     processing = True  # Set while command
@@ -808,14 +807,6 @@ def update_dataframe(subfolder):
     Edits the STATUS_DF row of a given subfolder
     """
     STATUS_DF.loc[STATUS_DF.index == subfolder.name, ] = subfolder.to_series().tolist()
-
-
-def new_subfolders():
-    """Any new subfolders that haven't been added to the basecalling queue"""
-    for subfolder in SUBFOLDERS:
-        if not subfolder.albacore_submitted:
-            return True
-    return False
 
 
 def is_still_basecalling():
