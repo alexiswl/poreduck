@@ -48,7 +48,7 @@ QSUB_LOG_DIR = ""
 FASTQ_DIR = ""
 SUBFOLDERS = []
 STATUS_CSV = ""
-QSUB_HOST = ""
+QSUB_HOST = None
 QSUB_TYPE = ""
 STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
@@ -90,7 +90,7 @@ class Subfolder:
         self.fastq_file = name + ".fastq"
         self.albacore_zip_file = self.albacore_dir + ".albacore.tar.gz"
         # Qsub related files / ids
-        self.qsub_submission_fie = os.path.join(QSUB_LOG_DIR, name + ".batch.sh")
+        self.qsub_submission_file = os.path.join(QSUB_LOG_DIR, name + ".batch.sh")
         self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
         self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
         self.extracted_jobid = -1
@@ -495,7 +495,10 @@ def run_albacore(subfolder):
     qsub_replacement_dict = {}
     qsub_replacement_dict["STDOUT"] = subfolder.albacore_qsub_output_log
     qsub_replacement_dict["STDERR"] = subfolder.albacore_qsub_error_log
-    qsub_replacement_dict["HOSTNAME"] = QSUB_HOST
+    if QSUB_HOST is not None:
+        qsub_replacement_dict["HOSTNAME"] = QSUB_HOST
+    else:
+        qsub_replacement_dict["HOSTNAME"] = "remove line"
     qsub_replacement_dict["MEM"] = memory_allocation
     qsub_replacement_dict["PARENT_DIRECTORY"] = PARENT_DIRECTORY
 
