@@ -90,6 +90,7 @@ class Subfolder:
         self.fastq_file = name + ".fastq"
         self.albacore_zip_file = self.albacore_dir + ".albacore.tar.gz"
         # Qsub related files / ids
+        self.qsub_submission_fie = os.path.join(QSUB_LOG_DIR, name + ".batch.sh")
         self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
         self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
         self.extracted_jobid = -1
@@ -491,13 +492,14 @@ def run_albacore(subfolder):
         basecaller_command = QSUB_SOURCE_STRING + ' && ' + basecaller_command
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_command_options = ["qsub"]
-    qsub_command_options.append(f"-o {subfolder.albacore_qsub_output_log}")
-    qsub_command_options.append(f"-e {subfolder.albacore_qsub_error_log}")
-    qsub_command_options.append(f"-S /bin/bash -l hostname={QSUB_HOST}")
+    qsub_replacement_dict = {}
+    qsub_replacement_dict["STDOUT"] = subfolder.albacore_qsub_output_log
+    qsub_replacement_dict["STDERR"] = subfolder.albacore_qsub_error_log
+    qsub_replacement_dict["HOSTNAME"] = QSUB_HOST
+    qsub_replacement_dict["MEM"] = memory_allocation
+    qsub_replacement_dict["PARENT_DIRECTORY"] = PARENT_DIRECTORY
+
     if QSUB_TYPE == "SGE":
-        qsub_command_options.append(f"-l h_vmem={memory_allocation}G")
-        qsub_command_options.append(f"-wd {PARENT_DIRECTORY})")
     elif QSUB_TYPE == "TORQUE":
         qsub_command_options.append(f"-l mem={memory_allocation}G")
         qsub_command_options.append(f"-d {PARENT_DIRECTORY})")
