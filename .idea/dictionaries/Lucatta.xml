@@ -5,16 +5,19 @@
       <w>basecaller</w>
       <w>dest</w>
       <w>fastq</w>
+      <w>jobid</w>
       <w>minknow</w>
       <w>mwhahaha</w>
       <w>pigz</w>
       <w>poretools</w>
       <w>proc</w>
       <w>qsub</w>
+      <w>rstrip</w>
       <w>runmux</w>
       <w>seqid</w>
       <w>sshpass</w>
       <w>taxid</w>
+      <w>tracejob</w>
     </words>
   </dictionary>
 </component>

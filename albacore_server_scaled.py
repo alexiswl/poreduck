@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 This albacore script searches for tar zipped folders in a directory.
@@ -50,6 +50,8 @@ SUBFOLDERS = []
 STATUS_CSV = ""
 QSUB_HOST = None
 QSUB_TYPE = ""
+QSUB_EXTRACTION_TEMPLATE = ""
+QSUB_ALBACORE_TEMPLATE = ""
 STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
@@ -70,7 +72,6 @@ LOGGER = None
 LOGGER_DIR = ""
 LOGGER_PATH = ""
 BARCODING = False
-QSUB_SOURCE_STRING = ""
 
 
 class Subfolder:
@@ -90,10 +91,11 @@ class Subfolder:
         self.fastq_file = name + ".fastq"
         self.albacore_zip_file = self.albacore_dir + ".albacore.tar.gz"
         # Qsub related files / ids
-        self.qsub_submission_file = os.path.join(QSUB_LOG_DIR, name + ".batch.sh")
+        self.extracted_submission_file = os.path.join(QSUB_LOG_DIR, name + ".extract.batch.sh")
         self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
         self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
         self.extracted_jobid = -1
+        self.albacore_submission_file = os.path.join(QSUB_LOG_DIR, name + ".albacore.batch.sh")
         self.albacore_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.o.log")
         self.albacore_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.e.log")
         self.albacore_jobid = -1
@@ -276,10 +278,14 @@ def get_arguments():
                              "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
     parser.add_argument("--barcoding", default=False, dest='barcoding', action='store_true',
                         help="Use this option to demultiplex library?")
-    parser.add_argument("--qsub_source_string", type=str, required=False, default=None,
-                        help="Anything that is required to be sourced prior to read_fast5_basecaller on qsub host?")
     parser.add_argument("--qsub_type", choices=QSUB_TYPES, default="SGE",
                         help="What qsub system are you using?")
+    parser.add_argument("--qsub_extraction_template", type=str, required=True,
+                        help="The qsub extraction template for your qsub command. " +
+                             "Check the poreduck examples for more information.")
+    parser.add_argument("--qsub_albacore_template", type=str, required=True,
+                        help="The qsub albacore template for your qsub command. " +
+                             "Check the poreduck examples for more information.")
 
     return parser.parse_args()
 
@@ -288,7 +294,7 @@ def set_global_variables(args):
     # Global variables
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
-    global LOGGER_DIR, BARCODING, QSUB_SOURCE_STRING, QSUB_TYPE
+    global LOGGER_DIR, BARCODING, QSUB_TYPE, QSUB_ALBACORE_TEMPLATE, QSUB_EXTRACTION_TEMPLATE
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -309,8 +315,8 @@ def set_global_variables(args):
     if args.log_directory is not None:
         LOGGER_DIR = args.log_directory
     BARCODING = args.barcoding
-    if args.qsub_source_string is not None:
-        QSUB_SOURCE_STRING = args.qsub_source_string
+    QSUB_EXTRACTION_TEMPLATE = args.qsub_extraction_template
+    QSUB_ALBACORE_TEMPLATE = args.qsub_albacore_template
     QSUB_TYPE = args.qsub_type
 
 
@@ -440,14 +446,39 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = f"pigz -dc {os.path.join(READS_DIR, subfolder.tar_filename)} | tar -xf -"
-    qsub_command = f"qsub -o {subfolder.extracted_qsub_output_log} -e {subfolder.extracted_qsub_error_log}" + \
-                   f"-N PIGZ -S /bin/bash -wd {READS_DIR} -l hostname={QSUB_HOST}"
-    tar2qsub_command = f"echo \"{tar_command}\" | {qsub_command}"
-    LOGGER.info(f"Submitting the following extraction job to sge:\n \"{tar2qsub_command}\"")
-    tar_proc = subprocess.Popen(tar2qsub_command, shell=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = tar_proc.communicate()
+    qsub_replacement_dict = {"STDOUT": subfolder.extracted_qsub_output_log,
+                             "STDERR": subfolder.extracted_qsub_error_log,
+                             "HOSTNAME": QSUB_HOST,
+                             "PARENT_DIRECTORY": PARENT_DIRECTORY,
+                             "COMMAND": tar_command}
 
+    # Copy the standard qsub file from the main folder to the qsub folder
+    cp_command = f"{QSUB_EXTRACTION_TEMPLATE} {subfolder.extraction_submission_file}"
+    cp_proc = subprocess.Popen(cp_command, shell=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = cp_proc.communicate()
+    if not stdout == "" or not stderr == "":
+        print("Copy command:", stdout, stderr)
+
+    # Now edit this file based on our inputs using sed.
+    for variable, replacement in qsub_replacement_dict.items():
+        if replacement is None:
+            sed_command = f"sed -i '/{variable}/d' {subfolder.extraction_submission_file}"
+        else:
+            sed_command = f"sed -i 's/{variable}/{replacement}/g' {subfolder.extraction_submission_file}"
+        sed_proc = subprocess.Popen(sed_command, shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = sed_proc.communicate()
+        if not stdout == "" or not stderr == "":
+            print("sed command:", stdout, stderr)
+
+    # Submit job
+    job_submission_command = f"qsub {subfolder.extraction_submission_file}"
+    job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = job_submission_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
@@ -488,38 +519,45 @@ def run_albacore(subfolder):
     if BARCODING:
         basecaller_command_options.append("--barcoding")
     basecaller_command = ' '.join(basecaller_command_options)
-    if not QSUB_SOURCE_STRING == "":
-        basecaller_command = QSUB_SOURCE_STRING + ' && ' + basecaller_command
 
     # These are both parsed into qsub which then determines what to do with it all.
-    qsub_replacement_dict = {}
-    qsub_replacement_dict["STDOUT"] = subfolder.albacore_qsub_output_log
-    qsub_replacement_dict["STDERR"] = subfolder.albacore_qsub_error_log
-    if QSUB_HOST is not None:
-        qsub_replacement_dict["HOSTNAME"] = QSUB_HOST
-    else:
-        qsub_replacement_dict["HOSTNAME"] = "remove line"
-    qsub_replacement_dict["MEM"] = memory_allocation
-    qsub_replacement_dict["PARENT_DIRECTORY"] = PARENT_DIRECTORY
+    qsub_replacement_dict = {"STDOUT": subfolder.albacore_qsub_output_log,
+                             "STDERR": subfolder.albacore_qsub_error_log,
+                             "HOSTNAME": QSUB_HOST,
+                             "MEM": memory_allocation,
+                             "PARENT_DIRECTORY": PARENT_DIRECTORY,
+                             "COMMAND": basecaller_command}
 
-    if QSUB_TYPE == "SGE":
-    elif QSUB_TYPE == "TORQUE":
-        qsub_command_options.append(f"-l mem={memory_allocation}G")
-        qsub_command_options.append(f"-d {PARENT_DIRECTORY})")
-    qsub_command_options.append(f"-N ALBACORE")
-    qsub_command_options.append(f" -v OMP_NUM_THREADS=1")
-    qsub_command = ' '.join(qsub_command_options)
-    # Put these all together into one grand command
-    albacore_command = f"echo \"{basecaller_command}\" | {qsub_command}"
-    LOGGER.info(f"Submitting the following job to SGE:\n\"{albacore_command}\"")
+    # Copy the standard qsub file from the main folder to the qsub folder
+    cp_command = f"{QSUB_ALBACORE_TEMPLATE} {subfolder.albacore_submission_file}"
+    cp_proc = subprocess.Popen(cp_command, shell=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = cp_proc.communicate()
+    if not stdout == "" or not stderr == "":
+        print("Copy command:", stdout, stderr)
 
-    # Execute qsub command via subprocess.
-    albacore_proc = subprocess.Popen(albacore_command, shell=True,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Now edit this file based on our inputs using sed.
+    for variable, replacement in qsub_replacement_dict.items():
+        if replacement is None:
+            sed_command = f"sed -i '/{variable}/d' {subfolder.albacore_submission_file}"
+        else:
+            sed_command = f"sed -i 's/{variable}/{replacement}/g' {subfolder.albacore_submission_file}"
+        sed_proc = subprocess.Popen(sed_command, shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = sed_proc.communicate()
+        if not stdout == "" or not stderr == "":
+            print("sed command:", stdout, stderr)
 
-    stdout, stderr = albacore_proc.communicate()
+    # Submit job
+    job_submission_command = f"qsub {subfolder.albacore_submission_file}"
+    job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    stdout, stderr = job_submission_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
-    # So job equal to third element of the array.
+    # So job equal to third element of th   e array.
     LOGGER.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
     subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
     update_dataframe(subfolder)
@@ -550,6 +588,8 @@ def remove_folder(subfolder):
     remove_proc = subprocess.Popen(remove_command, shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = remove_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     if not stdout == "" or stderr == "":
         LOGGER.info(f"Output of deleting folder command is\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
     update_dataframe(subfolder)
@@ -610,6 +650,8 @@ def move_fastq_file(subfolder):
             move_proc = subprocess.Popen(move_command, shell=True,
                                          stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             stdout, stderr = move_proc.communicate()
+            stdout = stdout.decode()
+            stderr = stderr.decode()
             if not stdout == "" or not stderr == "":
                 LOGGER.info(f"Output of mv command is:\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
 
@@ -631,6 +673,8 @@ def tar_albacore_folder(subfolder):
     tar_proc = subprocess.Popen(tar_command, shell=True,
                                 stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, stderr = tar_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     if not stdout == "" or not stderr == "":
         LOGGER.info(f"Output of tar albacore folder command is:\n\"{stdout.rstrip()}\"\n\"{stderr.rstrip()}\"")
     subfolder.albacore_tarred = True
@@ -803,6 +847,8 @@ def has_commenced(job_id):
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    qacct_stdout = qacct_stdout.decode()
+    qacct_stderr = qacct_stderr.decode()
     if QSUB_TYPE == "SGE" and qacct_stdout == "" \
             or QSUB_TYPE == "TORQUE" and int(qacct_stdout) > 1:
         # Start-time is non-existent
@@ -817,14 +863,16 @@ def has_completed(job_id, check_failed):
     Use the qacct command to see if the job has finished.
     No end_time is represented as -/-
     """
-    if QSUB_TYPE=="SGE":
+    if QSUB_TYPE == "SGE":
         qacct_command = f"qacct -j {job_id} | grep end_time | grep -v '\-\/\-'"
-    elif QSUB_TYPE=="TORQUE":
+    elif QSUB_TYPE == "TORQUE":
         qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status "
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    qacct_stdout = qacct_stdout.decode()
+    qacct_stderr = qacct_stderr.decode()
     if qacct_stdout == "":
         # end_time is non-existent
         return False
@@ -844,13 +892,17 @@ def has_failed(job_id):
     We pass the exit_status parameter into awk and sum it.
     If it's any greater than zero then the command has failed
     """
-    qacct_command = f"qacct -j {job_id} | grep exit_status | awk '{{sum+=$2}} END {{print sum}}'"
-    qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status | grep - v preparing |" + \
-                    f" cut - d' ' - f7 | cut - d'=' -f2"
+    if QSUB_TYPE == "SGE":
+        qacct_command = f"qacct -j {job_id} | grep exit_status | awk '{{sum+=$2}} END {{print sum}}'"
+    elif QSUB_TYPE == "TORQUE":
+        qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status | grep - v preparing |" + \
+                        f" cut - d' ' - f7 | cut - d'=' -f2"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
+    qacct_stdout = qacct_stdout.decode()
+    qacct_stderr = qacct_stderr.decode()
     if qacct_stdout.strip() == "":
         return True  
     if int(qacct_stdout) > 0:

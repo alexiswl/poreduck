@@ -275,6 +275,8 @@ def tar_folders(subdir_prefix, run):
         tar_proc = subprocess.Popen(tar_command, shell=True,
                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = tar_proc.communicate()
+        stdout = stdout.decode()
+        stderr = stderr.decode()
         md5sum_tar_file(tar_file, run)
         if not stdout == "" or not stderr == "":
             print("Output of pigz command is", stdout, stderr)
@@ -311,7 +313,6 @@ def run_rsync_command(run):
     # The tar.gz files will be placed in the reads sub folder
     rsync_command = SSHPASS_PREFIX + ' '.join(rsync_command_options) +\
         f" {run.fast5_dir}/ {SERVER_USERNAME}@{SERVER_NAME}:{DEST_DIRECTORY}/{reads_dir}"
-    print(rsync_command)
     run.rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, shell=True)
     print("polling run.rsync.proc", run.rsync_proc.poll())
@@ -337,7 +338,10 @@ def md5sum_tar_file(tar_file, run):
     checksum_proc = subprocess.Popen(md5sum_command, shell=True,
                                      stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     stdout, stderr = checksum_proc.communicate()
-    print("md5sum output", stdout, stderr)
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+    if not stdout == "" or not stderr == "":
+        print("md5sum output", stdout, stderr)
 
     os.chdir(READS_DIR)  # Change back out of parent directory
 
@@ -352,7 +356,10 @@ def copy_across_md5sum(run):
     scp_proc = subprocess.Popen(scp_command, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, shell=True)
     stdout, stderr = scp_proc.communicate()
-    print("Output of md5sum command", stdout, stderr)
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+    if not stdout == "" or not stderr == "":
+        print("Output of md5sum command", stdout, stderr)
 
 
 def rsync_across_csv_files(run):
@@ -374,6 +381,8 @@ def rsync_across_csv_files(run):
     rsync_proc = subprocess.Popen(rsync_command, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, shell=True)
     stdout, stderr = rsync_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     print("Output of rsync csv command", stdout, stderr)
 
 
@@ -587,8 +596,12 @@ def is_minknow_still_running():
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
-    # Split stdout by line, should be a bunch of MinKNOW commands running
-    print("MinKNOW running output %s:" % stdout.rstrip())
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
+    if not stdout == "" or not stderr == "":
+        print("MinKNOW running", stdout, stderr)
+
     if int(stdout.rstrip()) > 0:
         is_running = True
 
@@ -626,8 +639,14 @@ def check_directories():
     ping_command = subprocess.Popen(f"ping -c 1 {SERVER_NAME}", shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ping_command.wait()
-    out, error = ping_command.communicate()
-    print(out, error)
+    stdout, stderr = ping_command.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
+    if not stderr == "":
+        [print(line) for line in stdout.split("\n")][0]
+    else:
+        print("Ping command:", stdout, stderr)
 
     # Check if folder on server is present.
     # Log into server, then check for folder.
