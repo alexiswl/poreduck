@@ -11,9 +11,10 @@ poreduck currently can be used for two key steps of handling MinION data:
 1.  Transferring of reads from a laptop to a local server or hard-drive in real-time.
 2.  Running of a local-basecalling algorithm with
 
+## Tutorials (see below)
+
 ## Examples
 An examples of poreduck usage is shown below:
-
 `transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
 --dest_dir /data/storage/MinION/my_MinION_run`
 where `/var/lib/MinKNOW/data/reads` contains a list of runs in `YYYYMMDD_HHMM_SAMPLE_NAME` format.
@@ -38,12 +39,22 @@ Last tested on MinKNOW version 1.7.10
     * Type `make`.
     * You may need to install the zlib library if you get an error in b. This is done through the Cygwin setup.exe program.
 
-### Dependencies (important python modules)
+### Dependencies (Unix specific)
+1. pigz
+    * either `brew install pigz`
+    * or `conda install -c pigz`
+
+### Python Dependencies
 * python3.6 or higher is required. This script will break immediately if not satisfied!
 All of the python modules listed below can be installed through pip or conda.
 Non pre-installed python modules
-* paramiko
-* getpass
+1. paramiko
+    * either `conda install -c anaconda paramiko`
+    * or `pip install paramiko`
+ 
+### Downloading this repo.
+The following command will download this repo.
+`git clone https://github.com/alexiswl/poreduck.git`
 
 ### Making an id-rsa key.
 The sshpass is used to automatically perform the scp and rsync commands that would generally prompt a
@@ -77,3 +88,35 @@ You can test to see if you have SGE installed by running:
 Please talk to your IT team to enusre that 'h_vmem' and 'hostname' options can be modified by the user.
 
 Please let me know of any errors that you come across in this script.
+
+## Tutorials
+### transfer_fast5_to_server.py
+Before commencing this tutorial, you are expected to have previously:
+ * set up your ssh key with your server of choice.
+ * Installed python3.6 and poreduck dependencies
+ * Installed curl
+ * Downladed this repo
+#### Step 1. Download the following dataset using curl (946 M)
+`curl -o poreduck_test_files.tar.gz https://cloudstor.aarnet.edu.au/plus/index.php/s/vTbIOQdILUOgazt/download`
+#### Step 2. Move and untar the download
+`mv poreduck_test_files.tar.gz /path/to/reads`  
+`cd /path/to/reads`  
+`tar -xf poreduck_test_files.tar.gz`  
+
+You should see two folders have been created. Both end in '_TEST'
+
+#### Step 3. Running the transfer script
+We can now run the transfer script.  
+`/path/to/poreduck/transfer_fast5_to_server.py \ `  
+`--reads_dir /path/to/reads \ `  
+`--server_name <server_name> \ `  
+`--user_name <user_name> \ `  
+`--dest_dir /dest/on/server \ `  
+`--sample_name TEST \ `  
+`--no-sshpass`  
+ 
+Let's make sure that the data is there!   
+`ssh <user_name>@<server_name>:/dest/on/server "ls -R /dest/on/server/"`
+
+Should return a list of all the files we have created.
+

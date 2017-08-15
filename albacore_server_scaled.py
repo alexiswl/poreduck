@@ -29,6 +29,7 @@ from datetime import datetime
 # Before we begin, are we using python 3.6 or greater?
 try:
     assert sys.version_info >= (3, 6)
+    my_python_3p6_string = f"If you see a syntax error here you need to update your python version"
 except AssertionError:
     sys.exit("Error: Python version out of date. Require 3.6 or higher.")
 
