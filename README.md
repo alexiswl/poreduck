@@ -99,24 +99,102 @@ Before commencing this tutorial, you are expected to have previously:
 #### Step 1. Download the following dataset using curl (946 M)
 `curl -o poreduck_test_files.tar.gz https://cloudstor.aarnet.edu.au/plus/index.php/s/vTbIOQdILUOgazt/download`
 #### Step 2. Move and untar the download
-`mv poreduck_test_files.tar.gz /path/to/reads`  
-`cd /path/to/reads`  
-`tar -xf poreduck_test_files.tar.gz`  
+```bash 
+mv poreduck_test_files.tar.gz /path/to/reads  
+cd /path/to/reads
+tar -xf poreduck_test_files.tar.gz  
+```
 
 You should see two folders have been created. Both end in '_TEST'
 
 #### Step 3. Running the transfer script
 We can now run the transfer script.  
-`/path/to/poreduck/transfer_fast5_to_server.py \ `  
-`--reads_dir /path/to/reads \ `  
-`--server_name <server_name> \ `  
-`--user_name <user_name> \ `  
-`--dest_dir /dest/on/server \ `  
-`--sample_name TEST \ `  
-`--no-sshpass`  
+```bash
+/path/to/poreduck/transfer_fast5_to_server.py \ 
+`--reads_dir /path/to/reads \   
+`--server_name <server_name> \ 
+`--user_name <user_name> \ 
+`--dest_dir /dest/on/server \ 
+`--sample_name TEST \ 
+`--no-sshpass
+``` 
  
 Let's make sure that the data is there!   
 `ssh <user_name>@<server_name>:/dest/on/server "ls -R /dest/on/server/"`
 
 Should return a list of all the files we have created.
 
+### Resolving python version conflicts.
+Albacore runs only on 3.5 while poreduck requires 3.6.
+First of all, 3.6 is better so this should be your standard python3.
+You can determine your version using:
+`python3 --version`
+#### Python3.6
+If you are not on python3.6, I recommend you download anaconda3 using the following commands.
+```bash
+# Set the version number
+anaconda_version="4.4.0"
+# Download anaconda3 using the wget command
+wget https://repo.continuum.io/archive/Anaconda3-${anaconda_version}-MacOSX-x86_64.sh
+# Install anaconda. 
+# -b forces install without asking questions.
+# -p sets anaconda to be installed in our home directory.
+bash Anaconda3-${anaconda_version}-MacOSX-x86_64.sh -b -p $HOME/anaconda3
+# Now we need to update it.
+conda update conda
+# And we may need to install the latest version of git
+conda install -c anaconda git -y
+```
+
+#### Upgrading your python version on conda.
+If you're already using conda and you're not on python3.6,
+try the following command:
+`conda install python==3.6`
+
+### Creating a python environment:
+As stated before, albacore puts us in a dilemma.
+Here we can create an environment for albacore.
+```bash
+PYTHON_VERSION=3.5
+conda create --name albacore_env python=${PYTHON_VERSION} anaconda
+# Activate environment
+source activate albacore_env
+# Create a standard yaml file
+conda env export > standard.yaml
+# Update libraries (this may take some time)
+conda update --all
+# Download albacore pip wheel for mac
+wget https://mirror.oxfordnanoportal.com/software/analysis/ont_albacore-1.2.6-cp36-cp36m-macosx_10_11_x86_64.whl
+# Or Linux
+wget https://mirror.oxfordnanoportal.com/software/analysis/ont_albacore-1.2.6-cp35-cp35m-manylinux1_x86_64.whl
+# Install albacore using pip
+pip install ont_albacore-*.whl  # Star represents 
+# Write what we have installed to file
+conda env export > albacore.yaml
+# Decativate the albacore environment
+source deactivate
+```
+
+### Configuring your environment.
+You may wish to add a .bashrc equivalent to when you open this environment
+This can be configured as follows.
+```bash
+cd /home/jsmith/anaconda3/envs/analytics
+mkdir -p ./etc/conda/activate.d
+mkdir -p ./etc/conda/deactivate.d
+touch ./etc/conda/activate.d/env_vars.sh
+touch ./etc/conda/deactivate.d/env_vars.sh
+```
+
+For further reading see:
+https://conda.io/docs/using/envs.html
+
+
+## Running albacore
+Before commencing this tutorial, you are expected to have previously:
+ * created an albacore_env with python 3.5
+ * installed python3.6, with python3 set to python3.6
+
+Now that we have our albacore environment
+we can add the `source activate albacore_env` command to the start
+of each script.
