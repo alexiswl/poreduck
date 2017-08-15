@@ -315,8 +315,8 @@ def set_global_variables(args):
     if args.log_directory is not None:
         LOGGER_DIR = args.log_directory
     BARCODING = args.barcoding
-    QSUB_EXTRACTION_TEMPLATE = args.qsub_extraction_template
-    QSUB_ALBACORE_TEMPLATE = args.qsub_albacore_template
+    QSUB_EXTRACTION_TEMPLATE = os.path.abspath(args.qsub_extraction_template)
+    QSUB_ALBACORE_TEMPLATE = os.path.abspath(args.qsub_albacore_template)
     QSUB_TYPE = args.qsub_type
 
 
@@ -446,34 +446,42 @@ def extract_tarred_read_set(subfolder):
         subfolder.extracted_submitted = True
 
     tar_command = f"pigz -dc {os.path.join(READS_DIR, subfolder.tar_filename)} | tar -xf -"
+
     qsub_replacement_dict = {"STDOUT": subfolder.extracted_qsub_output_log,
                              "STDERR": subfolder.extracted_qsub_error_log,
-                             "HOSTNAME": QSUB_HOST,
-                             "PARENT_DIRECTORY": PARENT_DIRECTORY,
-                             "COMMAND": tar_command}
+                             "HOSTNAME": QSUB_HOST, 
+                             "COMMAND": tar_command,
+                             "WORKING_DIRECTORY": READS_DIR}
 
     # Copy the standard qsub file from the main folder to the qsub folder
-    cp_command = f"{QSUB_EXTRACTION_TEMPLATE} {subfolder.extraction_submission_file}"
+    cp_command = f"cp {QSUB_EXTRACTION_TEMPLATE} {subfolder.extracted_submission_file}"
     cp_proc = subprocess.Popen(cp_command, shell=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = cp_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
     if not stdout == "" or not stderr == "":
         print("Copy command:", stdout, stderr)
 
     # Now edit this file based on our inputs using sed.
     for variable, replacement in qsub_replacement_dict.items():
         if replacement is None:
-            sed_command = f"sed -i '/{variable}/d' {subfolder.extraction_submission_file}"
+            sed_command = f"sed -i \'/{variable}/d\' {subfolder.extracted_submission_file}" 
         else:
-            sed_command = f"sed -i 's/{variable}/{replacement}/g' {subfolder.extraction_submission_file}"
+            replacement_esc = str(replacement).replace("/", "\/")
+            sed_command = f"sed -i \'s/{variable}/{replacement_esc}/g\'" +\
+                          f" {subfolder.extracted_submission_file}"
         sed_proc = subprocess.Popen(sed_command, shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = sed_proc.communicate()
+        stdout = stdout.decode()
+        stderr = stderr.decode()
         if not stdout == "" or not stderr == "":
             print("sed command:", stdout, stderr)
 
     # Submit job
-    job_submission_command = f"qsub {subfolder.extraction_submission_file}"
+    job_submission_command = f"qsub {subfolder.extracted_submission_file}"
     job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = job_submission_proc.communicate()
@@ -524,27 +532,34 @@ def run_albacore(subfolder):
     qsub_replacement_dict = {"STDOUT": subfolder.albacore_qsub_output_log,
                              "STDERR": subfolder.albacore_qsub_error_log,
                              "HOSTNAME": QSUB_HOST,
-                             "MEM": memory_allocation,
-                             "PARENT_DIRECTORY": PARENT_DIRECTORY,
-                             "COMMAND": basecaller_command}
+                             "MEM": memory_allocation, 
+                             "COMMAND": basecaller_command,
+                             "WORKING_DIRECTORY": ALBACORE_DIR}
 
     # Copy the standard qsub file from the main folder to the qsub folder
-    cp_command = f"{QSUB_ALBACORE_TEMPLATE} {subfolder.albacore_submission_file}"
+    cp_command = f"cp {QSUB_ALBACORE_TEMPLATE} {subfolder.albacore_submission_file}"
     cp_proc = subprocess.Popen(cp_command, shell=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = cp_proc.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
     if not stdout == "" or not stderr == "":
         print("Copy command:", stdout, stderr)
 
     # Now edit this file based on our inputs using sed.
     for variable, replacement in qsub_replacement_dict.items():
         if replacement is None:
-            sed_command = f"sed -i '/{variable}/d' {subfolder.albacore_submission_file}"
+            sed_command = f"sed -i \'/{variable}/d\' {subfolder.albacore_submission_file}"
         else:
-            sed_command = f"sed -i 's/{variable}/{replacement}/g' {subfolder.albacore_submission_file}"
+            replacement_esc = str(replacement).replace("/", "\/")
+            sed_command = f"sed -i \'s/{variable}/{replacement_esc}/g\'" + \
+                          f" {subfolder.albacore_submission_file}"
         sed_proc = subprocess.Popen(sed_command, shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = sed_proc.communicate()
+        stdout = stdout.decode()
+        stderr = stderr.decode()
         if not stdout == "" or not stderr == "":
             print("sed command:", stdout, stderr)
 
@@ -854,7 +869,7 @@ def has_commenced(job_id):
         # Start-time is non-existent
         return False
     if not qacct_stderr == "":
-        LOGGER.info(f"qacct stderr of {qacct_stderr}")
+        LOGGER.info(f"qacct stderr of {qacct_stderr}") 
     return True
 
 
