@@ -11,7 +11,9 @@ poreduck currently can be used for two key steps of handling MinION data:
 1.  Transferring of reads from a laptop to a local server or hard-drive in real-time.
 2.  Running of a local-basecalling algorithm with
 
-## Tutorials (see below)
+## Tutorials
+See the bottom of this page.
+Or checkout this repo: https://alexiswl.github.io/ASimpleNanoporeTutorial/index.html
 
 ## Examples
 An examples of poreduck usage is shown below:
