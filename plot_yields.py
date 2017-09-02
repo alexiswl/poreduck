@@ -10,6 +10,13 @@ import statistics
 from matplotlib import pyplot as plt
 from matplotlib import dates as mdates
 import numpy as np
+import datetime
+import matplotlib.patches as mpatches
+import humanize
+import matplotlib.mlab as mlab
+from matplotlib.ticker import FuncFormatter
+import matplotlib
+
 
 """
 This script will create a yield plot of the data that has been created by the
@@ -36,6 +43,8 @@ READ_SETS = {}
 ALL_READS = None
 DATEPARSE = lambda dates: [pd.datetime.strptime(d, '%a %b %d %H:%M:%S %Y') for d in dates]
 SAMPLE_NAME = ""
+YIELD_DATA = None
+QUALITY_DESCRIPTIONS = ["bad", "alright", "better", "best"]
 
 # Import arguments.
 """
@@ -90,7 +99,7 @@ class Read_set:
             # Insert the fastq_file length
             self.df.set_value(df_index, "seq_length", fastq_length)
             # Insert the average quality
-            self.df.set_value(df_index, "av_phread", fastq_av_quality)
+            self.df.set_value(df_index, "av_qual", fastq_av_quality)
         self.added_fastq_data = True
 
     def append_set_id_to_csv(self):
@@ -183,33 +192,151 @@ def aggregate_dataframes():
     ALL_READS = ALL_READS.sort_values(['ctime'], ascending=[True])
 
 
-def plot_yield():
+def assign_yield_data():
+    """We use this for both yield plots"""
+    global YIELD_DATA
     # Read in seqlength and time from ALL_READS dataframe
-    yield_data = ALL_READS[['ctime', "seq_length"]]
+    YIELD_DATA = ALL_READS[['ctime', "seq_length"]]
+
     # Aggregate seqlength for each minute of sequencing. I love this resample command!
-    yield_data.set_index('ctime', inplace=True)
-    yield_data = yield_data.resample("1T").sum()
-    yield_data.reset_index(inplace=True)
+    YIELD_DATA.set_index('ctime', inplace=True)
+    YIELD_DATA = YIELD_DATA.resample("1T").sum()
+    YIELD_DATA.reset_index(inplace=True)
     # Generate a cumulative sum of sequence data
-    yield_data['cumsum_bp'] = yield_data['seq_length'].cumsum()
-    yield_data['cumsum_mb'] = yield_data['cumsum_bp'].apply(lambda x: x/1000000)
+    YIELD_DATA['cumsum_bp'] = YIELD_DATA['seq_length'].cumsum()
     # Convert time to timedelta format and then to float format, in hours.
-    yield_data['duration_tdelta'] = yield_data['ctime'].apply(lambda t: t - yield_data['ctime'].min())
-    yield_data['duration_float'] = yield_data['duration_tdelta'].apply(lambda t: t.total_seconds()/3600)
+    YIELD_DATA['duration_tdelta'] = YIELD_DATA['ctime'].apply(lambda t: t - YIELD_DATA['ctime'].min())
+    YIELD_DATA['duration_float'] = YIELD_DATA['duration_tdelta'].apply(lambda t: t.total_seconds())
+
+
+def plot_yield_general():
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
     num_points = 6
-    x_ticks = np.linspace(yield_data['duration_float'].min(), yield_data['duration_float'].max(), num_points)
+    x_ticks = np.linspace(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max(), num_points)
     ax.set_xticks(x_ticks)
-    # Set x and y labels and limites.
-    ax.set_xlabel("Time (hours)")
-    ax.set_ylabel("Yield (Mb)")
-    ax.set_xlim(yield_data['duration_float'].min(), yield_data['duration_float'].max())
-    ax.set_title(f"Yield for {SAMPLE_NAME}: (Mb/Hour)")
-    ax.plot(yield_data['duration_float'], yield_data['cumsum_mb'],
+
+    # Define axis formatters
+    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+    # Set x and y labels and limits.
+    ax.set_xlabel("Duration (HH:MM)")
+    ax.set_ylabel("Yield")
+    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
+    ax.set_title(f"Yield for {SAMPLE_NAME} (MB/Hour)")
+    ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_mb'],
             linestyle="solid", markevery=[])
     plt.show()
+
+
+def plot_yield_by_quality():
+    # Read in seqlength and time from ALL_READS dataframe
+    new_yield_data = ALL_READS[['ctime', "seq_length", "av_qual"]]
+    # Bin qualities
+    qual_bins = [0, 9, 15, 22, new_yield_data["av_qual"].max()]
+    print(new_yield_data["av_qual"].max())
+    new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
+                                                   labels=QUALITY_DESCRIPTIONS)
+    new_yield_data.set_index('ctime', inplace=True)
+    new_yield_data.drop('av_qual', axis=1, inplace=True)
+    yield_data_grouped = new_yield_data.groupby("descriptive_quality").apply(lambda d: d.resample("1T").sum())[
+        'seq_length']
+    yield_data_by_quality = {description: yield_data_grouped[description].to_frame().reset_index()
+                             for description in
+                             QUALITY_DESCRIPTIONS}
+
+    for description, yield_df in yield_data_by_quality.items():
+        yield_df.reset_index(inplace=True)
+        yield_df.reindex(index=YIELD_DATA.index, fill_value=0)
+        # Generate a cumulative sum of sequence data
+        yield_df['cumsum_bp'] = yield_df['seq_length'].cumsum()
+        # Convert time to timedelta format and then to float format, in hours.
+        yield_df['duration_tdelta'] = yield_df['ctime'].apply(lambda t: t - yield_df['ctime'].min())
+        yield_df['duration_float'] = yield_df['duration_tdelta'].apply(lambda t: t.total_seconds() / 3600)
+
+    # Set subplots.
+    fig, ax = plt.subplots(1)
+    # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
+    num_points = 6
+    x_ticks = np.linspace(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max(), num_points)
+    ax.set_xticks(x_ticks)
+    # Define axis formatters
+    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+    # Set x and y labels and limits.
+    ax.set_xlabel("Duration (HH:MM)")
+    ax.set_ylabel("Yield")
+    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
+    ax.set_title(f"Yield for {SAMPLE_NAME}")
+    colours = ['red', 'orange', 'blue', 'green']
+
+    ax.stackplot(YIELD_DATA['duration_float'],
+                 [yield_data_by_quality[description]['cumsum_bp'] for description in QUALITY_DESCRIPTIONS],
+                 colors=colours)
+    # Convert bases to appropriate level
+    formatter_y = FuncFormatter(y_yield_to_human_readable)
+
+    # creating the legend manually
+    ax.yaxis.set_major_formatter(formatter_y)
+    ax.legend([mpatches.Patch(color=colour) for colour in reversed(colours)],
+              reversed(QUALITY_DESCRIPTIONS), loc=2)
+
+    plt.show()
+
+
+def plot_read_length_hist():
+    # Define how many plots we want (1)
+    fig, ax = plt.subplots(1)
+    # Set the axis formatters
+    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    # Plot the histogram
+    ax.hist(ALL_READS["seq_length"], 50, weights=ALL_READS["seq_length"],
+            normed=1, facecolor='blue', alpha=0.76)
+    # Set the titles and axis labels
+    ax.set_title(f"Read Distribution Graph for {SAMPLE_NAME}")
+    ax.grid(color='black', linestyle=':', linewidth=0.5)
+    ax.set_xlabel("Read length")
+    ax.set_ylabel("Bases per bin")
+
+    plt.show()
+
+
+def y_hist_to_human_readable(y, position):
+    # Convert distribution to mega basepairs
+    if y == 0:
+        return 0
+    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y, gnu=True)
+
+    return s + "b"
+
+
+def x_hist_to_human_readable(x, position):
+    # Convert distribution to mega basepairs
+    if x == 0:
+        return 0
+    s = humanize.naturalsize(x, gnu=True)
+    return s + "b"
+
+
+def y_yield_to_human_readable(y, position):
+    # Convert distribution to mega basepairs
+    if y == 0:
+        return 0
+    s = humanize.naturalsize(y, gnu=True)
+
+    return s + "b"
+
+
+def x_yield_to_human_readable(x, position):
+    # Convert time in seconds to hours or minutes
+    hours = int(x/3600)
+    minutes = int((x - 3600*hours)/60)
+    if x == 0:
+        return 0
+    s = f"{hours:02d}:{minutes:02d}"
+    return s
 
 
 def main():
@@ -218,7 +345,10 @@ def main():
     import_csvs()
     add_fastq_data_to_dataframes()
     aggregate_dataframes()
-    plot_yield()
+    assign_yield_data()
+    plot_yield_general()
+    plot_yield_by_quality()
+    plot_read_length_hist()
 
 
 main()

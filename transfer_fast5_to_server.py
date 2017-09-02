@@ -45,6 +45,7 @@ import time  # For snoozing and for adding time of generation in csv output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
 from datetime import datetime  # For figuring out if mux and sequencing run are from the same run.
 import paramiko
+import h5py
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -69,7 +70,7 @@ RUNS = []
 MUX_PROCESSING_TIME = 600  # seconds
 THE_COUNT = 0  # mwhahaha (as in the one from sesame street)
 SUFFIX = ""
-NO_SSHPASS = False
+NO_SSHPASS = True
 SSHPASS_PREFIX = ""
 LOCAL = False  # Local basecalling
 
@@ -200,7 +201,7 @@ def check_folder_status(subdir, run, full=True):
     #       channel           - Channel ID of the run.
     #       read number       - What number read is this.
 
-    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no'])
+    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no', 'mux', 'duration'])
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(os.path.join(subdir, fast5_file)))
                          for fast5_file in fast5_files]
@@ -208,6 +209,19 @@ def check_folder_status(subdir, run, full=True):
                            for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-4]
                            for fast5_file in fast5_files]
+    mux = {}
+    duration = {}
+    # Get mux number and duration time
+    for fast5_row in fast5_pd.itertuples():
+        # Open fast5 file
+        f = h5py.File(os.path.join(subdir, fast5_row.filename), 'r')
+        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("start_mux")
+        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("duration")
+        f.close()
+    # Add them to the table
+    fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
+    fast5_pd['duration'] = fast5_pd['filename'].apply(lambda x: duration[x])
+
 
     # If this is the final folder, we will move regardless of if it is full:
     if not full:
@@ -418,7 +432,7 @@ def get_arguments():
                         help="Sample name that you typed into MinKNOW.")
     parser.add_argument("--suffix", type=str, required=False, default=None,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
-    parser.add_argument("--no-sshpass", default=False, dest='no_sshpass', action='store_true',
+    parser.add_argument("--sshpass", default=False, dest='sshpass', action='store_true',
                         help="ssh-pass is rather poor practise and quite a security risk." +
                              "Tick this option and set up an id_rsa key if you'd prefer." +
                              "You will still be required to enter your password for set-up purposes.")
@@ -441,8 +455,8 @@ def set_global_variables(args):
     SAMPLE_NAME = args.sample_name
     if args.suffix is not None:
         SUFFIX = args.suffix
-    NO_SSHPASS = args.no_sshpass
-    if not NO_SSHPASS:
+    if args.sshpass:
+        NO_SSHPASS = False
         SSHPASS_PREFIX = "sshpass -p %s " % PASSWORD
     LOCAL = args.local
 
@@ -531,7 +545,7 @@ def create_transferring_lock_file():
     s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
 
     # Command to check if folder is there.
-    cd_and_touch_command = "bash -c \"cd %s && touch %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    cd_and_touch_command = f"bash -c \"cd {DEST_DIRECTORY} && touch {TRANSFER_LOCK_FILE}\""
     stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
     static_stdout = stdout.read().decode()
     static_stderr = stderr.read().decode()
@@ -546,7 +560,7 @@ def remove_transferring_lock_file():
     s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
 
     # Command to check if folder is there.
-    cd_and_remove_command = "bash -c \"cd %s && rm %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    cd_and_remove_command = f"bash -c \"cd {DEST_DIRECTORY} && rm {TRANSFER_LOCK_FILE}\""
     stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
     static_stdout = stdout.read().decode()
     static_stderr = stderr.read().decode()
