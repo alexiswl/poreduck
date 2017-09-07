@@ -215,8 +215,8 @@ def check_folder_status(subdir, run, full=True):
     for fast5_row in fast5_pd.itertuples():
         # Open fast5 file
         f = h5py.File(os.path.join(subdir, fast5_row.filename), 'r')
-        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("start_mux")
-        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("duration")
+        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{fast5_row.read_no}"].attrs.__getitem__("start_mux")
+        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{fast5_row.read_no}"].attrs.__getitem__("duration")
         f.close()
     # Add them to the table
     fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
