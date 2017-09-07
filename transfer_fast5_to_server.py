@@ -204,9 +204,9 @@ def check_folder_status(subdir, run, full=True):
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(os.path.join(subdir, fast5_file)))
                          for fast5_file in fast5_files]
-    fast5_pd['channel'] = [fast5_file.split('_')[-4]
+    fast5_pd['channel'] = [fast5_file.split('_')[-2]
                            for fast5_file in fast5_files]
-    fast5_pd['read_no'] = [fast5_file.split('_')[-2]
+    fast5_pd['read_no'] = [fast5_file.split('_')[-4]
                            for fast5_file in fast5_files]
 
     # If this is the final folder, we will move regardless of if it is full:
