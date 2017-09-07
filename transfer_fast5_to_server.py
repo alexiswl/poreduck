@@ -45,6 +45,7 @@ import time  # For snoozing and for adding time of generation in csv output.
 import pandas as pd  # Create data frame of list of files with attributes for each.
 from datetime import datetime  # For figuring out if mux and sequencing run are from the same run.
 import paramiko
+import h5py
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -208,7 +209,19 @@ def check_folder_status(subdir, run, full=True):
                            for fast5_file in fast5_files]
     fast5_pd['read_no'] = [fast5_file.split('_')[-4]
                            for fast5_file in fast5_files]
-
+    mux = {}
+    duration = {}
+    # Get mux number and duration time
+    for fast5_row in fast5_pd.itertuples():
+        # Open fast5 file
+        f = h5py.File(os.path.join(subdir, fast5_row.filename), 'r')
+        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("start_mux")
+        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("duration")
+        f.close()
+    # Add them to the table
+    fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
+    fast5_pd['duration'] = fast5_pd['filename'].apply(lambda x: duration[x])
+   
     # If this is the final folder, we will move regardless of if it is full:
     if not full:
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
