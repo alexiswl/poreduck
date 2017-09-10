@@ -84,8 +84,9 @@ class Subfolder:
         self.albacore_dir = os.path.join(ALBACORE_DIR, name)
         # Albacore related files
         if CHOSEN_KIT == "SQK-LSK308":
-            self.albacore_dir = os.path.join(self.albacore_dir, "1dsq_analysis")
-        self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
+            self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
+        else:
+            self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
         self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
         self.fastq_file = name + ".fastq"
@@ -144,10 +145,10 @@ Main functions:
 """
 
 
-def main():
+def main(args):
     global TRANSFERRING
     # Basic house cleaning, get arguments, make sure they're legit.
-    args = get_arguments()
+    #args = get_arguments()
     set_global_variables(args) 
     check_directories()
     set_logger()
@@ -638,7 +639,19 @@ def move_fastq_file(subfolder):
         fastq_files_list = [os.path.join(subfolder.workspace_dir, fastq)
                             for fastq in os.listdir(subfolder.workspace_dir)
                             if fastq.endswith(".fastq")]
-        fastq_files_dict["unbarcoded"] = fastq_files_list
+        if CHOSEN_FLOWCELL == "SQK-LSK308":
+            fastq_files_dict["1d"] = fastq_files_list
+        else:
+            fastq_files_dict["unbarcoded"] = fastq_files_list
+
+    if CHOSEN_FLOWCELL == "SQK-LSK308":
+        # Get the 1dsq fastq file as well
+        fastq_folder_1dsq = os.path.join(subfolder.albacore_dir, "1dsq_analysis", "1dsq_analysis", "workspace")
+        fastq_files_list = [os.path.join(fastq_folder_1dsq, fastq)
+                            for fastq in os.listdir(fastq_folder_1dsq)
+                            if fastq.endswith(".fastq")]
+        fastq_files_dict["1dsq"] = fastq_files_list
+
 
     for barcode, fastq_files in fastq_files_dict.items():
         if len(fastq_files) > 1:
@@ -648,7 +661,7 @@ def move_fastq_file(subfolder):
 
         for fastq_file in fastq_files:
             fastq_file_index += 1
-            if BARCODING:
+            if BARCODING or CHOSEN_FLOWCELL == "SQK-LSK308":
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
                                                                                   barcode,
                                                                                   str(fastq_file_index),
@@ -918,7 +931,3 @@ def has_failed(job_id):
     if not qacct_stderr == "":
         LOGGER.info(f"qacct stderr of {qacct_stderr}")
     return False
-
-
-# Run the main function
-main()

@@ -15,7 +15,7 @@ each folder to 4000. This is done by creating sub-folders in the 'reads' directo
 0, 1, 2, as needed.
 
 However this comes with a couple of bugs and a couple more issues.
-Any scripts that relied on all reads being in one folder now have to implement a
+Any poreduck that relied on all reads being in one folder now have to implement a
 recursive stage, and the number of files isn't strictly 4000.
 Why? Because 'mux-reads' don't seem to count
 (so folder 0 will often have around 6000-7000 reads), and
@@ -100,10 +100,10 @@ Main run files:
 """
 
 
-def main():
+def main(args):
     global THE_COUNT, MINKNOW_RUNNING
     # Get argument list, password for server and set directories.
-    args = get_arguments()
+    #args = get_arguments()
     set_global_variables(args)
     check_directories()
 
@@ -215,8 +215,8 @@ def check_folder_status(subdir, run, full=True):
     for fast5_row in fast5_pd.itertuples():
         # Open fast5 file
         f = h5py.File(os.path.join(subdir, fast5_row.filename), 'r')
-        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("start_mux")
-        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{read_no}"].attrs.__getitem__("duration")
+        mux[fast5_row.filename] = f[f"Raw/Reads/Read_{fast5_row.read_no}"].attrs.__getitem__("start_mux")
+        duration[fast5_row.filename] = f[f"Raw/Reads/Read_{fast5_row.read_no}"].attrs.__getitem__("duration")
         f.close()
     # Add them to the table
     fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
@@ -401,7 +401,7 @@ def rsync_across_csv_files(run):
 
 
 """
-Initialisation scripts:
+Initialisation poreduck:
 1. get_arguments
 2. set_global_variables
 3. set_runs
@@ -740,4 +740,3 @@ def standardise_int_length(my_integer):
     # Input of 15 returns 0015
     return f"{int(my_integer):04}"
 
-main()
