@@ -98,7 +98,8 @@ class Read_set:
         #  ch=351 start_time=2017-08-24T07:04:36Z
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
-        # Run through fastq file and add attributes to dataframe.        for record in SeqIO.parse(self.fastq_path, "fastq"):
+        # Run through fastq file and add attributes to dataframe.
+        for record in SeqIO.parse(self.fastq_path, "fastq"):
             fastq_id = record.id.split()[0]
             row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
             # Get length and quality of read
