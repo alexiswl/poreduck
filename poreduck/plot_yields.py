@@ -283,12 +283,15 @@ def plot_yield_by_quality():
 
     for description, yield_df in yield_data_by_quality.items():
         yield_df.reset_index(inplace=True)
-        yield_df.reindex(index=YIELD_DATA.index, fill_value=0)
+        yield_df.set_index("time", inplace=True)
+        yield_df = yield_df.reindex(index=YIELD_DATA.time, fill_value=0)
+        yield_df.reset_index(inplace=True)
         # Generate a cumulative sum of sequence data
         yield_df['cumsum_bp'] = yield_df['seq_length'].cumsum()
         # Convert time to timedelta format and then to float format, in hours.
         yield_df['duration_tdelta'] = yield_df['time'].apply(lambda t: t - yield_df['time'].min())
         yield_df['duration_float'] = yield_df['duration_tdelta'].apply(lambda t: t.total_seconds() / 3600)
+        yield_data_by_quality[description] = yield_df
 
     # Set subplots.
     fig, ax = plt.subplots(1)
@@ -356,13 +359,15 @@ def plot_heatmap():
     channels_by_yield_df = pd.DataFrame(ALL_READS.groupby("channel")["seq_length"].sum())
     # Reset the index and have channel as a column instead of the index.
     channels_by_yield_df.reset_index(level=0, inplace=True)
-
     # Iterate through each row of the yield by channel dataframe.
     for yield_row in channels_by_yield_df.itertuples():
+        print([(ix, iy)
+                for ix, row in enumerate(channels_by_order_array)
+                for iy, i in enumerate(row)])
         channel_index = [(ix, iy)
                          for ix, row in enumerate(channels_by_order_array)
                          for iy, i in enumerate(row)
-                         if i == yield_row.channel][0]
+                         if int(i) == int(yield_row.channel)][0]
         # Assign channel yield to position in MinKNOW
         channels_by_yield_array[channel_index] = yield_row.seq_length
 
