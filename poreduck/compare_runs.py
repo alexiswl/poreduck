@@ -62,7 +62,7 @@ class Run:
     def assign_yield_data(self):
         """We use this for both yield plots"""
 
-        # Read in seqlength and time from ALL_READS dataframe
+        # Read in seq length and time from ALL_READS dataframe
         self.yield_data = self.all_data[['time', "seq_length"]]
 
         # Aggregate seqlength for each minute of sequencing. I love this resample command!
@@ -85,20 +85,20 @@ def plot_read_length_hist():
         # Filter out the top 1000th percentile.
         seq_df_1 = seq_df_1[seq_df_1 < seq_df_1.quantile(0.9999)]
         seq_df_2 = seq_df_2[seq_df_2 < seq_df_2.quantile(0.9999)]
-
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    # Set labels of axis.
+    ax.set_xlabel("Read length")
     # Plot the histogram
     ax.hist(seq_df_1, 50, weights=seq_df_1,
             normed=1, facecolor='blue', alpha=1, label=RUNS[0].name)
     ax.hist(seq_df_2, 50, weights=seq_df_2,
             normed=1, facecolor='red', alpha=0.5, label=RUNS[1].name)
-    # Set the titles and axis labels
+    # Set the titles and add a legend.
     ax.set_title(f"Read Distribution Graph for {RUNS[0].name} and {RUNS[1].name}")
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     plt.legend()
-    ax.set_xlabel("Read length")
-    #ax.set_ylabel("Bases per bin")
+
     savefig(os.path.join(PLOTS_DIR, f"{RUNS[0].name}_{RUNS[1].name}_read_length_hist.png"))
 
 
@@ -143,6 +143,7 @@ def set_args(args):
     PLOTS_DIR = args.plots_dir
     if args.clip:
         CLIP = True
+
 
 def get_runs(args):
     global RUNS

@@ -98,10 +98,7 @@ class Read_set:
         #  ch=351 start_time=2017-08-24T07:04:36Z
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
-        #self.df["fastq_id"] = self.df.apply(lambda _: "DATA_NOT_FOUND", axis=1)
-        #self.df["seq_length"] = self.df.apply(lambda _: 0, axis=1)
-        #self.df["av_qual"] = self.df.apply(lambda _: 0, axis=1)
-        for record in SeqIO.parse(self.fastq_path, "fastq"):
+        # Run through fastq file and add attributes to dataframe.        for record in SeqIO.parse(self.fastq_path, "fastq"):
             fastq_id = record.id.split()[0]
             row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
             # Get length and quality of read
@@ -114,17 +111,6 @@ class Read_set:
             self.df.loc[-1] = row_as_list
             self.df.index += 1
 
-            #fastq_id, run_id, read_no, channel, start_time = [description.split('=')[-1]
-            #                                                  for description in record.description.split()]
-            #fastq_length = len(record.seq)
-            #fastq_av_quality = statistics.mean(record.letter_annotations["phred_quality"])
-            #df_index = self.df.query("channel==@channel & read_no==@read_no").index
-            # Insert the fastq id
-            #self.df.set_value(df_index, "fastq_id", fastq_id)
-            # Insert the fastq_file length
-            #self.df.set_value(df_index, "seq_length", fastq_length)
-            # Insert the average quality
-            #self.df.set_value(df_index, "av_qual", fastq_av_quality)
         self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
         self.added_fastq_data = True
 
@@ -144,9 +130,6 @@ class Read_set:
         for index, duration in durations.items():
             self.df.set_value(index, "duration", durations)
 
-    #def append_set_id_to_csv(self):
-    #    self.df["read_set"] = self.df.apply(lambda _: self.id, axis=1)
-
 
 def get_arguments():
     parser = argparse.ArgumentParser(
@@ -162,7 +145,7 @@ def get_arguments():
     parser.add_argument("--sample_name", type=str, required=False,
                         help="Name to add onto each of the plots")
     args = parser.parse_args()
-    return(args)
+    return args
 
 
 def set_arguments(args):
@@ -179,7 +162,7 @@ def set_arguments(args):
         PLOTS_DIR = os.path.join(CWD, "plots")
     if not os.path.isdir(PLOTS_DIR):
         os.mkdir(PLOTS_DIR)
-    # Check and set CSV_DIR\
+    # Check and set CSV_DIR
     if not CSV_DIR == "":
         if not os.path.isdir(CSV_DIR):
             sys.exit(f"Error: {CSV_DIR} could not be found")
@@ -237,10 +220,9 @@ def aggregate_dataframes():
 def assign_yield_data():
     """We use this for both yield plots"""
     global YIELD_DATA
-    # Read in seqlength and time from ALL_READS dataframe
+    # Read in seq length and time from ALL_READS dataframe
     YIELD_DATA = ALL_READS[['time', "seq_length"]]
-
-    # Aggregate seqlength for each minute of sequencing. I love this resample command!
+    # Aggregate seq length for each minute of sequencing. I love this resample command!
     YIELD_DATA.set_index('time', inplace=True)
     YIELD_DATA = YIELD_DATA.resample("1T").sum()
     YIELD_DATA.reset_index(inplace=True)
@@ -278,7 +260,6 @@ def plot_yield_by_quality():
     qual_bins = [0, 9, 15, 22, new_yield_data["av_qual"].max()]
     new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
                                                    labels=QUALITY_DESCRIPTIONS)
-
     new_yield_data.set_index(pd.DatetimeIndex(new_yield_data['time']), inplace=True)
     new_yield_data.drop('av_qual', axis=1, inplace=True)
     yield_data_grouped = new_yield_data.groupby("descriptive_quality").apply(lambda d: d.resample("1T").sum())[
@@ -333,10 +314,18 @@ def plot_read_length_hist():
         # Filter out the top 1000th percentile.
         seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
 
+    def y_hist_to_human_readable_seq(y, position):
+        # Convert distribution to base pairs
+        num_bins = 50
+        if y == 0:
+            return 0
+        s = humanize.naturalsize(seq_df.sum() * seq_df.count() * y / num_bins, gnu=True)
+        return s + "b"
+
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
     # Set the axis formatters
-    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
+    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable_seq))
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Plot the histogram
     ax.hist(seq_df, num_bins, weights=seq_df,
@@ -361,21 +350,18 @@ def plot_heatmap():
     # In which each row has the follow multiplication factor
     row_factors = [3, 2, 1, 0]
     # Create the values that make up the numbers on the far-right column of the grid.
-    RH_values = [64 * chunk + 8 * row_factor for chunk in chunks for row_factor in row_factors]
+    rh_values = [64 * chunk + 8 * row_factor for chunk in chunks for row_factor in row_factors]
     # Use the minknow_column_order function which reference the far-right column for a given row
     # to fill in the rest of the values for each row.
-    channels_by_order_array = np.array([[j for j in minknow_column_order(i)] for i in RH_values])
+    channels_by_order_array = np.array([[j for j in minknow_column_order(i)] for i in rh_values])
     # Create an array of the same dimensions but filled with zeroes.
     channels_by_yield_array = np.zeros(channels_by_order_array.shape)
-    # Summate the values for each channel.
+    # Sum the values for each channel.
     channels_by_yield_df = pd.DataFrame(ALL_READS.groupby("channel")["seq_length"].sum())
     # Reset the index and have channel as a column instead of the index.
     channels_by_yield_df.reset_index(level=0, inplace=True)
     # Iterate through each row of the yield by channel dataframe.
     for yield_row in channels_by_yield_df.itertuples():
-        print([(ix, iy)
-                for ix, row in enumerate(channels_by_order_array)
-                for iy, i in enumerate(row)])
         channel_index = [(ix, iy)
                          for ix, row in enumerate(channels_by_order_array)
                          for iy, i in enumerate(row)
@@ -433,7 +419,7 @@ def plot_pore_yield_hist():
 
 
 def y_hist_to_human_readable(y, position):
-    # Convert distribution to basepairs
+    # Convert distribution to base pairs
     num_bins = 50
     if y == 0:
         return 0
@@ -443,7 +429,7 @@ def y_hist_to_human_readable(y, position):
 
 
 def x_hist_to_human_readable(x, position):
-    # Convert distribution to basepairs
+    # Convert distribution to base pairs
     if x == 0:
         return 0
     s = humanize.naturalsize(x, gnu=True)
@@ -451,7 +437,7 @@ def x_hist_to_human_readable(x, position):
 
 
 def y_yield_to_human_readable(y, position):
-    # Convert distribution to basepairs
+    # Convert distribution to base pairs
     if y == 0:
         return 0
     s = humanize.naturalsize(y, gnu=True)
@@ -470,7 +456,6 @@ def x_yield_to_human_readable(x, position):
 
 
 def main(args):
-    #args = get_arguments()
     set_arguments(args)
     import_fastq()
     if CSV_DIR is not "":

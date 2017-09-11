@@ -149,8 +149,7 @@ Main functions:
 def main(args):
     global TRANSFERRING
     # Basic house cleaning, get arguments, make sure they're legit.
-    #args = get_arguments()
-    set_global_variables(args) 
+    set_global_variables(args)
     check_directories()
     set_logger()
     
@@ -466,13 +465,13 @@ def extract_tarred_read_set(subfolder):
         print("Copy command:", stdout, stderr)
 
     with fileinput.FileInput(subfolder.extracted_submission_file, inplace=True) as file:
-    # Now edit this file based on our inputs.
+        # Now edit this file based on our inputs.
         for line in file:
             for variable, replacement in qsub_replacement_dict.items():
                 if replacement is None and variable in line:
                     line = ""
                 else:
-                    line=line.replace(f"%{variable}%", replacement)
+                    line = line.replace(f"%{variable}%", replacement)
 
     # Submit job
     job_submission_command = f"qsub {subfolder.extracted_submission_file}"
@@ -542,13 +541,13 @@ def run_albacore(subfolder):
         print("Copy command:", stdout, stderr)
 
     with fileinput.FileInput(subfolder.albacore_submission_file, inplace=True) as file:
-    # Now edit this file based on our inputs.
+        # Now edit this file based on our inputs.
         for line in file:
             for variable, replacement in qsub_replacement_dict.items():
                 if replacement is None and variable in line:
                     line = ""
                 else:
-                    line=line.replace(f"%{variable}%", replacement)
+                    line = line.replace(f"%{variable}%", replacement)
 
     # Submit job
     job_submission_command = f"qsub {subfolder.albacore_submission_file}"
@@ -638,7 +637,6 @@ def move_fastq_file(subfolder):
                             for fastq in os.listdir(fastq_folder_1dsq)
                             if fastq.endswith(".fastq")]
         fastq_files_dict["1dsq"] = fastq_files_list
-
 
     for barcode, fastq_files in fastq_files_dict.items():
         if len(fastq_files) > 1:
