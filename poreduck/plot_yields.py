@@ -6,7 +6,9 @@ import argparse
 import sys
 import os
 import statistics
-from matplotlib import pyplot as plt
+import matplotlib
+import platform
+import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as mpatches
 import humanize
@@ -14,6 +16,9 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 from itertools import chain
 import seaborn as sns
+
+if platform.system() == 'Linux':
+    matplotlib.use('agg')
 
 """
 This script will create a yield plot of the data that has been created by the
