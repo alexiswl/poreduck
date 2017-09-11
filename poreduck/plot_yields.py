@@ -327,6 +327,7 @@ def plot_yield_by_quality():
 
 
 def plot_read_length_hist():
+    num_bins = 50
     seq_df = ALL_READS["seq_length"]
     if CLIP:
         # Filter out the top 1000th percentile.
@@ -338,7 +339,7 @@ def plot_read_length_hist():
     ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Plot the histogram
-    ax.hist(seq_df, 50, weights=seq_df,
+    ax.hist(seq_df, num_bins, weights=seq_df,
             normed=1, facecolor='blue', alpha=0.76)
     # Set the titles and axis labels
     ax.set_title(f"Read Distribution Graph for {SAMPLE_NAME}")
@@ -410,12 +411,14 @@ def plot_heatmap():
 
 
 def plot_pore_yield_hist():
+    num_bins = 50
     new_yield_data = ALL_READS.groupby(["channel", "mux"])['seq_length'].sum()
     fig, ax = plt.subplots(1)
-    (n, bins, patches) = ax.hist(new_yield_data['seq_length'], 50, weights=None,
+    (n, bins, patches) = ax.hist(new_yield_data['seq_length'], num_bins, weights=None,
                                  # [1],#channels_by_yield_df['seq_length'],
                                  normed=1, facecolor='blue', alpha=0.76)
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
         s = (bins[1]-bins[0])*y*new_yield_data['seq_length'].count()
@@ -431,9 +434,10 @@ def plot_pore_yield_hist():
 
 def y_hist_to_human_readable(y, position):
     # Convert distribution to basepairs
+    num_bins = 50
     if y == 0:
         return 0
-    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/50, gnu=True)
+    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/num_bins, gnu=True)
 
     return s + "b"
 

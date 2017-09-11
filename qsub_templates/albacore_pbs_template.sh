@@ -7,7 +7,7 @@
 #PBS -e %STDERR%
 #PBS -S /bin/bash
 #PBS -l h_vmem=%MEM%g
-#PBS -wd %PARENT_DIRECTORY%
+#PBS -wd %WORKING_DIRECTORY%
 #PBS -v OMP_NUM_THREADS=1
 # Insert your source files here around our 'command'. An example would be:
 source activate albacore_env

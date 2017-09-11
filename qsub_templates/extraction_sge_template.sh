@@ -6,6 +6,6 @@
 #$ -o %STDOUT%
 #$ -e %STDERR%
 #$ -S /bin/bash
-#$ -wd %PARENT_DIRECTORY%
+#$ -wd %WORKING_DIRECTORY%
 # Insert your source files here around our 'command'.
 %COMMAND%

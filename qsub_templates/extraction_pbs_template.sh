@@ -6,6 +6,6 @@
 #PBS -o %STDOUT%
 #PBS -e %STDERR%
 #PBS -S /bin/bash
-#PBS -wd %PARENT_DIRECTORY%
+#PBS -wd %WORKING_DIRECTORY%
 # Insert your source files here around our 'command'.
 %COMMAND%
