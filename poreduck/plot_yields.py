@@ -190,7 +190,7 @@ def set_arguments(args):
     if not os.path.isdir(FASTQ_DIR):
         sys.exit(f"Error: {FASTQ_DIR} could not be found")
     FASTQ_DIR = os.path.abspath(FASTQ_DIR)
-    FASTQ_FILES = [os.path.join(FASTQ_DIR, fastq_file)
+    FASTQ_FILES = [fastq_file
                    for fastq_file in os.listdir(FASTQ_DIR)
                    if fastq_file.endswith(".fastq")]
     if args.sample_name:
