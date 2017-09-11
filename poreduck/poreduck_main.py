@@ -162,6 +162,7 @@ def main():
     compare_parser.set_defaults(func=run_function)
     args = parser.parse_args()
 
+    # Print help if just 'poreduck' is typed in.
     if len(sys.argv) == 1:
         parser.print_help()
     else:
