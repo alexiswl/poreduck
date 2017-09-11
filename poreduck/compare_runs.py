@@ -4,6 +4,8 @@ import os
 import platform
 import pandas as pd
 import matplotlib
+if platform.system() == 'Linux':
+    matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
@@ -15,12 +17,10 @@ from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
 
-if platform.system() == 'Linux':
-    matplotlib.use('agg')
-
 CSV_DIR = ""
 PLOTS_DIR = ""
 RUNS = []
+CLIP = False
 
 """
 Take two runs, 
@@ -77,15 +77,21 @@ class Run:
 
 
 def plot_read_length_hist():
+    seq_df_1 = RUNS[0].all_data["seq_length"]
+    seq_df_2 = RUNS[1].all_data["seq_length"]
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
+    if CLIP:
+        # Filter out the top 1000th percentile.
+        seq_df_1 = seq_df_1[seq_df_1 < seq_df_1.quantile(0.9999)]
+        seq_df_2 = seq_df_2[seq_df_2 < seq_df_2.quantile(0.9999)]
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Plot the histogram
-    ax.hist(RUNS[0].all_data["seq_length"], 50, weights=RUNS[0].all_data["seq_length"],
+    ax.hist(seq_df_1, 50, weights=seq_df_1,
             normed=1, facecolor='blue', alpha=1, label=RUNS[0].name)
-    ax.hist(RUNS[1].all_data["seq_length"], 50, weights=RUNS[1].all_data["seq_length"],
+    ax.hist(seq_df_2, 50, weights=seq_df_2,
             normed=1, facecolor='red', alpha=0.5, label=RUNS[1].name)
     # Set the titles and axis labels
     ax.set_title(f"Read Distribution Graph for {RUNS[0].name} and {RUNS[1].name}")
@@ -125,7 +131,7 @@ def plot_yield_general():
 
 
 def set_args(args):
-    global PLOTS_DIR
+    global PLOTS_DIR, CLIP
     # Check to ensure that both fastq folders are there
     if not os.path.isdir(args.fastq_1):
         sys.exit(f"Error, could not find directory {args.fastq_1}")
@@ -135,7 +141,8 @@ def set_args(args):
     if not os.path.isdir(args.plots_dir):
         os.mkdir(args.plots_dir)
     PLOTS_DIR = args.plots_dir
-
+    if args.clip:
+        CLIP = True
 
 def get_runs(args):
     global RUNS

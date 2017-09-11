@@ -8,6 +8,8 @@ import os
 import statistics
 import matplotlib
 import platform
+if platform.system() == 'Linux':
+    matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as mpatches
@@ -17,8 +19,6 @@ from matplotlib.pylab import savefig
 from itertools import chain
 import seaborn as sns
 
-if platform.system() == 'Linux':
-    matplotlib.use('agg')
 
 """
 This script will create a yield plot of the data that has been created by the
@@ -49,6 +49,7 @@ SAMPLE_NAME = ""
 YIELD_DATA = None
 QUALITY_DESCRIPTIONS = ["bad", "alright", "better", "best"]
 QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
+CLIP = False
 
 # Import arguments.
 """
@@ -166,7 +167,7 @@ def get_arguments():
 
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
-    global CSV_FILES, FASTQ_FILES, SAMPLE_NAME
+    global CSV_FILES, FASTQ_FILES, SAMPLE_NAME, CLIP
     if not args.no_csv:
         CSV_DIR = args.csv_dir
     FASTQ_DIR = args.fastq_dir
@@ -194,7 +195,8 @@ def set_arguments(args):
                    if fastq_file.endswith(".fastq")]
     if args.sample_name:
         SAMPLE_NAME = args.sample_name
-
+    if args.clip:
+        CLIP = True
 
 def import_fastq():
     global SAMPLE_NAME
@@ -204,9 +206,7 @@ def import_fastq():
             # Unless it's the mux scan!
             if "mux_scan" in fastq_file:
                 continue
-            SAMPLE_NAME = '_'.join(fastq_file.split("_")[2:]).replace(".fastq", "")
-        fastq_number = fastq_file.split("_")[0]
-
+            SAMPLE_NAME = '_'.join(fastq_file.split(".")[0].split("_")[2:]).replace(".fastq", "")
         if "mux_scan" in fastq_file:
             fastq_id = fastq_file + "_mux"
         else:
@@ -326,13 +326,18 @@ def plot_yield_by_quality():
 
 
 def plot_read_length_hist():
+    seq_df = ALL_READS["seq_length"]
+    if CLIP:
+        # Filter out the top 1000th percentile.
+        seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
+
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
     # Set the axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Plot the histogram
-    ax.hist(ALL_READS["seq_length"], 50, weights=ALL_READS["seq_length"],
+    ax.hist(seq_df, 50, weights=seq_df,
             normed=1, facecolor='blue', alpha=0.76)
     # Set the titles and axis labels
     ax.set_title(f"Read Distribution Graph for {SAMPLE_NAME}")
@@ -427,7 +432,7 @@ def y_hist_to_human_readable(y, position):
     # Convert distribution to basepairs
     if y == 0:
         return 0
-    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y, gnu=True)
+    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/50, gnu=True)
 
     return s + "b"
 

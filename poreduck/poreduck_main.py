@@ -141,6 +141,8 @@ def main():
     plot_parser.add_argument("--output_dir", type=str, required=True,
                              help="/path/to/plots_dir" +
                                   "By default will be created in current working directory")
+    plot_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
+                             help="Remove outliers from the historgram ( >3 std.dev)")
     plot_parser.add_argument("--sample_name", type=str, required=False,
                              help="Name to add onto each of the plots")
     plot_parser.set_defaults(func=run_function)
@@ -159,6 +161,9 @@ def main():
                                 help="name of sample/run 2")
     compare_parser.add_argument("--plots_dir", type=str, required=True,
                                 help="where do you wish these plots to go?")
+    compare_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
+                                help="Remove outliers from the historgram ( >3 std.dev)")
+
     compare_parser.set_defaults(func=run_function)
     args = parser.parse_args()
 
