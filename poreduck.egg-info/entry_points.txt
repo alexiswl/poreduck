@@ -1,3 +1,0 @@
-[console_scripts]
-poreduck = poreduck.poreduck_main:main
-
