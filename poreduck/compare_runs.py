@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import os
+import platform
 import pandas as pd
-from matplotlib import pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 import numpy as np
@@ -12,6 +14,9 @@ from poreduck.plot_yields import Read_set
 from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
+
+if platform.system() == 'Linux':
+    matplotlib.use('agg')
 
 CSV_DIR = ""
 PLOTS_DIR = ""
