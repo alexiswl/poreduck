@@ -120,7 +120,6 @@ class Read_set:
             # Insert the average quality
             #self.df.set_value(df_index, "av_qual", fastq_av_quality)
         self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
-        print(self.df.head())
         self.added_fastq_data = True
 
     def append_csv_data(self):
@@ -168,20 +167,20 @@ def set_arguments(args):
     FASTQ_DIR = args.fastq_dir
     if args.output_dir:
         PLOTS_DIR = args.output_dir
-        print(os.path.abspath(os.path.join(PLOTS_DIR, os.pardir)))
         if not os.path.isdir(os.path.abspath(os.path.join(PLOTS_DIR, os.pardir))):
             sys.exit(f"Error: Cannot create {PLOTS_DIR}. Parent directory does not exist.")
     else:
         PLOTS_DIR = os.path.join(CWD, "plots")
     if not os.path.isdir(PLOTS_DIR):
         os.mkdir(PLOTS_DIR)
-    # Check and set CSV_DIR
-    if not os.path.isdir(CSV_DIR):
-        sys.exit(f"Error: {CSV_DIR} could not be found")
-    CSV_DIR = os.path.abspath(CSV_DIR)
-    CSV_FILES = [os.path.join(CSV_DIR, csv_file)
-                 for csv_file in os.listdir(CSV_DIR)
-                 if csv_file.endswith(".csv")]
+    # Check and set CSV_DIR\
+    if not CSV_DIR == "":
+        if not os.path.isdir(CSV_DIR):
+            sys.exit(f"Error: {CSV_DIR} could not be found")
+        CSV_DIR = os.path.abspath(CSV_DIR)
+        CSV_FILES = [os.path.join(CSV_DIR, csv_file)
+                     for csv_file in os.listdir(CSV_DIR)
+                     if csv_file.endswith(".csv")]
     if not os.path.isdir(FASTQ_DIR):
         sys.exit(f"Error: {FASTQ_DIR} could not be found")
     FASTQ_DIR = os.path.abspath(FASTQ_DIR)
@@ -225,6 +224,7 @@ def aggregate_dataframes():
             columns = list(read_set.df.columns)
             ALL_READS = pd.DataFrame(columns=columns)
         ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
+
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True])
 
 
@@ -252,7 +252,6 @@ def plot_yield_general():
     num_points = 6
     x_ticks = np.linspace(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max(), num_points)
     ax.set_xticks(x_ticks)
-
     # Define axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
@@ -261,9 +260,8 @@ def plot_yield_general():
     ax.set_ylabel("Yield")
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
     ax.set_title(f"Yield for {SAMPLE_NAME} (MB/Hour)")
-    ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_mb'],
+    ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
-    plt.show()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_general_yield_plot.png"))
 
 
@@ -272,10 +270,10 @@ def plot_yield_by_quality():
     new_yield_data = ALL_READS[['time', "seq_length", "av_qual"]]
     # Bin qualities
     qual_bins = [0, 9, 15, 22, new_yield_data["av_qual"].max()]
-    print(new_yield_data["av_qual"].max())
     new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
                                                    labels=QUALITY_DESCRIPTIONS)
-    new_yield_data.set_index('time', inplace=True)
+
+    new_yield_data.set_index(pd.DatetimeIndex(new_yield_data['time']), inplace=True)
     new_yield_data.drop('av_qual', axis=1, inplace=True)
     yield_data_grouped = new_yield_data.groupby("descriptive_quality").apply(lambda d: d.resample("1T").sum())[
         'seq_length']
@@ -285,12 +283,15 @@ def plot_yield_by_quality():
 
     for description, yield_df in yield_data_by_quality.items():
         yield_df.reset_index(inplace=True)
-        yield_df.reindex(index=YIELD_DATA.index, fill_value=0)
+        yield_df.set_index("time", inplace=True)
+        yield_df = yield_df.reindex(index=YIELD_DATA.time, fill_value=0)
+        yield_df.reset_index(inplace=True)
         # Generate a cumulative sum of sequence data
         yield_df['cumsum_bp'] = yield_df['seq_length'].cumsum()
         # Convert time to timedelta format and then to float format, in hours.
         yield_df['duration_tdelta'] = yield_df['time'].apply(lambda t: t - yield_df['time'].min())
         yield_df['duration_float'] = yield_df['duration_tdelta'].apply(lambda t: t.total_seconds() / 3600)
+        yield_data_by_quality[description] = yield_df
 
     # Set subplots.
     fig, ax = plt.subplots(1)
@@ -306,10 +307,9 @@ def plot_yield_by_quality():
     ax.set_ylabel("Yield")
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
     ax.set_title(f"Yield for {SAMPLE_NAME}")
-
     ax.stackplot(YIELD_DATA['duration_float'],
-                 [yield_data_by_quality[description]['cumsum_bp'] for description in QUALITY_DESCRIPTIONS],
-                 colors=QUALITY_COLOURS)
+                 [yield_data_by_quality[description]['cumsum_bp'] for description in reversed(QUALITY_DESCRIPTIONS)],
+                 colors=reversed(QUALITY_COLOURS))
     # Convert bases to appropriate level
     formatter_y = FuncFormatter(y_yield_to_human_readable)
 
@@ -317,8 +317,6 @@ def plot_yield_by_quality():
     ax.yaxis.set_major_formatter(formatter_y)
     ax.legend([mpatches.Patch(color=colour) for colour in reversed(QUALITY_COLOURS)],
               reversed(QUALITY_DESCRIPTIONS), loc=2)
-
-    plt.show()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_stacked_yield_plot.png"))
 
 
@@ -336,8 +334,6 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Read length")
     ax.set_ylabel("Bases per bin")
-
-    plt.show()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_read_length_hist.png"))
 
 
@@ -363,13 +359,15 @@ def plot_heatmap():
     channels_by_yield_df = pd.DataFrame(ALL_READS.groupby("channel")["seq_length"].sum())
     # Reset the index and have channel as a column instead of the index.
     channels_by_yield_df.reset_index(level=0, inplace=True)
-
     # Iterate through each row of the yield by channel dataframe.
     for yield_row in channels_by_yield_df.itertuples():
+        print([(ix, iy)
+                for ix, row in enumerate(channels_by_order_array)
+                for iy, i in enumerate(row)])
         channel_index = [(ix, iy)
                          for ix, row in enumerate(channels_by_order_array)
                          for iy, i in enumerate(row)
-                         if i == yield_row.channel][0]
+                         if int(i) == int(yield_row.channel)][0]
         # Assign channel yield to position in MinKNOW
         channels_by_yield_array[channel_index] = yield_row.seq_length
 
@@ -397,7 +395,6 @@ def plot_heatmap():
     ax.axvline([8], color='white', lw=15)
     # Nice big title!
     ax.set_title("Heatmap of Yield by Channel", fontsize=25);
-    plt.show()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_heatmap.png"))
 
 
