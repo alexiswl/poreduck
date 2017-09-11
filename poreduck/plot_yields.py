@@ -198,6 +198,7 @@ def set_arguments(args):
     if args.clip:
         CLIP = True
 
+
 def import_fastq():
     global SAMPLE_NAME
     for fastq_file in FASTQ_FILES:

@@ -24,6 +24,7 @@ import sys  # For errors
 import time  # For schnoozing!
 import pandas as pd  # For the status.csv file
 import logging
+import fileinput
 from datetime import datetime
 
 # Before we begin, are we using python 3.6 or greater?
@@ -464,21 +465,14 @@ def extract_tarred_read_set(subfolder):
     if not stdout == "" or not stderr == "":
         print("Copy command:", stdout, stderr)
 
-    # Now edit this file based on our inputs using sed.
-    for variable, replacement in qsub_replacement_dict.items():
-        if replacement is None:
-            sed_command = f"sed -i \'/{variable}/d\' {subfolder.extracted_submission_file}" 
-        else:
-            replacement_esc = str(replacement).replace("/", "\/")
-            sed_command = f"sed -i \'s/{variable}/{replacement_esc}/g\'" +\
-                          f" {subfolder.extracted_submission_file}"
-        sed_proc = subprocess.Popen(sed_command, shell=True,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = sed_proc.communicate()
-        stdout = stdout.decode()
-        stderr = stderr.decode()
-        if not stdout == "" or not stderr == "":
-            print("sed command:", stdout, stderr)
+    with fileinput.FileInput(subfolder.extracted_submission_file, inplace=True) as file:
+    # Now edit this file based on our inputs.
+        for line in file:
+            for variable, replacement in qsub_replacement_dict.items():
+                if replacement is None and variable in line:
+                    line = ""
+                else:
+                    line=line.replace(f"%{variable}%", replacement)
 
     # Submit job
     job_submission_command = f"qsub {subfolder.extracted_submission_file}"
@@ -547,21 +541,14 @@ def run_albacore(subfolder):
     if not stdout == "" or not stderr == "":
         print("Copy command:", stdout, stderr)
 
-    # Now edit this file based on our inputs using sed.
-    for variable, replacement in qsub_replacement_dict.items():
-        if replacement is None:
-            sed_command = f"sed -i \'/{variable}/d\' {subfolder.albacore_submission_file}"
-        else:
-            replacement_esc = str(replacement).replace("/", "\/")
-            sed_command = f"sed -i \'s/{variable}/{replacement_esc}/g\'" + \
-                          f" {subfolder.albacore_submission_file}"
-        sed_proc = subprocess.Popen(sed_command, shell=True,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = sed_proc.communicate()
-        stdout = stdout.decode()
-        stderr = stderr.decode()
-        if not stdout == "" or not stderr == "":
-            print("sed command:", stdout, stderr)
+    with fileinput.FileInput(subfolder.albacore_submission_file, inplace=True) as file:
+    # Now edit this file based on our inputs.
+        for line in file:
+            for variable, replacement in qsub_replacement_dict.items():
+                if replacement is None and variable in line:
+                    line = ""
+                else:
+                    line=line.replace(f"%{variable}%", replacement)
 
     # Submit job
     job_submission_command = f"qsub {subfolder.albacore_submission_file}"
