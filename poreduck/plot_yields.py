@@ -125,7 +125,9 @@ class Read_set:
         self.csv_df = pd.read_csv(self.csv_path, header=0)
         for csv_row in self.csv_df.itertuples():
             # Find the index of the respective csv file
-            df_index = self.df.query("channel==@csv_row.channel & read_no==@csv_row.read_no").index
+            channel_csv = csv_row.channel
+            read_csv = csv_row.read_no
+            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index
         for index, mux in muxs.items():
             self.df.set_value(index, "mux", mux)
         for index, duration in durations.items():
