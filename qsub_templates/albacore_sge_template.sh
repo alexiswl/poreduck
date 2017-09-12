@@ -3,6 +3,7 @@
 # When we run albacore. One needs to manipulate the source files to suit their particular server.
 # This is the parameter list.
 #$ -N albacore
+#$ -terse
 #$ -o %STDOUT%
 #$ -e %STDERR%
 #$ -S /bin/bash

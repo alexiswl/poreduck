@@ -491,10 +491,11 @@ def extract_tarred_read_set(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    if QSUB_TYPE == "SGE":
-        subfolder.extracted_jobid = int(stdout.rstrip().split()[2])
-    elif QSUB_TYPE == "TORQUE":
-        subfolder.extracted_jobid = int(stdout.rstrip().split('.')[0])
+    if stdout.rstrip().split(".")[0].isdigit():
+        subfolder.extracted_jobid = int(stdout.rstrip().split(".")[0])
+    else:
+        LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
+        sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
     update_dataframe(subfolder)
 
 
@@ -576,7 +577,11 @@ def run_albacore(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of th   e array.
     LOGGER.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    subfolder.albacore_jobid = int(stdout.rstrip().split()[2])
+    if stdout.rstrip().split(".")[0].isdigit():
+        subfolder.albacore_jobid = int(stdout.rstrip().split(".")[0])
+    else:
+        LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
+        sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
     update_dataframe(subfolder)
 
 
