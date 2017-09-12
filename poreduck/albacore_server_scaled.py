@@ -468,10 +468,18 @@ def extract_tarred_read_set(subfolder):
         # Now edit this file based on our inputs.
         for line in file:
             for variable, replacement in qsub_replacement_dict.items():
-                if replacement is None and variable in line:
-                    line = ""
+                # If the replacement is none we need to remove this line.
+                if replacement is None:
+                    if variable in line:
+                        line = ""
+                    # Or continue if the variable is not in this line.
+                    else:
+                        continue
+                # Substitute in the replacement for this variable in this line.
                 else:
                     line = line.replace(f"%{variable}%", replacement)
+            # Print the substituted line which is captured by the fileinput.
+            print(line.rstrip())
 
     # Submit job
     job_submission_command = f"qsub {subfolder.extracted_submission_file}"
@@ -544,10 +552,18 @@ def run_albacore(subfolder):
         # Now edit this file based on our inputs.
         for line in file:
             for variable, replacement in qsub_replacement_dict.items():
-                if replacement is None and variable in line:
-                    line = ""
+                # If the replacement is none we need to remove this line.
+                if replacement is None:
+                    if variable in line:
+                        line = ""
+                    # Or continue if the variable is not in this line.
+                    else:
+                        continue
+                # Substitute in the replacement for this variable in this line.
                 else:
                     line = line.replace(f"%{variable}%", replacement)
+            # Print the substituted line which is captured by the fileinput.
+            print(line.rstrip())
 
     # Submit job
     job_submission_command = f"qsub {subfolder.albacore_submission_file}"

@@ -90,7 +90,7 @@ def plot_read_length_hist():
     # Set labels of axis.
     ax.set_xlabel("Read length")
     ax.set_ylabel("")
-    ax.get_xaxis().set_ticklabels([])
+    ax.get_yaxis().set_ticklabels([])
 
     # Plot the histogram
     ax.hist(seq_df_1, 50, weights=seq_df_1,
