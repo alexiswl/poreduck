@@ -467,17 +467,17 @@ def extract_tarred_read_set(subfolder):
     with fileinput.FileInput(subfolder.extracted_submission_file, inplace=True) as file:
         # Now edit this file based on our inputs.
         for line in file:
-            for variable, replacement in qsub_replacement_dict.items():
+            for key, replacement in qsub_replacement_dict.items():
                 # If the replacement is none we need to remove this line.
                 if replacement is None:
-                    if variable in line:
+                    if key in line:
                         line = ""
-                    # Or continue if the variable is not in this line.
+                    # Or continue if the key is not in this line.
                     else:
                         continue
-                # Substitute in the replacement for this variable in this line.
+                # Substitute in the replacement for this key in this line.
                 else:
-                    line = line.replace(f"%{variable}%", replacement)
+                    line = line.replace(f"%{key}%", replacement)
             # Print the substituted line which is captured by the fileinput.
             print(line.rstrip())
 
