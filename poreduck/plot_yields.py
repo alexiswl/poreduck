@@ -18,6 +18,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 from itertools import chain
 import seaborn as sns
+import time
 
 
 """
@@ -68,22 +69,27 @@ class Read_set:
         # Use fastq file to get meta data info
         self.fastq_path = os.path.join(fastq_dir, fastq_file)
         self.fastq_file = fastq_file
-        self.number = self.fastq_file.split("_")[0]
-        self.random = self.fastq_file.split("_")[1]
+        self.number = None
+        self.random = None
+        self.id = None
 
         if not CSV_DIR == "":
+            self.number = self.fastq_file.split("_")[0]
+            self.random = self.fastq_file.split("_")[1]
             self.csv_file = [csv_file for csv_file in os.listdir(CSV_DIR)
                              if csv_file.split("_")[0] == self.number
                              and csv_file.split("_")[1] == self.random
                              and csv_file.endswith(".csv")][0]
             self.csv_path = os.path.join(CSV_DIR, self.csv_file)
 
-        if "mux" in fastq_file:
-            self.id = self.number + self.random + "_mux"
-        else:
-            self.id = self.number + self.random + "_seq"
+            if "mux" in fastq_file:
+                self.id = self.number + self.random + "_mux"
+            else:
+                self.id = self.number + self.random + "_seq"
         self.df = None
         self.added_fastq_data = False
+        self.added_csv_data = False
+        self.aggregated_to_global_dataframe = False
 
     def read_csv(self):
         self.df = pd.read_csv(self.csv_path, header=0, parse_dates=['ctime'], date_parser=DATEPARSE_CSV)
@@ -153,7 +159,7 @@ def get_arguments():
 
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
-    global CSV_FILES, FASTQ_FILES, SAMPLE_NAME, CLIP
+    global CSV_FILES, SAMPLE_NAME, CLIP
     if not args.no_csv:
         CSV_DIR = args.csv_dir
     FASTQ_DIR = args.fastq_dir
@@ -170,15 +176,9 @@ def set_arguments(args):
         if not os.path.isdir(CSV_DIR):
             sys.exit(f"Error: {CSV_DIR} could not be found")
         CSV_DIR = os.path.abspath(CSV_DIR)
-        CSV_FILES = [os.path.join(CSV_DIR, csv_file)
-                     for csv_file in os.listdir(CSV_DIR)
-                     if csv_file.endswith(".csv")]
     if not os.path.isdir(FASTQ_DIR):
         sys.exit(f"Error: {FASTQ_DIR} could not be found")
     FASTQ_DIR = os.path.abspath(FASTQ_DIR)
-    FASTQ_FILES = [fastq_file
-                   for fastq_file in os.listdir(FASTQ_DIR)
-                   if fastq_file.endswith(".fastq")]
     if args.sample_name:
         SAMPLE_NAME = args.sample_name
     if args.clip:
@@ -198,25 +198,29 @@ def import_fastq():
             fastq_id = fastq_file + "_mux"
         else:
             fastq_id = fastq_file + "_seq"
-        READ_SETS[fastq_id] = Read_set(FASTQ_DIR, fastq_file)
-        READ_SETS[fastq_id].read_fastq()
+        if fastq_id not in READ_SETS.keys():
+            READ_SETS[fastq_id] = Read_set(FASTQ_DIR, fastq_file)
+            READ_SETS[fastq_id].read_fastq()
 
 
 def add_csv_data_to_dataframes():
     for bin_number, read_set in READ_SETS.items():
-        read_set.append_csv_data()
+        if not read_set.added_csv_data:
+            read_set.append_csv_data()
 
 
 def aggregate_dataframes():
     global ALL_READS
     first_dataframe = True
     for bin_number, read_set in READ_SETS.items():
+        if read_set.aggregated_to_global_dataframe:
+            continue
         if first_dataframe:
             first_dataframe = False
             columns = list(read_set.df.columns)
             ALL_READS = pd.DataFrame(columns=columns)
         ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
-
+        read_set.aggregated_to_global_dataframe = True
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True])
 
 
@@ -459,13 +463,19 @@ def x_yield_to_human_readable(x, position):
     return s
 
 
-def main(args):
-    set_arguments(args)
-    import_fastq()
-    if CSV_DIR is not "":
-        add_csv_data_to_dataframes()
-    aggregate_dataframes()
-    assign_yield_data()
+def is_basecalling():
+    # Does the file basecalling exist (note must be in run directory).
+    if os.path.isfile(os.path.join(os.getcwd(), "BASECALLING")):
+        return True
+    else:
+        return False
+
+
+def have_a_break():
+    time.sleep(15)
+
+
+def run_plot_commands():
     plot_yield_general()
     plot_yield_by_quality()
     plot_read_length_hist()
@@ -473,5 +483,42 @@ def main(args):
     # CSV specific plots
     if not CSV_DIR == "":
         plot_pore_yield_hist()
+
+
+def get_fastq_files():
+    global FASTQ_FILES
+    FASTQ_FILES = [fastq_file
+                   for fastq_file in os.listdir(FASTQ_DIR)
+                   if fastq_file.endswith(".fastq")]
+
+
+def get_csv_files():
+    global CSV_FILES
+    CSV_FILES = [os.path.join(CSV_DIR, csv_file)
+                 for csv_file in os.listdir(CSV_DIR)
+                 if csv_file.endswith(".csv")]
+
+
+def main(args):
+    set_arguments(args)
+    basecalling = True
+    while basecalling:
+        current_fastq_files = FASTQ_FILES.copy()
+        get_fastq_files()
+        if CSV_DIR is not "":
+            get_csv_files()
+        if len(list(set(FASTQ_FILES).difference(current_fastq_files))) == 0:
+            have_a_break()
+        import_fastq()
+        if CSV_DIR is not "":
+            add_csv_data_to_dataframes()
+        aggregate_dataframes()
+        assign_yield_data()
+        run_plot_commands()
+        if not is_basecalling():
+            basecalling = False
+
+
+
 
 

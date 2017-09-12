@@ -26,6 +26,7 @@ import pandas as pd  # For the status.csv file
 import logging
 import fileinput
 from datetime import datetime
+from pathlib import Path
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -36,6 +37,7 @@ except AssertionError:
 
 # Set global and semi-global variables
 TRANSFERRING = True
+BASECALLING_LOCK_FILE = None
 READS_DIR = ""
 CW_DIR = ""
 ALBACORE_DIR = ""
@@ -152,7 +154,8 @@ def main(args):
     set_global_variables(args)
     check_directories()
     set_logger()
-    
+    create_basecalling_lock_file()
+
     # Pick up previous basecalling
     pick_up_from_previous_run()
 
@@ -193,7 +196,7 @@ def main(args):
     # Merge fastq files at the end of the run.
     generate_dataframe()    
     merge_fastq_files_wrapper()
-
+    remove_basecalling_lock_file()
 
 def run_pipeline():
     # Extract tarballs
@@ -295,6 +298,7 @@ def set_global_variables(args):
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
     global LOGGER_DIR, BARCODING, QSUB_TYPE, QSUB_ALBACORE_TEMPLATE, QSUB_EXTRACTION_TEMPLATE
+    global BASECALLING_LOCK_FILE
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -318,6 +322,7 @@ def set_global_variables(args):
     QSUB_EXTRACTION_TEMPLATE = os.path.abspath(args.qsub_extraction_template)
     QSUB_ALBACORE_TEMPLATE = os.path.abspath(args.qsub_albacore_template)
     QSUB_TYPE = args.qsub_type
+    BASECALLING_LOCK_FILE = os.path.join(WORKING_DIR, "BASECALLING")
 
 
 def check_directories():
@@ -763,6 +768,8 @@ Miscellaneous pipeline non-core functions
 6. is_still_basecalling
 7. get_current_subfolder
 8. num_current_jobs
+9. create_basecalling_lock_file
+10. remove_basecalling_lock_file
 """
 
 
@@ -937,3 +944,13 @@ def has_failed(job_id):
     if not qacct_stderr == "":
         LOGGER.info(f"qacct stderr of {qacct_stderr}")
     return False
+
+
+def create_basecalling_lock_file():
+    # Create a file called BASECALLING in the working directory
+    Path(BASECALLING_LOCK_FILE).touch()
+
+
+def remove_basecalling_lock_file():
+    # Remove the basecalling lock file.
+    os.remove(BASECALLING_LOCK_FILE)
