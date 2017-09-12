@@ -72,6 +72,7 @@ class Read_set:
         self.number = None
         self.random = None
         self.id = None
+        self.csv_df = None
 
         if not CSV_DIR == "":
             self.number = self.fastq_file.split("_")[0]
