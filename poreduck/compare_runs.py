@@ -12,7 +12,7 @@ from matplotlib.pylab import savefig
 import numpy as np
 import sys
 
-from poreduck.plot_yields import Read_set
+from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
@@ -43,7 +43,7 @@ class Run:
         fastq_files = [fastq_file for fastq_file in os.listdir(self.fastq_dir)
                        if fastq_file.endswith(".fastq")]
         for fastq_file in fastq_files:
-            self.read_sets.append(Read_set(fastq_dir=self.fastq_dir, fastq_file=fastq_file))
+            self.read_sets.append(Read_Set(fastq_dir=self.fastq_dir, fastq_file=fastq_file))
 
     def get_fastq_data(self):
         for read_set in self.read_sets:

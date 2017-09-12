@@ -60,7 +60,7 @@ CLIP = False
 """
 
 
-class Read_set:
+class Read_Set:
     """
     The class readset is assigned to each set of 4000 reads
     It contains attributes such as fastq file, csv file, random_number and mux boolean.
@@ -200,7 +200,7 @@ def import_fastq():
         else:
             fastq_id = fastq_file + "_seq"
         if fastq_id not in READ_SETS.keys():
-            READ_SETS[fastq_id] = Read_set(FASTQ_DIR, fastq_file)
+            READ_SETS[fastq_id] = Read_Set(FASTQ_DIR, fastq_file)
             READ_SETS[fastq_id].read_fastq()
 
 
