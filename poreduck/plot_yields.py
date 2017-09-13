@@ -407,16 +407,15 @@ def plot_heatmap():
 def plot_pore_yield_hist():
     num_bins = 50
     new_yield_data = ALL_READS.groupby(["channel", "mux"])['seq_length'].sum()
-    new_yield_data.reset_index(level=0, inplace=True)
     fig, ax = plt.subplots(1)
-    (n, bins, patches) = ax.hist(new_yield_data['seq_length'], num_bins, weights=None,
+    (n, bins, patches) = ax.hist(new_yield_data, num_bins, weights=None,
                                  # [1],#channels_by_yield_df['seq_length'],
                                  normed=1, facecolor='blue', alpha=0.76)
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
 
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
-        s = (bins[1]-bins[0])*y*new_yield_data['seq_length'].count()
+        s = (bins[1]-bins[0])*y*new_yield_data.count()
         return s
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
