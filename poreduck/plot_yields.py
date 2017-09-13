@@ -134,7 +134,7 @@ class Read_Set:
             # Find the index of the respective csv file
             channel_csv = csv_row.channel
             read_csv = csv_row.read_no
-            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index
+            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()
             # Write value to dictionary with index of our fastq dataframe as the key
             muxs[df_index] = csv_row.mux
             duration[df_index] = csv_row.duration
