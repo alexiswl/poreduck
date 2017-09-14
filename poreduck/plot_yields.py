@@ -31,8 +31,7 @@ we might as well make a bunch of plots to go along with it!
 # Before we begin, are we using python 3.6 or greater?
 try:
     assert sys.version_info >= (3, 6)
-    my_python_3p6_string = f"If you see a syntax error here you need to update your python version"
-except (AssertionError, SyntaxError):
+except AssertionError:
     sys.exit("Error: Python version out of date. Require 3.6 or higher.")
 
 # Set global variables
@@ -134,7 +133,10 @@ class Read_Set:
             # Find the index of the respective csv file
             channel_csv = csv_row.channel
             read_csv = csv_row.read_no
-            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
+            try:
+                df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
+            except IndexError:
+                print(channel_csv, read_csv, csv_row, self.id)
             # Write value to dictionary with index of our fastq dataframe as the key
             muxs[df_index] = csv_row.mux
             durations[df_index] = csv_row.duration
