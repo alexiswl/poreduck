@@ -135,8 +135,7 @@ class Read_Set:
             read_csv = str(csv_row.read_no)
             try:
                 df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
-            except IndexError:
-                print(channel_csv, read_csv, csv_row, self.id)
+            except IndexError: 
                 continue
             # Write value to dictionary with index of our fastq dataframe as the key
             muxs[df_index] = csv_row.mux
@@ -422,7 +421,7 @@ def plot_pore_yield_hist():
 
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
-        s = (bins[1]-bins[0])*y*new_yield_data.count()
+        s = humanize.naturalsize((bins[1]-bins[0])*y*new_yield_data.count(), gnu=True)
         return s
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
