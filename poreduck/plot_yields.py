@@ -134,7 +134,11 @@ class Read_Set:
             # Find the index of the respective csv file
             channel_csv = csv_row.channel
             read_csv = csv_row.read_no
-            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index
+            df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
+            # Write value to dictionary with index of our fastq dataframe as the key
+            muxs[df_index] = csv_row.mux
+            durations[df_index] = csv_row.duration
+        # Now write the value of the mux and duration to fastq dataframe
         for index, mux in muxs.items():
             self.df.set_value(index, "mux", mux)
         for index, duration in durations.items():
@@ -258,7 +262,7 @@ def plot_yield_general():
     ax.set_title(f"Yield for {SAMPLE_NAME} (MB/Hour)")
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_general_yield_plot.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot.png"))
 
 
 def plot_yield_by_quality():
@@ -312,7 +316,7 @@ def plot_yield_by_quality():
     ax.yaxis.set_major_formatter(formatter_y)
     ax.legend([mpatches.Patch(color=colour) for colour in reversed(QUALITY_COLOURS)],
               reversed(QUALITY_DESCRIPTIONS), loc=2)
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_stacked_yield_plot.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot_by_quality.png"))
 
 
 def plot_read_length_hist():
@@ -343,10 +347,10 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Read length")
     ax.set_ylabel("Bases per bin")
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_read_length_hist.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_hist_read_length_by_basepair.png"))
 
 
-def plot_heatmap():
+def plot_poremap():
     def minknow_column_order(i):
         return chain(range(i + 33, i + 41), reversed(range(i + 1, i + 9)))
     # Channels are not in order, 121 is in the topleft, 89 in the top right.
@@ -400,23 +404,22 @@ def plot_heatmap():
     # Create line down the middle as shown in MinKNOW.
     ax.axvline([8], color='white', lw=15)
     # Nice big title!
-    ax.set_title("Heatmap of Yield by Channel", fontsize=25);
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_heatmap.png"))
+    ax.set_title("Map of Yield by Channel", fontsize=25);
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_map_by_pore.png"))
 
 
 def plot_pore_yield_hist():
     num_bins = 50
     new_yield_data = ALL_READS.groupby(["channel", "mux"])['seq_length'].sum()
-    new_yield_data.reset_index(level=0, inplace=True)
     fig, ax = plt.subplots(1)
-    (n, bins, patches) = ax.hist(new_yield_data['seq_length'], num_bins, weights=None,
+    (n, bins, patches) = ax.hist(new_yield_data, num_bins, weights=None,
                                  # [1],#channels_by_yield_df['seq_length'],
                                  normed=1, facecolor='blue', alpha=0.76)
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
 
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
-        s = (bins[1]-bins[0])*y*new_yield_data['seq_length'].count()
+        s = (bins[1]-bins[0])*y*new_yield_data.count()
         return s
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
@@ -425,6 +428,7 @@ def plot_pore_yield_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Yield in single pore")
     ax.set_ylabel("Pores per bin")
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_hist_yield_by_pore.png"))
 
 
 def y_hist_to_human_readable(y, position):
@@ -480,7 +484,7 @@ def run_plot_commands():
     plot_yield_general()
     plot_yield_by_quality()
     plot_read_length_hist()
-    plot_heatmap()
+    plot_poremap()
     # CSV specific plots
     if not CSV_DIR == "":
         plot_pore_yield_hist()
