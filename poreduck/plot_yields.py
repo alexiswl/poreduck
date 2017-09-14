@@ -137,7 +137,7 @@ class Read_Set:
             df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
             # Write value to dictionary with index of our fastq dataframe as the key
             muxs[df_index] = csv_row.mux
-            duration[df_index] = csv_row.duration
+            durations[df_index] = csv_row.duration
         # Now write the value of the mux and duration to fastq dataframe
         for index, mux in muxs.items():
             self.df.set_value(index, "mux", mux)
