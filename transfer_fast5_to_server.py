@@ -604,8 +604,10 @@ def is_minknow_still_running():
     # last folder and perform one last rsync command.
 
     is_running = False  # Now to disprove this.
-
-    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
+    if os.name == 'nt':
+         psef_command = "ps -efW | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
+    else:
+         psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()
