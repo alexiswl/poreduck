@@ -144,7 +144,7 @@ def set_args(args):
     global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES
     # Check to ensure that all fastq folders are there
     FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dirs.split(",")]
-    NAMES = [name for name in args.names.split(",")]
+    NAMES = [name for name in args.run_names.split(",")]
     for fastq_dir in FASTQ_DIRS:
         if not os.path.isdir(fastq_dir):
             sys.exit(f"Error, could not find directory {fastq_dir}")
