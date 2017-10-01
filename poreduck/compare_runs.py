@@ -11,7 +11,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 import numpy as np
 import sys
-import pyjoyplots as pjp
+import pyjoyplot as pjp
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
