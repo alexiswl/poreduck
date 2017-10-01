@@ -151,18 +151,14 @@ def main():
     # Compare arguments
     compare_parser = subparsers.add_parser('compare_plots',
                                            help="This command takes in two fastq directories, and creates comparison plots")
-    compare_parser.add_argument("--fastq_1", type=str, required=True,
-                                help="/path/to/fastq_1, should have a bunch of .fastq files in it")
-    compare_parser.add_argument("--fastq_2", type=str, required=True,
-                                help="/path/to/fastq_2, should have a bunch of .fastq files in it")
-    compare_parser.add_argument("--run_1", type=str, required=True, dest="name_1",
-                                help="name of sample/run 1")
-    compare_parser.add_argument("--run_2", type=str, required=True, dest="name_2",
-                                help="name of sample/run 2")
+    compare_parser.add_argument("--fastq_dirs", type=str, required=True,
+                                help="/path/to/fastq_1,/path/to/fastq_2, etc")
+    compare_parser.add_argument("--run_names", type=str, required=True,
+                                help="\"name of run 1\",\"name of run 2\", etc")
     compare_parser.add_argument("--plots_dir", type=str, required=True,
                                 help="where do you wish these plots to go?")
     compare_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
-                                help="Remove outliers from the historgram ( >3 std.dev)")
+                                help="Remove outliers from the historgram (0.999th percentile)")
 
     compare_parser.set_defaults(func=run_function)
     args = parser.parse_args()

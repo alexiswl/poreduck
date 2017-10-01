@@ -15,7 +15,6 @@ numpy>=1.13.1
 olefile>=0.44
 packaging>=16.8
 pandas>=0.20.3
-pigz>=2.3
 paramiko>=2.2.1
 patsy>=0.4.1
 Pillow>=4.2.1

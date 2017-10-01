@@ -20,6 +20,9 @@ from poreduck.plot_yields import x_yield_to_human_readable
 CSV_DIR = ""
 PLOTS_DIR = ""
 RUNS = []
+FASTQ_DIRS = []
+NAMES = []
+SEQ_DFS = []
 CLIP = False
 
 """
@@ -68,7 +71,7 @@ class Run:
         # Aggregate seqlength for each minute of sequencing. I love this resample command!
         self.yield_data.set_index(pd.DatetimeIndex(self.yield_data['time']), inplace=True)
         self.yield_data = self.yield_data.resample("1T").sum()
-        self.yield_data.reset_index(inplace=True)#, drop=True)
+        self.yield_data.reset_index(inplace=True)
         # Generate a cumulative sum of sequence data
         self.yield_data['cumsum_bp'] = self.yield_data['seq_length'].cumsum()
         # Convert time to timedelta format and then to float format, in hours.
@@ -77,14 +80,16 @@ class Run:
 
 
 def plot_read_length_hist():
-    seq_df_1 = RUNS[0].all_data["seq_length"]
-    seq_df_2 = RUNS[1].all_data["seq_length"]
+    """For loop of SEQ_DFS here"""
+    global SEQ_DFS
+    SEQ_DFS = [run.all_data["seq_length"] for run in RUNS]
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
     if CLIP:
         # Filter out the top 1000th percentile.
-        seq_df_1 = seq_df_1[seq_df_1 < seq_df_1.quantile(0.9999)]
-        seq_df_2 = seq_df_2[seq_df_2 < seq_df_2.quantile(0.9999)]
+        """For loop of SEQ_DFS here"""
+        for seq_df in SEQ_DFS:
+            seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Set labels of axis.
@@ -93,15 +98,16 @@ def plot_read_length_hist():
     ax.get_yaxis().set_ticklabels([])
 
     # Plot the histogram
-    ax.hist(seq_df_1, 50, weights=seq_df_1,
-            normed=1, facecolor='blue', alpha=1, label=RUNS[0].name)
-    ax.hist(seq_df_2, 50, weights=seq_df_2,
-            normed=1, facecolor='red', alpha=0.5, label=RUNS[1].name)
+    """For loop here with the ax.hist. with SEQ_DFS"""
+    for (index, seq_df) in enumerate(SEQ_DFS):
+        ax.hist(seq_df, 50, weights=seq_df,
+                normed=1, facecolor='blue', alpha=1, label=RUNS[index].name)
     # Set the titles and add a legend.
-    ax.set_title(f"Read Distribution Graph for {RUNS[0].name} and {RUNS[1].name}")
+    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
+    ax.set_title(f"Read Distribution Graph for {title_string}")
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     plt.legend()
-
+    """Need to have another 'regex' name"""
     savefig(os.path.join(PLOTS_DIR, f"{RUNS[0].name}_{RUNS[1].name}_read_length_hist.png"))
 
 
@@ -110,8 +116,8 @@ def plot_yield_general():
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
     num_points = 6
-    min_x = min([RUNS[0].yield_data['duration_float'].min(), RUNS[1].yield_data['duration_float'].min()])
-    max_x = max([RUNS[0].yield_data['duration_float'].max(), RUNS[1].yield_data['duration_float'].max()])
+    min_x = min([run.yield_data['duration_float'].min() for run in RUNS])
+    max_x = max([run.yield_data['duration_float'].max() for run in RUNS])
     x_ticks = np.linspace(min_x,
                           max_x,
                           num_points)
@@ -124,22 +130,24 @@ def plot_yield_general():
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
     ax.set_xlim(min_x, max_x)
-    ax.set_title(f"Yield for {RUNS[0].name} and {RUNS[1].name} (B/Hour)")
-    ax.plot(RUNS[0].yield_data['duration_float'], RUNS[0].yield_data['cumsum_bp'],
-            linestyle="solid", markevery=[], label=RUNS[0].name)
-    ax.plot(RUNS[1].yield_data['duration_float'], RUNS[1].yield_data['cumsum_bp'],
-            linestyle="solid", markevery=[], label=RUNS[1].name)
+    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
+    ax.set_title(f"Yield for {title_string} (B/Hour)")
+    """For loop here with SEQ_DFS here"""
+    for run in RUNS:
+        ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
+                linestyle="solid", markevery=[], label=run.name)
     plt.legend()
     savefig(os.path.join(PLOTS_DIR, f"{RUNS[0].name}_{RUNS[1].name}_general_yield_plot.png"))
 
 
 def set_args(args):
-    global PLOTS_DIR, CLIP
-    # Check to ensure that both fastq folders are there
-    if not os.path.isdir(args.fastq_1):
-        sys.exit(f"Error, could not find directory {args.fastq_1}")
-    if not os.path.isdir(args.fastq_2):
-        sys.exit(f"Error, could not find directory {args.fastq_2}")
+    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES
+    # Check to ensure that all fastq folders are there
+    FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dir.split(",")]
+    NAMES = [name for name in args.names.split(",")]
+    for fastq_dir in FASTQ_DIRS:
+        if not os.path.isdir(fastq_dir):
+            sys.exit(f"Error, could not find directory {fastq_dir}")
     # Make plots directory if it doesn't exist
     if not os.path.isdir(args.plots_dir):
         os.mkdir(args.plots_dir)
@@ -150,15 +158,16 @@ def set_args(args):
 
 def get_runs(args):
     global RUNS
-    RUNS.append(Run(args.fastq_1, args.name_1))
-    RUNS.append(Run(args.fastq_2, args.name_2))
+    """ZIP split fastq_dir, name_dir split(",")  RUNS"""
+    for fastq_dir, name in zip(FASTQ_DIRS, NAMES):
+        RUNS.append(Run(fastq_dir, name))
+
     # Now load up dataframes.
     for run in RUNS:
         run.get_read_sets()
         run.get_fastq_data()
         run.aggregate_dataframes()
         run.assign_yield_data()
-
 
 def main(args):
     set_args(args)
