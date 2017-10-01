@@ -11,7 +11,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 import numpy as np
 import sys
-
+import pyjoyplots as pjp
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
@@ -84,12 +84,18 @@ def plot_read_length_hist():
     global SEQ_DFS
     SEQ_DFS = [run.all_data["seq_length"] for run in RUNS]
     # Define how many plots we want (1)
-    fig, ax = plt.subplots(1)
+    #fig, ax = plt.subplots(1)
     if CLIP:
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
         for seq_df in SEQ_DFS:
             seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
+    # Merge all the SEQ_DFS.
+    all_seq_dfs = pd.DataFrame(data=None, columns=SEQ_DFS[0].columns)
+    for index, seq_df in enumerate(SEQ_DFS):
+        seq_df["Run"] = RUNS[index].name
+        all_seq_dfs.append(seq_df, ignore_index=True)
+    ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist")
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Set labels of axis.
@@ -98,17 +104,18 @@ def plot_read_length_hist():
     ax.get_yaxis().set_ticklabels([])
 
     # Plot the histogram
-    """For loop here with the ax.hist. with SEQ_DFS"""
-    for (index, seq_df) in enumerate(SEQ_DFS):
-        ax.hist(seq_df, 50, weights=seq_df,
-                normed=1, facecolor='blue', alpha=1, label=RUNS[index].name)
+    #"""For loop here with the ax.hist. with SEQ_DFS"""
+    #for (index, seq_df) in enumerate(SEQ_DFS):
+    #    ax.hist(seq_df, 50, weights=seq_df,
+    #            normed=1, facecolor='blue', alpha=1, label=RUNS[index].name)
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Read Distribution Graph for {title_string}")
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     plt.legend()
     """Need to have another 'regex' name"""
-    savefig(os.path.join(PLOTS_DIR, f"{RUNS[0].name}_{RUNS[1].name}_read_length_hist.png"))
+    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES]
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
 
 
 def plot_yield_general():
@@ -168,6 +175,7 @@ def get_runs(args):
         run.get_fastq_data()
         run.aggregate_dataframes()
         run.assign_yield_data()
+
 
 def main(args):
     set_args(args)
