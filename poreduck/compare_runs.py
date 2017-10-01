@@ -114,7 +114,7 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     plt.legend()
     """Need to have another 'regex' name"""
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES]
+    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES]))
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
 
 
