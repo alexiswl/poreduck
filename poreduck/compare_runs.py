@@ -91,11 +91,12 @@ def plot_read_length_hist():
         for seq_df in SEQ_DFS:
             seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
     # Merge all the SEQ_DFS.
-    all_seq_dfs = pd.Series(data=[seq_df for seq_df in SEQ_DFS],
+    all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
                             axis=0)
     all_seq_dfs = all_seq_dfs.reset_index(level=0)
     all_seq_dfs.columns = ["Run", "seq_length"]
+    all_seq_dfs = all_seq_dfs.reset_index(drop=True)
     ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist")
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
