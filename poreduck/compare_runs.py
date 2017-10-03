@@ -12,6 +12,7 @@ from matplotlib.pylab import savefig
 import numpy as np
 import sys
 import pyjoyplot as pjp
+import math
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
@@ -83,38 +84,45 @@ def plot_read_length_hist():
     """For loop of SEQ_DFS here"""
     global SEQ_DFS
     SEQ_DFS = [run.all_data["seq_length"] for run in RUNS]
+    print(SEQ_DFS[0].dtype)
     # Define how many plots we want (1)
     #fig, ax = plt.subplots(1)
     if CLIP:
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
-        for seq_df in SEQ_DFS:
-            seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9999)] for seq_df in SEQ_DFS]
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
                             axis=0)
+    # Drop the index levels except for 0 which represents 'Run'
     all_seq_dfs = all_seq_dfs.reset_index(level=0)
     all_seq_dfs.columns = ["Run", "seq_length"]
+    # Reset the index to 0:nrow
     all_seq_dfs = all_seq_dfs.reset_index(drop=True)
-    ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist")
+    # Bins need to be malleable depending on the range of the run.
+    max_by_run = all_seq_dfs.groupby("Run")["seq_length"].max().to_dict()
+    min_by_run = all_seq_dfs.groupby("Run")["seq_length"].min().to_dict()
+    if CLIP:
+        bins = [math.ceil((max_by_run[run] - min_by_run[run])/1800)
+                for run in sorted(all_seq_dfs.Run.unique())]
+    else:
+        bins = [math.ceil((max_by_run[run] - min_by_run[run])/3600)
+                for run in sorted(all_seq_dfs.Run.unique())]
+    # Although it is already numeric, we need to re-numerate this column.
+    # Until the pull-request comes through!
+    all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
+    # Plot the histogram using pyjoyplot
+    ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist", order=sorted([run.name for run in RUNS]),
+                  bins=bins, weights=True)
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Set labels of axis.
-    ax.set_xlabel("Read length")
-    ax.set_ylabel("")
-    ax.get_yaxis().set_ticklabels([])
-
-    # Plot the histogram
-    #"""For loop here with the ax.hist. with SEQ_DFS"""
-    #for (index, seq_df) in enumerate(SEQ_DFS):
-    #    ax.hist(seq_df, 50, weights=seq_df,
-    #            normed=1, facecolor='blue', alpha=1, label=RUNS[index].name)
+    ax.set_xlabel("Read length") 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Read Distribution Graph for {title_string}")
-    ax.grid(color='black', linestyle=':', linewidth=0.5)
-    plt.legend()
+    ax.grid(color='black', linestyle=':', linewidth=0.5) 
     """Need to have another 'regex' name"""
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
@@ -146,7 +154,8 @@ def plot_yield_general():
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
     plt.legend()
-    savefig(os.path.join(PLOTS_DIR, f"{RUNS[0].name}_{RUNS[1].name}_general_yield_plot.png"))
+    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
 
 
 def set_args(args):
