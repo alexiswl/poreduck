@@ -653,12 +653,12 @@ def move_fastq_file(subfolder):
         for barcode in barcodes:
             # Get fastq files in the workspace directory
             fastq_files_list = [os.path.join(subfolder.workspace_dir, "pass", barcode, fastq)
-                                for fastq in os.listdir(os.path.join(subfolder.workspace_dir, barcode))
+                                for fastq in os.listdir(os.path.join(subfolder.workspace_dir, "pass", barcode))
                                 if fastq.endswith(".fastq")]
             fastq_files_dict[barcode] = fastq_files_list
     else:
         fastq_files_list = [os.path.join(subfolder.workspace_dir, "pass", fastq)
-                            for fastq in os.listdir(subfolder.workspace_dir)
+                            for fastq in os.listdir(os.path.join(subfolder.workspace_dir, "pass"))
                             if fastq.endswith(".fastq")]
         if CHOSEN_FLOWCELL == "SQK-LSK308":
             fastq_files_dict["1d"] = fastq_files_list
@@ -668,8 +668,8 @@ def move_fastq_file(subfolder):
     if CHOSEN_FLOWCELL == "SQK-LSK308":
         # Get the 1dsq fastq file as well
         fastq_folder_1dsq = os.path.join(subfolder.albacore_dir, "1dsq_analysis", "1dsq_analysis", "workspace")
-        fastq_files_list = [os.path.join(fastq_folder_1dsq, fastq)
-                            for fastq in os.listdir(fastq_folder_1dsq)
+        fastq_files_list = [os.path.join(fastq_folder_1dsq, "pass", fastq)
+                            for fastq in os.listdir(os.path.join(fastq_folder_1dsq, "pass"))
                             if fastq.endswith(".fastq")]
         fastq_files_dict["1dsq"] = fastq_files_list
 
