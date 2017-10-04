@@ -496,8 +496,13 @@ def extract_tarred_read_set(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of the array.
     LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    if stdout.rstrip().split(".")[0].isdigit():
-        subfolder.extracted_jobid = int(stdout.rstrip().split(".")[0])
+    # Get job ID:
+    if QSUB_TYPE == "SLURM":
+        job_id = stdout.rstrip().split(";")[0]
+    else:
+        job_id = stdout.rstrip().split(".")[0]
+    if job_id.isdigit():
+        subfolder.extracted_jobid = int(job_id)
     else:
         LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
         sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
@@ -582,8 +587,13 @@ def run_albacore(subfolder):
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of th   e array.
     LOGGER.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    if stdout.rstrip().split(".")[0].isdigit():
-        subfolder.albacore_jobid = int(stdout.rstrip().split(".")[0])
+    # Get job ID:
+    if QSUB_TYPE == "SLURM":
+        job_id = stdout.rstrip().split(";")[0]
+    else:
+        job_id = stdout.rstrip().split(".")[0]
+    if job_id.isdigit():
+        subfolder.albacore_jobid = int(job_id)
     else:
         LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
         sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
@@ -875,6 +885,8 @@ def has_commenced(job_id):
         qacct_command = f"qacct -j {job_id} | grep start_time | grep -v '\-\/\-'"
     elif QSUB_TYPE == "TORQUE":
         qacct_command = f"tracejob {job_id} | grep QUEUED | wc -l"
+    elif QSUB_TYPE == "SLURM":
+        qacct_command = f"sacct -j {job_id} | tail -n 1 | grep RUNNING | wc -l"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -882,7 +894,8 @@ def has_commenced(job_id):
     qacct_stdout = qacct_stdout.decode()
     qacct_stderr = qacct_stderr.decode()
     if QSUB_TYPE == "SGE" and qacct_stdout == "" \
-            or QSUB_TYPE == "TORQUE" and int(qacct_stdout) > 1:
+            or QSUB_TYPE == "TORQUE" and int(qacct_stdout) > 1\
+            or QSUB_TYPE == "SLURM" and int(qacct_stdout) > 1:
         # Start-time is non-existent
         return False
     if not qacct_stderr == "":
@@ -899,6 +912,8 @@ def has_completed(job_id, check_failed):
         qacct_command = f"qacct -j {job_id} | grep end_time | grep -v '\-\/\-'"
     elif QSUB_TYPE == "TORQUE":
         qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status "
+    elif QSUB_TYPE == "SLURM":
+        qacct_command = f"sacct -j {job_id} | grep 'COMPLETED\|FAILED'"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -929,6 +944,8 @@ def has_failed(job_id):
     elif QSUB_TYPE == "TORQUE":
         qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status | grep - v preparing |" + \
                         f" cut - d' ' - f7 | cut - d'=' -f2"
+    elif QSUB_TYPE == "SLURM":
+        qacct_command = f"sacct {job_id} | tail -n1 | grep FAILED | wc -l"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
