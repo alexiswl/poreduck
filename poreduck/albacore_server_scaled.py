@@ -298,7 +298,6 @@ def set_global_variables(args):
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
     global LOGGER_DIR, BARCODING, QSUB_TYPE, QSUB_ALBACORE_TEMPLATE, QSUB_EXTRACTION_TEMPLATE
-    global BASECALLING_LOCK_FILE
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -322,43 +321,42 @@ def set_global_variables(args):
     QSUB_EXTRACTION_TEMPLATE = os.path.abspath(args.qsub_extraction_template)
     QSUB_ALBACORE_TEMPLATE = os.path.abspath(args.qsub_albacore_template)
     QSUB_TYPE = args.qsub_type
-    BASECALLING_LOCK_FILE = os.path.join(WORKING_DIR, "BASECALLING")
 
 
 def check_directories():
     # Make sure the directories exist, change to reads directory,
     # Create any other necessary directories for the script to run.
     global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
-    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH, QSUB_TYPE
+    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH, QSUB_TYPE, BASECALLING_LOCK_FILE
     if not os.path.isdir(READS_DIR):
         sys.exit(f"Error, {READS_DIR} does not exist")
 
-    READS_DIR = os.path.abspath(READS_DIR) + "/"
+    READS_DIR = os.path.abspath(READS_DIR)
     os.chdir(READS_DIR)
 
     PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir)) + "/"
 
     if ALBACORE_DIR == "":
-        ALBACORE_DIR = PARENT_DIRECTORY + "albacore/"
+        ALBACORE_DIR = os.path.join(PARENT_DIRECTORY, "albacore")
     else:
         ALBACORE_DIR = os.path.abspath(ALBACORE_DIR)
 
     if not os.path.isdir(ALBACORE_DIR):
         os.mkdir(ALBACORE_DIR)
 
-    QSUB_LOG_DIR = PARENT_DIRECTORY + "qsub_log/"
+    QSUB_LOG_DIR = os.path.join(PARENT_DIRECTORY, "qsub_log")
     if not os.path.isdir(QSUB_LOG_DIR):
         os.mkdir(QSUB_LOG_DIR)
 
     if FASTQ_DIR == "":
-        FASTQ_DIR = PARENT_DIRECTORY + "fastq/"
+        FASTQ_DIR = os.path.join(PARENT_DIRECTORY, "fastq")
     else:
         FASTQ_DIR = os.path.abspath(FASTQ_DIR)
 
     if not os.path.isdir(FASTQ_DIR):
         os.mkdir(FASTQ_DIR)
     if LOGGER_DIR == "":
-        LOGGER_DIR = PARENT_DIRECTORY + "poreduck_logs/"
+        LOGGER_DIR = os.path.join(PARENT_DIRECTORY, "poreduck_logs")
     else:
         LOGGER_DIR = os.path.abspath(LOGGER_DIR)
     if not os.path.isdir(LOGGER_DIR):
@@ -375,6 +373,7 @@ def check_directories():
         if os.path.isfile(STATUS_CSV):
             print(f"Warning, STATUS_CSV not defined but still exists. Removing file {STATUS_CSV}")
             os.remove(STATUS_CSV)
+    BASECALLING_LOCK_FILE = os.path.join(PARENT_DIRECTORY, "BASECALLING")
 
 
 def set_logger():
