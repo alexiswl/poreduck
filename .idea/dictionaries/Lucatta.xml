@@ -14,7 +14,9 @@
       <w>qsub</w>
       <w>rstrip</w>
       <w>runmux</w>
+      <w>sacct</w>
       <w>seqid</w>
+      <w>slurm</w>
       <w>sshpass</w>
       <w>taxid</w>
       <w>tracejob</w>

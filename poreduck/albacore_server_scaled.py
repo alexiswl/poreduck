@@ -195,7 +195,7 @@ def main(args):
 
     # Merge fastq files at the end of the run.
     generate_dataframe()    
-    merge_fastq_files_wrapper()
+    #merge_fastq_files_wrapper()
     remove_basecalling_lock_file()
 
 def run_pipeline():
@@ -653,12 +653,12 @@ def move_fastq_file(subfolder):
                     or os.path.isdir(os.path.join(subfolder.workspace_dir, barcode)) and barcode == "unclassified"]
         for barcode in barcodes:
             # Get fastq files in the workspace directory
-            fastq_files_list = [os.path.join(subfolder.workspace_dir, barcode, fastq)
+            fastq_files_list = [os.path.join(subfolder.workspace_dir, "pass", barcode, fastq)
                                 for fastq in os.listdir(os.path.join(subfolder.workspace_dir, barcode))
                                 if fastq.endswith(".fastq")]
             fastq_files_dict[barcode] = fastq_files_list
     else:
-        fastq_files_list = [os.path.join(subfolder.workspace_dir, fastq)
+        fastq_files_list = [os.path.join(subfolder.workspace_dir, "pass", fastq)
                             for fastq in os.listdir(subfolder.workspace_dir)
                             if fastq.endswith(".fastq")]
         if CHOSEN_FLOWCELL == "SQK-LSK308":
