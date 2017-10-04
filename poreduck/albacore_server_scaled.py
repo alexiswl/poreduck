@@ -576,7 +576,11 @@ def run_albacore(subfolder):
             print(line.rstrip())
 
     # Submit job
-    job_submission_command = f"qsub {subfolder.albacore_submission_file}"
+    if QSUB_TYPE == "SGE" or QSUB_TYPE == "TORQUE":
+        job_submission_command = f"qsub {subfolder.albacore_submission_file}"
+    elif QSUB_TYPE == "SLURM":
+        job_submission_command = f"sbatch {subfolder.albacore_submission_file}"
+
     job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -613,7 +617,7 @@ def remove_folder(subfolder):
         subfolder.folder_removed = True
 
     # Ensure that the tarred read set still exists
-    if not os.path.join(READS_DIR, subfolder.tar_filename + ".tar.gz"):
+    if not os.path.isfile(os.path.join(READS_DIR, subfolder.tar_filename)):
         LOGGER.info("Um... the archive doesn't exist, I'm not going to delete the folder")
         return
 
