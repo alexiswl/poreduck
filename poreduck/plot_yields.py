@@ -120,8 +120,8 @@ class Read_Set:
         # Convert columns to correct format
         self.df['seq_length'] = pd.to_numeric(self.df["seq_length"])
         self.df['av_qual'] = pd.to_numeric(self.df['av_qual'])
-        self.df['time'] = pd.to_datetime(self.df['time'], format="%Y-%m-%dT%H:%M:%SZ")
-        #self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
+        # self.df['time'] = pd.to_datetime(self.df['time'], format="%Y-%m-%dT%H:%M:%SZ")
+        self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
         # Tick the box that we have added the fastq to a dataframe
         self.added_fastq_data = True
 
