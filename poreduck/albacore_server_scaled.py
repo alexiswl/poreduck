@@ -486,7 +486,10 @@ def extract_tarred_read_set(subfolder):
             print(line.rstrip())
 
     # Submit job
-    job_submission_command = f"qsub {subfolder.extracted_submission_file}"
+    if QSUB_TYPE == "SLURM":
+        job_submission_command = f"sbatch {subfolder.extracted_submission_file}"
+    elif QSUB_TYPE == "SGE" or QSUB_TYPE == "TORQUE":
+        job_submission_command = f"qsub {subfolder.extracted_submission_file}"
     job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = job_submission_proc.communicate()
