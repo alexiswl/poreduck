@@ -246,8 +246,9 @@ def assign_yield_data():
     YIELD_DATA.reset_index(inplace=True)
     # Generate a cumulative sum of sequence data
     YIELD_DATA['cumsum_bp'] = YIELD_DATA['seq_length'].cumsum()
-    # Convert time to timedelta format and then to float format, in hours.
+    # Convert time to timedelta format and then to float format, in seconds.
     YIELD_DATA['duration_tdelta'] = YIELD_DATA['time'].apply(lambda t: t - YIELD_DATA['time'].min())
+    # Create a duration float.
     YIELD_DATA['duration_float'] = YIELD_DATA['duration_tdelta'].apply(lambda t: t.total_seconds())
 
 
@@ -265,7 +266,7 @@ def plot_yield_general():
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
-    ax.set_title(f"Yield for {SAMPLE_NAME} (MB/Hour)")
+    ax.set_title(f"Yield for {SAMPLE_NAME} over run duration")
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot.png"))
@@ -313,14 +314,16 @@ def plot_yield_by_quality():
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
     ax.set_title(f"Yield for {SAMPLE_NAME}")
     ax.stackplot(YIELD_DATA['duration_float'],
-                 [yield_data_by_quality[description]['cumsum_bp'] for description in reversed(QUALITY_DESCRIPTIONS)],
+                 [yield_data_by_quality[description]['cumsum_bp']
+                  for description in reversed(QUALITY_DESCRIPTIONS)],
                  colors=reversed(QUALITY_COLOURS))
     # Convert bases to appropriate level
     formatter_y = FuncFormatter(y_yield_to_human_readable)
 
     # creating the legend manually
     ax.yaxis.set_major_formatter(formatter_y)
-    ax.legend([mpatches.Patch(color=colour) for colour in reversed(QUALITY_COLOURS)],
+    ax.legend([mpatches.Patch(color=colour)
+               for colour in reversed(QUALITY_COLOURS)],
               reversed(QUALITY_DESCRIPTIONS), loc=2)
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot_by_quality.png"))
 
@@ -426,7 +429,7 @@ def plot_pore_yield_hist():
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
         s = humanize.naturalsize((bins[1]-bins[0])*y*new_yield_data.count(), gnu=True)
-        return s
+        return s.replace("B", "")
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
     # Set the titles and axis labels
