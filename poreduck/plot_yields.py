@@ -222,12 +222,10 @@ def add_csv_data_to_dataframes():
 
 def aggregate_dataframes():
     global ALL_READS
-    first_dataframe = True
     for bin_number, read_set in READ_SETS.items():
         if read_set.aggregated_to_global_dataframe:
             continue
-        if first_dataframe:
-            first_dataframe = False
+        if ALL_READS is None:
             columns = list(read_set.df.columns)
             ALL_READS = pd.DataFrame(columns=columns)
         ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
