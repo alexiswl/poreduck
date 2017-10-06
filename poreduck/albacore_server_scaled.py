@@ -688,6 +688,9 @@ def move_fastq_file(subfolder):
             LOGGER.info("It seems like we have more than 1 file here", fastq_files)
 
         fastq_file_index = -1
+        barcode_dir = os.path.join(FASTQ_DIR, barcode)
+        if not os.path.isdir(barcode_dir):
+            os.mkdir(barcode_dir)
 
         for fastq_file in fastq_files:
             fastq_file_index += 1
@@ -696,14 +699,19 @@ def move_fastq_file(subfolder):
                                                                                   barcode,
                                                                                   str(fastq_file_index),
                                                                                   "fastq"]))
+                # Create move command and run through subprocess.
+                move_command = f"mv {fastq_file} {os.path.join(barcode_dir, new_fastq_file)}"
+                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
+
             else:
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
                                                                                   str(fastq_file_index),
                                                                                   "fastq"]))
 
-            # Create move command and run through subprocess.
-            move_command = f"mv {fastq_file} {os.path.join(FASTQ_DIR, new_fastq_file)}"
-            LOGGER.info(f"Moving fastq files in {subfolder.workspace_dir} to {FASTQ_DIR}")
+
+                # Create move command and run through subprocess.
+                move_command = f"mv {fastq_file} {os.path.join(FASTQ_DIR, new_fastq_file)}"
+                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
             move_proc = subprocess.Popen(move_command, shell=True,
                                          stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             stdout, stderr = move_proc.communicate()
@@ -712,7 +720,7 @@ def move_fastq_file(subfolder):
             if not stdout == "" or not stderr == "":
                 LOGGER.info(f"Output of mv command is:\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
 
-    # Set as complete so we don't have to do it again.
+    # Set as complete so we don't try to do it again.
     subfolder.fastq_moved = True
     update_dataframe(subfolder)
 
