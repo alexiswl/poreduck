@@ -26,6 +26,7 @@ This script will create a yield plot of the data that has been created by the
 albacore_server_scaled.py script and placed in the folder transfer_fast5_to_server.py
 As it takes some time to handle and format the data such that the yield plots can be used...
 we might as well make a bunch of plots to go along with it!
+Create plots for barcoding samples coming soon! - Will need a higher level of abstraction
 """
 
 # Before we begin, are we using python 3.6 or greater?
