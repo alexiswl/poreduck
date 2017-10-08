@@ -255,7 +255,7 @@ def plot_yield_general():
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
-    num_points = 6
+    num_points = 7  # Need to include zero point.
     x_ticks = np.linspace(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max(), num_points)
     ax.set_xticks(x_ticks)
     # Define axis formatters
@@ -265,7 +265,7 @@ def plot_yield_general():
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
-    ax.set_title(f"Yield for {SAMPLE_NAME} over run duration")
+    ax.set_title(f"Yield for {SAMPLE_NAME} over time")
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot.png"))
@@ -301,7 +301,7 @@ def plot_yield_by_quality():
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
-    num_points = 6
+    num_points = 7  # Need to include zero point
     x_ticks = np.linspace(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max(), num_points)
     ax.set_xticks(x_ticks)
     # Define axis formatters
@@ -311,7 +311,7 @@ def plot_yield_by_quality():
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
     ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
-    ax.set_title(f"Yield for {SAMPLE_NAME}")
+    ax.set_title(f"Yield for {SAMPLE_NAME} over time by quality")
     ax.stackplot(YIELD_DATA['duration_float'],
                  [yield_data_by_quality[description]['cumsum_bp']
                   for description in reversed(QUALITY_DESCRIPTIONS)],

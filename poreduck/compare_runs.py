@@ -114,7 +114,7 @@ def plot_read_length_hist():
     all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
     # Plot the histogram using pyjoyplot
     ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist", order=sorted([run.name for run in RUNS]),
-                  bins=bins, weights=True)
+                  bins=bins, weights=True, figsize=[12, 12])
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Set labels of axis.
