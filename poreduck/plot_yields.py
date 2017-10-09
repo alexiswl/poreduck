@@ -92,9 +92,6 @@ class Read_Set:
         self.added_csv_data = False
         self.aggregated_to_global_dataframe = False
 
-    def read_csv(self):
-        self.df = pd.read_csv(self.csv_path, header=0, parse_dates=['ctime'], date_parser=DATEPARSE_CSV)
-
     def read_fastq(self):
         if not os.path.isfile(self.fastq_path):
             print("Could not find path")
@@ -227,6 +224,7 @@ def aggregate_dataframes():
         if read_set.aggregated_to_global_dataframe:
             continue
         if ALL_READS is None:
+            # Initialise ALL_READS dataframe on first iteration
             ALL_READS = read_set.df.copy()
         else:
             ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
@@ -250,7 +248,6 @@ def print_stats():
     # Describe the quality of the sequences
     av_qual_describe = ALL_READS["av_qual"].describe().to_string()
     # Calculate the N50 of the read lengths
-    n50_found = False
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
     seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
@@ -280,7 +277,7 @@ def print_stats():
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
         output_handle.writelines(f"\t{qual_line}\n"
-                            for qual_line in av_qual_describe.split("\n"))
+                                 for qual_line in av_qual_describe.split("\n"))
         output_handle.write("N50 value:\n")
         output_handle.write(f"\t{n50}\n")
         output_handle.write("Run duration\n")
@@ -295,13 +292,16 @@ def assign_yield_data():
     # Aggregate seq length for each minute of sequencing. I love this resample command!
     YIELD_DATA.set_index('time', inplace=True)
     YIELD_DATA = YIELD_DATA.resample("1T").sum()
-    YIELD_DATA.reset_index(inplace=True)
+    # Reset index but keep time as a column
+    YIELD_DATA.reset_index(inplace=True, drop=False)
     # Generate a cumulative sum of sequence data
     YIELD_DATA['cumsum_bp'] = YIELD_DATA['seq_length'].cumsum()
     # Convert time to timedelta format and then to float format, in seconds.
     YIELD_DATA['duration_tdelta'] = YIELD_DATA['time'].apply(lambda t: t - YIELD_DATA['time'].min())
     # Create a duration float.
     YIELD_DATA['duration_float'] = YIELD_DATA['duration_tdelta'].apply(lambda t: t.total_seconds())
+    # Write to csv to debug
+    YIELD_DATA.to_csv("yield_data.debug.csv", header=True)
 
 
 def plot_yield_general():
