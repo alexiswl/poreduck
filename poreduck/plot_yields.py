@@ -253,7 +253,7 @@ def print_stats():
     n50_found = False
     n50 = 0
     while not n50_found:
-        for index, seq_value in pd.iterrows(ALL_READS['seq_length'].sort_values()):
+        for index, seq_value in ALL_READS['seq_length'].sort_values().iterrows():
             if (ALL_READS['seq_length'][:index-1].sum() <= ALL_READS['seq_length'][index-1:].sum()
                 and ALL_READS['seq_length'][:index].sum() >= ALL_READS['seq_length'][index:].sum()):
                 n50_found = True
