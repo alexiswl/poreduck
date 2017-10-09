@@ -807,8 +807,8 @@ def get_subfolders():
     """
     global SUBFOLDERS
     # Get a list of tarballs
-    subfolders = [tarred_folder.replace(".tar.gz", "") for tarred_folder
-                  in os.listdir(READS_DIR) if tarred_folder.endswith(".tar.gz")]
+    subfolders = sorted([tarred_folder.replace(".tar.gz", "") for tarred_folder
+                         in os.listdir(READS_DIR) if tarred_folder.endswith(".tar.gz")])
     for subfolder in subfolders:
         is_initialised = False
         for initialised_subfolder in SUBFOLDERS:
