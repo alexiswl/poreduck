@@ -121,8 +121,8 @@ class Read_Set:
         # Convert columns to correct format
         self.df['seq_length'] = pd.to_numeric(self.df["seq_length"])
         self.df['av_qual'] = pd.to_numeric(self.df['av_qual'])
-        # self.df['time'] = pd.to_datetime(self.df['time'], format="%Y-%m-%dT%H:%M:%SZ")
-        self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
+        self.df['time'] = pd.to_datetime(self.df['time'], format="%Y-%m-%dT%H:%M:%SZ")
+        # self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
         # Tick the box that we have added the fastq to a dataframe
         self.added_fastq_data = True
 
@@ -140,7 +140,7 @@ class Read_Set:
             read_csv = str(csv_row.read_no)
             try:
                 df_index = self.df.query("channel==@channel_csv & read==@read_csv").index.tolist()[0]
-            except IndexError: 
+            except IndexError:
                 continue
             # Write value to dictionary with index of our fastq dataframe as the key
             muxs[df_index] = csv_row.mux
@@ -232,6 +232,48 @@ def aggregate_dataframes():
         ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
         read_set.aggregated_to_global_dataframe = True
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True])
+
+
+def print_stats():
+    """
+    List of stats:
+    cumsum of ALL_READS["seq_length"]
+    Describe seq_length
+    Describe av_qual
+    Calculate N50 of read length.
+    Estimated run duration.
+    """
+    # Get total yield
+    total_bp = ALL_READS["seq_length"].sum()
+    # Describe the seq_length histogram
+    total_bp_describe = ALL_READS["seq_length"].describe().tostring()
+    # Describe the quality of the sequences
+    av_qual_describe = ALL_READS["av_qual"].describe().tostring()
+    # Calculate the N50 of the read lengths
+    n50_found = False
+    n50 = 0
+    while not n50_found:
+        for index, seq_value in pd.iterrows(ALL_READS['seq_length'].sort_values()):
+            if (ALL_READS['seq_length'][:index-1].sum() <= ALL_READS['seq_length'][index-1:].sum()
+                and ALL_READS['seq_length'][:index].sum() >= ALL_READS['seq_length'][index:].sum()):
+                n50_found = True
+                n50 = seq_value
+    # Get run duration, from first read to last read.
+    run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
+
+    # Now print the stats
+    with open("run_stats.txt", "w") as output_handle:
+        # Print total basepairs
+        output_handle.writelines("Total basepairs:")
+        output_handle.writelines(f"\t{total_bp}")
+        output_handle.writelines("Description of Read Lengths:")
+        output_handle.write(total_bp_describe)
+        output_handle.writelines("Description of Read Qualities:")
+        output_handle.write(av_qual_describe)
+        output_handle.writelines("N50 value:")
+        output_handle.writelines(n50)
+        output_handle.writelines("Run duration")
+        output_handle.writelines(run_duration)
 
 
 def assign_yield_data():
@@ -526,6 +568,7 @@ def main(args):
         if CSV_DIR is not "":
             add_csv_data_to_dataframes()
         aggregate_dataframes()
+        print_stats()
         assign_yield_data()
         run_plot_commands()
         if not is_basecalling():
