@@ -50,6 +50,10 @@ SAMPLE_NAME = ""
 YIELD_DATA = None
 QUALITY_DESCRIPTIONS = ["bad", "alright", "better", "best"]
 QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
+
+QUALITY_DESCRIPTIONS.reverse()
+QUALITY_COLOURS.reverse()
+
 CLIP = False
 
 # Import arguments.
@@ -229,7 +233,7 @@ def aggregate_dataframes():
         else:
             ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
         read_set.aggregated_to_global_dataframe = True
-    ALL_READS = ALL_READS.sort_values(['time'], ascending=[True])
+    ALL_READS = ALL_READS.sort_values(['time'], ascending=[True]).reset_index(drop=True)
 
 
 def print_stats():
@@ -367,16 +371,14 @@ def plot_yield_by_quality():
     ax.set_title(f"Yield for {SAMPLE_NAME} over time by quality")
     ax.stackplot(YIELD_DATA['duration_float'],
                  [yield_data_by_quality[description]['cumsum_bp']
-                  for description in reversed(QUALITY_DESCRIPTIONS)],
-                 colors=reversed(QUALITY_COLOURS))
-    # Convert bases to appropriate level
-    formatter_y = FuncFormatter(y_yield_to_human_readable)
-
-    # creating the legend manually
-    ax.yaxis.set_major_formatter(formatter_y)
+                  for description in QUALITY_DESCRIPTIONS],
+                 colors=QUALITY_COLOURS)
+    # Add legend to plot.
     ax.legend([mpatches.Patch(color=colour)
-               for colour in reversed(QUALITY_COLOURS)],
-              reversed(QUALITY_DESCRIPTIONS), loc=2)
+               for colour in QUALITY_COLOURS],
+              QUALITY_DESCRIPTIONS, loc=2)
+    # Ensure labels are not missed.
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot_by_quality.png"))
 
 
@@ -465,7 +467,9 @@ def plot_poremap():
     # Create line down the middle as shown in MinKNOW.
     ax.axvline([8], color='white', lw=15)
     # Nice big title!
-    ax.set_title("Map of Yield by Channel", fontsize=25);
+    ax.set_title("Map of Yield by Channel", fontsize=25)
+    # Ensure labels are not missed.
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_map_by_pore.png"))
 
 
@@ -489,6 +493,8 @@ def plot_pore_yield_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Yield in single pore")
     ax.set_ylabel("Pores per bin")
+    # Ensure labels are not missed.
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_hist_yield_by_pore.png"))
 
 
@@ -575,6 +581,7 @@ def main(args):
             get_csv_files()
         if len(list(set(FASTQ_FILES).difference(current_fastq_files))) == 0:
             have_a_break()
+            continue
         import_fastq()
         if CSV_DIR is not "":
             add_csv_data_to_dataframes()
