@@ -279,12 +279,12 @@ def print_stats():
                                  for qual_line in total_bp_describe.split("\n"))
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
-        output_handle.write(f"\t{qual_line}\n"
+        output_handle.writelines(f"\t{qual_line}\n"
                             for qual_line in av_qual_describe.split("\n"))
-        output_handle.writelines("N50 value:\n")
-        output_handle.writelines(f"\t{n50}\n")
-        output_handle.writelines("Run duration\n")
-        output_handle.writelines(f"\t{run_duration}\n")
+        output_handle.write("N50 value:\n")
+        output_handle.write(f"\t{n50}\n")
+        output_handle.write("Run duration\n")
+        output_handle.write(f"\t{run_duration}\n")
 
 
 def assign_yield_data():
