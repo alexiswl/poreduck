@@ -277,7 +277,7 @@ def print_stats():
         output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
-        output_handle.writelines(f"\t{qual_line)}\n"
+        output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in total_bp_describe.split("\n"))
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
