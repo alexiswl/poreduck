@@ -252,7 +252,7 @@ def print_stats():
     # Calculate the N50 of the read lengths
     n50_found = False
     n50 = 0
-    seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values()
+    seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
     seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
     for index, seq_value in seq_length_sorted_as_series.iteritems():
         if (seq_length_cumsum_as_series[index] <= total_bp*0.5

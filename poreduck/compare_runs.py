@@ -84,7 +84,6 @@ def plot_read_length_hist():
     SEQ_DFS = [run.all_data["seq_length"] for run in RUNS]
     print(SEQ_DFS[0].dtype)
     # Define how many plots we want (1)
-    #fig, ax = plt.subplots(1)
     if CLIP:
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
