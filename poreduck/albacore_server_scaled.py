@@ -363,7 +363,7 @@ def check_directories():
     if not os.path.isdir(LOGGER_DIR):
         os.mkdir(LOGGER_DIR)
     LOGGER_PATH = os.path.join(LOGGER_DIR, '.'.join([str(datetime.now().date()),
-                                                     str(datetime.now().time()),
+                                                     str(datetime.now().time()).replace(":", "-"),
                                                      "albacore_pipeline.log"]))
 
     if not STATUS_CSV == "":

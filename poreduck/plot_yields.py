@@ -247,6 +247,7 @@ def print_stats():
     """
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
+    total_bp_h = humanize.naturalsize(total_bp, gnu=True).replace("B", "b")
     # Describe the seq_length histogram
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
@@ -260,20 +261,20 @@ def print_stats():
             and seq_length_cumsum_as_series[index+1] >= total_bp*0.5):
             n50 = seq_value
             break
-
+    n50_h = humanize.naturalsize(n50, gnu=True).replace("B", "b")
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
     days, seconds = run_duration.days, run_duration.seconds
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
-    run_duration = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
+    run_duration_h = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
     with open("run_stats.txt", "w") as output_handle:
         # Print total basepairs
         output_handle.write("Total basepairs:\n")
-        output_handle.write(f"\t{total_bp}\n")
+        output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
         output_handle.writelines(f"\t{qual_line}\n"
@@ -283,9 +284,9 @@ def print_stats():
         output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in av_qual_describe.split("\n"))
         output_handle.write("N50 value:\n")
-        output_handle.write(f"\t{n50}\n")
+        output_handle.write(f"\t{n50}\t|\t{n50_h}\n")
         output_handle.write("Run duration\n")
-        output_handle.write(f"\t{run_duration}\n")
+        output_handle.write(f"\t{run_duration.total_seconds()}\t|\t{run_duration_h}\n")
 
 
 def assign_yield_data():
@@ -295,7 +296,7 @@ def assign_yield_data():
     YIELD_DATA = ALL_READS[['time', "seq_length"]]
     # Aggregate seq length for each minute of sequencing. I love this resample command!
     YIELD_DATA.set_index('time', inplace=True)
-    YIELD_DATA = YIELD_DATA.resample("1T").sum()
+    YIELD_DATA = YIELD_DATA.resample("1T").sum().fillna(0)
     # Reset index but keep time as a column
     YIELD_DATA.reset_index(inplace=True, drop=False)
     # Generate a cumulative sum of sequence data
@@ -527,8 +528,9 @@ def y_yield_to_human_readable(y, position):
 
 def x_yield_to_human_readable(x, position):
     # Convert time in seconds to hours or minutes
-    hours = int(x/3600)
-    minutes = int((x - 3600*hours)/60)
+    hours = x // 3600
+    minutes = (x % 3600) // 60
+    seconds = x % 60
     if x == 0:
         return 0
     s = f"{hours:02d}:{minutes:02d}"
