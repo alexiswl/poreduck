@@ -246,9 +246,9 @@ def print_stats():
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
     # Describe the seq_length histogram
-    total_bp_describe = ALL_READS["seq_length"].describe().tostring()
+    total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
-    av_qual_describe = ALL_READS["av_qual"].describe().tostring()
+    av_qual_describe = ALL_READS["av_qual"].describe().to_string()
     # Calculate the N50 of the read lengths
     n50_found = False
     n50 = 0
