@@ -27,6 +27,8 @@ import logging
 import fileinput
 from datetime import datetime
 from pathlib import Path
+import shutil
+import gzip
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -114,6 +116,8 @@ class Subfolder:
         self.albacore_tarred = False
         self.folder_removed = False
         self.fastq_moved = False
+        self.fastq_gzipped = False
+
 
     def to_series(self):
         return pd.Series(data=[self.name,
@@ -196,8 +200,8 @@ def main(args):
 
     # Merge fastq files at the end of the run.
     generate_dataframe()    
-    #merge_fastq_files_wrapper()
     remove_basecalling_lock_file()
+
 
 def run_pipeline():
     # Extract tarballs
@@ -230,6 +234,11 @@ def run_pipeline():
      if subfolder.albacore_complete and
      not subfolder.fastq_moved]
 
+    # Gzip fastq file in the FASTQ_DIR
+    [gzip_fastq_file(subfolder) for subfolder in SUBFOLDERS
+     if subfolder.fastq_moved and
+     not subfolder.fastq_gzipped]
+
     # Tar albacore directory
     [tar_albacore_folder(subfolder) for subfolder in SUBFOLDERS
      if subfolder.albacore_complete and
@@ -238,60 +247,11 @@ def run_pipeline():
 
 """
 General script initialisation functions
-1. get_arguments
-2. set_global_variables
-3. check_directories
-4. set_logger
+1. set_global_variables
+2. check_directories
+3. set_logger
 4. pick_up_from_previous_run
 """
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser(
-        description="The albacore-server scaled command incorporates qsub to spread " +
-                    "the server load and rapidly " + "generate data off the MinION.")
-    parser.add_argument("--reads_dir", type=str, required=True,
-                        help="/path/to/reads, " +
-                             "should have a bunch of tar zipped files in it.")
-    parser.add_argument("--flowcell", type=str, choices=FLOWCELLS,
-                        help="Pick a flowcell version")
-    parser.add_argument("--kit", type=str, choices=KITS,
-                        help="Pick a kit type")
-    parser.add_argument("--output_dir", type=str, required=False, default=None,
-                        help="Will be called 'albacore'" +
-                             " and sit adjacent to the reads folder if left blank.")
-    parser.add_argument("--num_threads", type=int, required=False, default=5,
-                        help="How many threads did you wish to use " +
-                             "per parallel output default is 5.")
-    parser.add_argument("--fastq_dir", type=str, required=False, default=None,
-                        help="Where should the fastq data be placed." +
-                             "Will be called 'fastq'" +
-                             "and sit adjacent to reads folder if left blank.")
-    parser.add_argument("--resume", type=str, required=False, default=None,
-                        help="Resume the albacore run, need a csv file")
-    parser.add_argument("--qsub_directory", type=str, required=False, default=None,
-                        help="Where would you like to place the qsub files?")
-    parser.add_argument("--qsub_host", type=str, required=False, default=None,
-                        help="Where would you like the qsub jobs to be run?")
-    parser.add_argument("--max_processes", type=int, required=False, default=None,
-                        help="Limit the number of jobs that can be processed at any given moment." +
-                             "This command will prevent extraction/albacore jobs from being submitted while" +
-                             "there exists 'max_processes' jobs running / in the queue.")
-    parser.add_argument("--log_directory", type=str, required=False, default=None,
-                        help="Where do you wish to store the poreduck logs? " +
-                             "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
-    parser.add_argument("--barcoding", default=False, dest='barcoding', action='store_true',
-                        help="Use this option to demultiplex library?")
-    parser.add_argument("--qsub_type", choices=QSUB_TYPES, default="SGE",
-                        help="What qsub system are you using?")
-    parser.add_argument("--qsub_extraction_template", type=str, required=True,
-                        help="The qsub extraction template for your qsub command. " +
-                             "Check the poreduck examples for more information.")
-    parser.add_argument("--qsub_albacore_template", type=str, required=True,
-                        help="The qsub albacore template for your qsub command. " +
-                             "Check the poreduck examples for more information.")
-
-    return parser.parse_args()
 
 
 def set_global_variables(args):
@@ -459,16 +419,9 @@ def extract_tarred_read_set(subfolder):
                              "WORKING_DIRECTORY": READS_DIR}
 
     # Copy the standard qsub file from the main folder to the qsub folder
-    cp_command = f"cp {QSUB_EXTRACTION_TEMPLATE} {subfolder.extracted_submission_file}"
-    cp_proc = subprocess.Popen(cp_command, shell=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = cp_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
+    shutil.copy(QSUB_EXTRACTION_TEMPLATE, subfolder.extracted_submission_file)
 
-    if not stdout == "" or not stderr == "":
-        print("Copy command:", stdout, stderr)
-
+    # Now manipulate the submission file based on the replacement dict
     with fileinput.FileInput(subfolder.extracted_submission_file, inplace=True) as file:
         # Now edit this file based on our inputs.
         for line in file:
@@ -552,16 +505,9 @@ def run_albacore(subfolder):
                              "WORKING_DIRECTORY": ALBACORE_DIR}
 
     # Copy the standard qsub file from the main folder to the qsub folder
-    cp_command = f"cp {QSUB_ALBACORE_TEMPLATE} {subfolder.albacore_submission_file}"
-    cp_proc = subprocess.Popen(cp_command, shell=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = cp_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
+    shutil.copy(QSUB_ALBACORE_TEMPLATE, subfolder.albacore_submission_file)
 
-    if not stdout == "" or not stderr == "":
-        print("Copy command:", stdout, stderr)
-
+    # Manipulate submission file based on replacement dict.
     with fileinput.FileInput(subfolder.albacore_submission_file, inplace=True) as file:
         # Now edit this file based on our inputs.
         for line in file:
@@ -625,18 +571,9 @@ def remove_folder(subfolder):
         LOGGER.info("Um... the archive doesn't exist, I'm not going to delete the folder")
         return
 
-    # Generate remove command
-    remove_command = f"rm -rf {os.path.join(READS_DIR, subfolder.name)}"
-
-    # Run remove command through subprocess
-    remove_proc = subprocess.Popen(remove_command, shell=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = remove_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
-    if not stdout == "" or stderr == "":
-        LOGGER.info(f"Output of deleting folder command is\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    update_dataframe(subfolder)
+    # Remove opened fast5 folder
+    LOGGER.info(f"Deleting {os.path.join(READS_DIR, subfolder.name)}")
+    shutil.rmtree(os.path.join(READS_DIR, subfolder.name))
 
 
 def move_fastq_file(subfolder):
@@ -687,42 +624,61 @@ def move_fastq_file(subfolder):
         if len(fastq_files) > 1:
             LOGGER.info("It seems like we have more than 1 file here", fastq_files)
 
-        fastq_file_index = -1
         barcode_dir = os.path.join(FASTQ_DIR, barcode)
         if not os.path.isdir(barcode_dir) and BARCODING:
             os.mkdir(barcode_dir)
 
-        for fastq_file in fastq_files:
-            fastq_file_index += 1
+        for index, fastq_file in enumerate(fastq_files):
             if BARCODING or CHOSEN_KIT == "SQK-LSK308":
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
                                                                                   barcode,
-                                                                                  str(fastq_file_index),
+                                                                                  str(index),
                                                                                   "fastq"]))
-                # Create move command and run through subprocess.
-                move_command = f"mv {fastq_file} {os.path.join(barcode_dir, new_fastq_file)}"
-                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
-
             else:
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
-                                                                                  str(fastq_file_index),
+                                                                                  str(index),
                                                                                   "fastq"]))
 
-
-                # Create move command and run through subprocess.
-                move_command = f"mv {fastq_file} {os.path.join(FASTQ_DIR, new_fastq_file)}"
-                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
-            move_proc = subprocess.Popen(move_command, shell=True,
-                                         stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            stdout, stderr = move_proc.communicate()
-            stdout = stdout.decode()
-            stderr = stderr.decode()
-            if not stdout == "" or not stderr == "":
-                LOGGER.info(f"Output of mv command is:\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
+            # Create move command and run through subprocess.
+            LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
+            shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
 
     # Set as complete so we don't try to do it again.
     subfolder.fastq_moved = True
     update_dataframe(subfolder)
+
+
+def gzip_fastq_file(subfolder):
+    # Get fastq files
+    if BARCODING:
+        barcode_dirs = [os.path.join(FASTQ_DIR, barcode_dir)
+                        for barcode_dir in os.listdir(FASTQ_DIR)
+                        if os.path.isdir(os.path.join(FASTQ_DIR, barcode_dir))
+                        and barcode_dir.startswith("barcode")]
+        fastq_files = [os.path.join(barcode_dir, fastq_file)
+                       for barcode_dir in barcode_dirs
+                       for fastq_file in os.listdir(barcode_dir)
+                       if os.path.isfile(os.path.join(barcode_dir, fastq_file))
+                       and ".".join(fastq_file.split(".")[:-2]) == subfolder.name
+                       and fastq_file.endswith(".fastq")
+                       ]
+    else:
+        fastq_files = [os.path.join(FASTQ_DIR, fastq_file)
+                       for fastq_file in os.listdir(FASTQ_DIR)
+                       if os.path.isfile(os.path.join(FASTQ_DIR, fastq_file))
+                       and ".".join(fastq_file.split(".")[:-2]) == subfolder.name
+                       and fastq_file.endswith(".fastq")
+                       ]
+
+    # Now gzip fastq file then remove original.
+    for fastq_file in fastq_files:
+        # Gzip fastq file with gzip python module
+        fastq_gzipped = fastq_file + ".gz"
+        with open(fastq_file) as f_in, gzip.open(fastq_gzipped, 'wb') as f_out:
+            f_out.writelines(f_in)
+        # Remove fastq file
+        os.remove(fastq_file)
+    subfolder.fastq_gzipped = True
 
 
 def tar_albacore_folder(subfolder):
@@ -745,45 +701,6 @@ def tar_albacore_folder(subfolder):
     subfolder.albacore_tarred = True
     os.chdir(READS_DIR)
 
-
-def merge_fastq_files_wrapper():
-    """ Merge all of the fastq files in the fastq directory to all.fastq"""
-
-    if BARCODING:
-        # fastq_file: 0003_49335_plasmids.barcode07.0.fastq
-        # Get list of final fastq files
-        fastq_files = [os.path.join(FASTQ_DIR, fastq_file) for fastq_file in os.listdir(FASTQ_DIR)
-                       if len(fastq_file.split(".")) >= 3  
-                       and (fastq_file.split(".")[-3].startswith("barcode")
-                            or fastq_file.split(".")[-3] == "unclassified")
-                       and "all" not in fastq_file]
-        # Group fastq files by barcode
-        fastq_by_barcodes = {}
-        for fastq_file in fastq_files:
-            barcode = fastq_file.split(".")[-3]
-            if barcode not in fastq_by_barcodes:
-                fastq_by_barcodes[barcode] = [fastq_file]
-            else:
-                fastq_by_barcodes[barcode].append(fastq_file)
-        for barcode, fastq_files in fastq_by_barcodes.items():
-            concatenated_fastq_file = os.path.join(FASTQ_DIR, barcode + ".all.fastq")
-            merge_fastq_files(fastq_files, concatenated_fastq_file)
-    else:
-        concatenated_fastq_file = os.path.join(FASTQ_DIR, "all.fastq")
-        fastq_files = [os.path.join(FASTQ_DIR, fastq) for fastq in os.listdir(FASTQ_DIR)
-                       if fastq.endswith(".fastq") and not fastq == "all.fastq"]
-        merge_fastq_files(fastq_files, concatenated_fastq_file)
-
-
-def merge_fastq_files(fastq_files, concatenated_fastq_file):
-    LOGGER.info(f"Concatenating all of the fastq files in {FASTQ_DIR} to {concatenated_fastq_file}")
-    for fastq_file in fastq_files:
-        concat_command = f"cat {fastq_file} >> {concatenated_fastq_file}"
-        concat_proc = subprocess.Popen(concat_command, shell=True,
-                                       stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        stdout, stderr = concat_proc.communicate()
-        if not stdout == "" or not stderr == "":
-            LOGGER.info(f"Output of cat command is:\nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
 
 """
 Miscellaneous pipeline non-core functions

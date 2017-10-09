@@ -39,16 +39,15 @@ QSUB_TYPES = ["SGE", "TORQUE", "SLURM"]
 
 # Define main script:
 
+
 def main():
-    ## Create poreduck parser
+    # Create poreduck parser
     parser = argparse.ArgumentParser(prog='poreduck', description="poreduck package")
-                                     #usage="Choose from 'transfer_fast5_to_server, albacore_server_scaled and plot_yields'")
     parser.add_argument("--version", help="Get version of poreduck",
                         action="version",
                         version=poreduck.__version__)
 
     subparsers = parser.add_subparsers(help="Callable poreduck functions", dest="command")
-
 
     # Transfer to server arguments
     transfer_parser = subparsers.add_parser('transfer_to_server',
@@ -146,7 +145,6 @@ def main():
     plot_parser.add_argument("--sample_name", type=str, required=False,
                              help="Name to add onto each of the plots")
     plot_parser.set_defaults(func=run_function)
-
 
     # Compare arguments
     compare_parser = subparsers.add_parser('compare_plots',
