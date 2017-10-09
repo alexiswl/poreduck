@@ -227,9 +227,9 @@ def aggregate_dataframes():
         if read_set.aggregated_to_global_dataframe:
             continue
         if ALL_READS is None:
-            columns = list(read_set.df.columns)
-            ALL_READS = pd.DataFrame(columns=columns)
-        ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
+            ALL_READS = read_set.df.copy()
+        else:
+            ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
         read_set.aggregated_to_global_dataframe = True
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True])
 
@@ -265,7 +265,7 @@ def print_stats():
     days, seconds = run_duration.days, run_duration.seconds
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    seconds  = seconds % 60
+    seconds = seconds % 60
     run_duration = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
