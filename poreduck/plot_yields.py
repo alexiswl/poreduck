@@ -13,7 +13,7 @@ if platform.system() == 'Linux':
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as mpatches
-import humanize
+import humanfriendly
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 from itertools import chain
@@ -247,16 +247,16 @@ def print_stats():
     """
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
-    total_bp_h = humanize.naturalsize(total_bp, gnu=True).replace("B", "") + "b"
+    total_bp_h = humanfriendly.format_size(total_bp, binary=False).replace("B", "") + "b"
     # Describe the seq_length histogram
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
     av_qual_describe = ALL_READS["av_qual"].describe().to_string()
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
     total_bp_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
-                                   for qual_line in total_bp_describe])
+                                   for qual_line in total_bp_describe.split("\n")])
     av_qual_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
-                                   for qual_line in av_qual_describe])
+                                   for qual_line in av_qual_describe.split("\n")])
     # Calculate the N50 of the read lengths
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
@@ -266,7 +266,7 @@ def print_stats():
             and seq_length_cumsum_as_series[index+1] >= total_bp*0.5):
             n50 = seq_value
             break
-    n50_h = humanize.naturalsize(n50, gnu=True).replace("B", "") + "b"
+    n50_h = humanfriendly.format_size(n50, binary=False).replace("B", "") + "b"
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
     days, seconds = run_duration.days, run_duration.seconds
@@ -404,7 +404,7 @@ def plot_read_length_hist():
         num_bins = 50
         if y == 0:
             return 0
-        s = humanize.naturalsize(seq_df.sum() * seq_df.count() * y / num_bins, gnu=True)
+        s = humanfriendly.format_size(seq_df.sum() * seq_df.count() * y / num_bins, binary=False)
         return s + "b"
 
     # Define how many plots we want (1)
@@ -494,7 +494,7 @@ def plot_pore_yield_hist():
 
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
-        s = humanize.naturalsize((bins[1]-bins[0])*y*new_yield_data.count(), gnu=True)
+        s = humanfriendly.format_size((bins[1]-bins[0])*y*new_yield_data.count(), binary=False)
         return s.replace("B", "")
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
@@ -513,7 +513,7 @@ def y_hist_to_human_readable(y, position):
     num_bins = 50
     if y == 0:
         return 0
-    s = humanize.naturalsize(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/num_bins, gnu=True)
+    s = humanfriendly.format_size(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/num_bins, binary=False)
 
     return s + "b"
 
@@ -522,7 +522,7 @@ def x_hist_to_human_readable(x, position):
     # Convert distribution to base pairs
     if x == 0:
         return 0
-    s = humanize.naturalsize(x, gnu=True)
+    s = humanfriendly.format_size(x, binary=False)
     return s + "b"
 
 
@@ -530,7 +530,7 @@ def y_yield_to_human_readable(y, position):
     # Convert distribution to base pairs
     if y == 0:
         return 0
-    s = humanize.naturalsize(y, gnu=True)
+    s = humanfriendly.format_size(y, binary=False)
 
     return s + "b"
 
