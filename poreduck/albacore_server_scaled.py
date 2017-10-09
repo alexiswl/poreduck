@@ -19,16 +19,15 @@ This allows the transfer_fast5_to_server.py script to know when to stop looking.
 # Import necessary modules
 import os  # General directory list stuff
 import subprocess  # Executing each of the qsub commands.
-import argparse  # For allowing users to configure the arguments used.
 import sys  # For errors
 import time  # For schnoozing!
 import pandas as pd  # For the status.csv file
-import logging
-import fileinput
-from datetime import datetime
-from pathlib import Path
-import shutil
-import gzip
+import logging  # For logging
+import fileinput  # Manipulating sge files
+from datetime import datetime  # Logging times of actions
+from pathlib import Path  # Creating lock files
+import shutil  # Deleting opened directories
+import gzip  # Gzipping fastq files.
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -117,7 +116,6 @@ class Subfolder:
         self.folder_removed = False
         self.fastq_moved = False
         self.fastq_gzipped = False
-
 
     def to_series(self):
         return pd.Series(data=[self.name,

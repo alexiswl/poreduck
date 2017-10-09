@@ -255,21 +255,21 @@ def print_stats():
     print(total_bp_describe, av_qual_describe)
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
     try:
-        total_bp_describe = '\n'.join([qual_line.split()[0] + "\t" + "{8:2f}".format(qual_line.split()[1])
+        total_bp_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(qual_line.split()[1])
                                        for qual_line in total_bp_describe.split("\n")])
-        av_qual_describe = '\n'.join([qual_line.split()[0] + "\t" + "{8:2f}".format(qual_line.split()[1])
+        av_qual_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(qual_line.split()[1])
                                       for qual_line in av_qual_describe.split("\n")])
     except IndexError:
         print("index error", total_bp_describe, av_qual_describe)
-        print([my_line for my_line in total_bp_describe])
-        print([my_line for my_line in av_qual_describe])
+        print([my_line for my_line in total_bp_describe.split("\n")])
+        print([my_line for my_line in av_qual_describe.split("\n")])
     # Calculate the N50 of the read lengths
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
     seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
     for index, seq_value in seq_length_sorted_as_series.iteritems():
-        if (seq_length_cumsum_as_series[index] <= total_bp*0.5
-            and seq_length_cumsum_as_series[index+1] >= total_bp*0.5):
+        if (seq_length_cumsum_as_series[index] <= total_bp*0.5 <=
+                seq_length_cumsum_as_series[index+1]):
             n50 = seq_value
             break
     n50_h = humanfriendly.format_size(n50, binary=False).replace("B", "") + "b"
@@ -278,7 +278,7 @@ def print_stats():
     days, seconds = run_duration.days, run_duration.seconds
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
+    seconds %= seconds
     run_duration_h = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
@@ -288,7 +288,7 @@ def print_stats():
         output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
-        output_handle.writelines(f"\t{qual_line}"
+        output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in total_bp_describe.split("\n"))
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
