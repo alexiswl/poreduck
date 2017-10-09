@@ -260,26 +260,26 @@ def print_stats():
             n50 = seq_value
             break
 
-# Get run duration, from first read to last read.
+    # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
 
     # Now print the stats
     with open("run_stats.txt", "w") as output_handle:
         # Print total basepairs
-        output_handle.writelines("Total basepairs:")
-        output_handle.writelines(f"\t{total_bp}")
-        output_handle.writelines("Description of Read Lengths:")
+        output_handle.write("Total basepairs:\n")
+        output_handle.write(f"\t{total_bp}\n")
+        output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
-        output_handle.write("\n".join(["\t" + qual_line
-                                       for qual_line in total_bp_describe.split("\n")]))
-        output_handle.writelines("Description of Read Qualities:")
+        output_handle.writelines(f"\t{qual_line}\n"
+                                 for qual_line in total_bp_describe.split("\n"))
+        output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
-        output_handle.write("\n".join(["\t" + qual_line
-                                       for qual_line in av_qual_describe.split("\n")]))
-        output_handle.writelines("N50 value:")
-        output_handle.writelines(f"\t{n50}")
-        output_handle.writelines("Run duration")
-        output_handle.writelines(f"\t{run_duration}")
+        output_handle.write(f"\t{qual_line}\n"
+                            for qual_line in av_qual_describe.split("\n"))
+        output_handle.writelines("N50 value:\n")
+        output_handle.writelines(f"\t{n50}\n")
+        output_handle.writelines("Run duration\n")
+        output_handle.writelines(f"\t{run_duration}\n")
 
 
 def assign_yield_data():
