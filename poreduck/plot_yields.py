@@ -252,11 +252,15 @@ def print_stats():
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
     av_qual_describe = ALL_READS["av_qual"].describe().to_string()
+    print(total_bp_describe, av_qual_describe)
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
-    total_bp_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
-                                   for qual_line in total_bp_describe.split("\n")])
-    av_qual_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
-                                   for qual_line in av_qual_describe.split("\n")])
+    try:
+        total_bp_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
+                                       for qual_line in total_bp_describe.split("\n")])
+        av_qual_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
+                                      for qual_line in av_qual_describe.split("\n")])
+    except IndexError:
+        print(total_bp_describe, av_qual_describe)
     # Calculate the N50 of the read lengths
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
