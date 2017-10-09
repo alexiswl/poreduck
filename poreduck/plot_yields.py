@@ -247,7 +247,7 @@ def print_stats():
     """
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
-    total_bp_h = humanize.naturalsize(total_bp, gnu=True).replace("B", "b")
+    total_bp_h = humanize.naturalsize(total_bp, gnu=True).replace("B", "") + "b"
     # Describe the seq_length histogram
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
@@ -261,7 +261,7 @@ def print_stats():
             and seq_length_cumsum_as_series[index+1] >= total_bp*0.5):
             n50 = seq_value
             break
-    n50_h = humanize.naturalsize(n50, gnu=True).replace("B", "b")
+    n50_h = humanize.naturalsize(n50, gnu=True).replace("B", "") + "b"
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
     days, seconds = run_duration.days, run_duration.seconds
@@ -277,7 +277,7 @@ def print_stats():
         output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
-        output_handle.writelines(f"\t{qual_line}\n"
+        output_handle.writelines(f"\t{qual_line)}\n"
                                  for qual_line in total_bp_describe.split("\n"))
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
@@ -533,7 +533,7 @@ def x_yield_to_human_readable(x, position):
     seconds = x % 60
     if x == 0:
         return 0
-    s = f"{hours:02d}:{minutes:02d}"
+    s = f"{hours:02f}:{minutes:02f}"
     return s
 
 
