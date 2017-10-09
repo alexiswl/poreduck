@@ -54,13 +54,11 @@ class Run:
             read_set.read_fastq()
 
     def aggregate_dataframes(self):
-        first_dataframe = True
         for read_set in self.read_sets:
-            if first_dataframe:
-                first_dataframe = False
-                columns = list(read_set.df.columns)
-                self.all_data = pd.DataFrame(columns=columns)
-            self.all_data = self.all_data.append(read_set.df, ignore_index=True)
+            if self.all_data is None:
+                self.all_data = read_set.df.copy()
+            else:
+                self.all_data = self.all_data.append(read_set.df, ignore_index=True)
         self.all_data = self.all_data.sort_values(['time'], ascending=[True])
 
     def assign_yield_data(self):
