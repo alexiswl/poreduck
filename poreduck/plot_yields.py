@@ -252,13 +252,13 @@ def print_stats():
     # Calculate the N50 of the read lengths
     n50_found = False
     n50 = 0
-    while not n50_found:
-        for index, seq_value in ALL_READS['seq_length'].sort_values().iteritems():
-            if (ALL_READS['seq_length'][:index-1].sum() <= ALL_READS['seq_length'][index-1:].sum()
-                and ALL_READS['seq_length'][:index].sum() >= ALL_READS['seq_length'][index:].sum()):
-                n50_found = True
-                n50 = seq_value
-    # Get run duration, from first read to last read.
+    for index, seq_value in ALL_READS['seq_length'].sort_values().iteritems():
+        if (ALL_READS['seq_length'][:index-1].sum() <= ALL_READS['seq_length'][index-1:].sum()
+            and ALL_READS['seq_length'][:index].sum() >= ALL_READS['seq_length'][index:].sum()):
+            n50 = seq_value
+            # N50 found so we can break the for loop
+            break
+# Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
 
     # Now print the stats
