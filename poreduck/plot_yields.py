@@ -267,13 +267,17 @@ def print_stats():
         output_handle.writelines("Total basepairs:")
         output_handle.writelines(f"\t{total_bp}")
         output_handle.writelines("Description of Read Lengths:")
-        output_handle.write(total_bp_describe)
+        # Tab indent each of the descriptor lines
+        output_handle.write("\n".join(["\t" + qual_line
+                                       for qual_line in total_bp_describe.split("\n")]))
         output_handle.writelines("Description of Read Qualities:")
-        output_handle.write(av_qual_describe)
+        # Tab indent each of the descriptor lines
+        output_handle.write("\n".join(["\t" + qual_line
+                                       for qual_line in av_qual_describe.split("\n")]))
         output_handle.writelines("N50 value:")
-        output_handle.writelines(n50)
+        output_handle.writelines(f"\t{n50}")
         output_handle.writelines("Run duration")
-        output_handle.writelines(run_duration)
+        output_handle.writelines(f"\t{run_duration}")
 
 
 def assign_yield_data():
