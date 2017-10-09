@@ -262,6 +262,11 @@ def print_stats():
 
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
+    days, seconds = run_duration.days, run_duration.seconds
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds  = seconds % 60
+    run_duration = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
     with open("run_stats.txt", "w") as output_handle:
