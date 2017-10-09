@@ -252,12 +252,14 @@ def print_stats():
     # Calculate the N50 of the read lengths
     n50_found = False
     n50 = 0
-    for index, seq_value in ALL_READS['seq_length'].sort_values().iteritems():
-        if (ALL_READS['seq_length'][:index-1].sum() <= ALL_READS['seq_length'][index-1:].sum()
-            and ALL_READS['seq_length'][:index].sum() >= ALL_READS['seq_length'][index:].sum()):
+    seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values()
+    seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
+    for index, seq_value in seq_length_sorted_as_series.iteritems():
+        if (seq_length_cumsum_as_series[index] <= total_bp*0.5
+            and seq_length_cumsum_as_series[index+1] >= total_bp*0.5):
             n50 = seq_value
-            # N50 found so we can break the for loop
             break
+
 # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
 
