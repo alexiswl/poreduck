@@ -533,12 +533,12 @@ def y_yield_to_human_readable(y, position):
 
 def x_yield_to_human_readable(x, position):
     # Convert time in seconds to hours or minutes
-    hours = x // 3600
-    minutes = (x % 3600) // 60
-    seconds = x % 60
+    hours = int(x // 3600)
+    minutes = int((x % 3600) // 60)
+    seconds = int(x % 60)
     if x == 0:
         return 0
-    s = f"{hours:02f}:{minutes:02f}"
+    s = f"{hours:02d}:{minutes:02d}"
     return s
 
 
