@@ -252,6 +252,11 @@ def print_stats():
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
     av_qual_describe = ALL_READS["av_qual"].describe().to_string()
+    # Reformat each of the describe method outputs such that they're rounded to two decimal places.
+    total_bp_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
+                                   for qual_line in total_bp_describe])
+    av_qual_describe = '\n'.join([qual_line.split("\t")[0] + "\t" + "{8:2}".format(qual_line.split("\t")[1])
+                                   for qual_line in av_qual_describe])
     # Calculate the N50 of the read lengths
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
@@ -271,13 +276,13 @@ def print_stats():
     run_duration_h = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
-    with open("run_stats.txt", "w") as output_handle:
+    with open(os.path.join(PLOTS_DIR, "{SAMPLE_NAME}.run_stats.txt", "w")) as output_handle:
         # Print total basepairs
         output_handle.write("Total basepairs:\n")
         output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
-        output_handle.writelines(f"\t{qual_line}\n"
+        output_handle.writelines(f"\t{qual_line}"
                                  for qual_line in total_bp_describe.split("\n"))
         output_handle.write("Description of Read Qualities:\n")
         # Tab indent each of the descriptor lines
