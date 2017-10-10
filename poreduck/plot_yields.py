@@ -307,7 +307,7 @@ def print_stats():
         output_handle.writelines(f"\tN{100*percentile:02.0f}:\t{nx_value:8d}\t|\t{nx_h_value.rjust(9)}\n"
                                  for percentile, nx_value, nx_h_value in zip(PERCENTILES, nx, nx_h))
         output_handle.write("Run duration\n")
-        output_handle.write(f"\t{run_duration.total_seconds():16f}\t|\t{run_duration_h}\n")
+        output_handle.write(f"\t{run_duration.total_seconds():8.1f} seconds\t|\t{run_duration_h}\n")
 
 
 def assign_yield_data():
