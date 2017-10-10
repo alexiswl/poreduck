@@ -136,7 +136,9 @@ def main():
                           help="I didn't use poreduck to upload my data to my server." +
                                "I promise to do so next time to reap all of the benefits.")
     plot_parser.add_argument("--fastq_dir", type=str, required=True,
-                             help="/path/to/fastq/files")
+                             help="/path/to/fastq/files.fastq")
+    plot_parser.add_argument("--gzipped", default=False, action='store_true', dest="gzipped",
+                             help="Are the fastq files gzipped. (Ends with fastq.gz)")
     plot_parser.add_argument("--output_dir", type=str, required=True,
                              help="/path/to/plots_dir" +
                                   "By default will be created in current working directory")

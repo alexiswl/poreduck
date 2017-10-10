@@ -19,7 +19,7 @@ from matplotlib.pylab import savefig
 from itertools import chain
 import seaborn as sns
 import time
-
+import gzip
 
 """
 This script will create a yield plot of the data that has been created by the
@@ -53,9 +53,9 @@ QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
 PERCENTILES = [0.1, 0.25, 0.5, 0.75, 0.9]
 QUALITY_DESCRIPTIONS.reverse()
 QUALITY_COLOURS.reverse()
-
+GZIPPED = False
 CLIP = False
-
+FASTQ_SUFFIX = ".fastq"
 # Import arguments.
 """
     csv directory
@@ -107,7 +107,11 @@ class Read_Set:
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
         # Run through fastq file and add attributes to dataframe.
-        for record in SeqIO.parse(self.fastq_path, "fastq"):
+        if GZIPPED:
+            input_handle = gzip.open(self.fastq_path, "rt")
+        else:
+            input_handle = open(self.fastq_path, "r")
+        for record in SeqIO.parse(input_handle, "fastq"):
             fastq_id = record.id.split()[0]
             row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
             # Get length and quality of read
@@ -126,6 +130,7 @@ class Read_Set:
         # self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
         # Tick the box that we have added the fastq to a dataframe
         self.added_fastq_data = True
+        input_handle.close()
 
     def append_csv_data(self):
         # Set default columns
@@ -172,7 +177,7 @@ def get_arguments():
 
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
-    global CSV_FILES, SAMPLE_NAME, CLIP
+    global CSV_FILES, SAMPLE_NAME, CLIP, GZIPPED, FASTQ_SUFFIX
     if not args.no_csv:
         CSV_DIR = args.csv_dir
     FASTQ_DIR = args.fastq_dir
@@ -196,6 +201,9 @@ def set_arguments(args):
         SAMPLE_NAME = args.sample_name
     if args.clip:
         CLIP = True
+    if args.gzipped:
+        GZIPPED = True
+        FASTQ_SUFFIX = ".fastq.gz"
 
 
 def import_fastq():
@@ -206,7 +214,7 @@ def import_fastq():
             # Unless it's the mux scan!
             if "mux_scan" in fastq_file:
                 continue
-            SAMPLE_NAME = '_'.join(fastq_file.split(".")[0].split("_")[2:]).replace(".fastq", "")
+            SAMPLE_NAME = '_'.join(fastq_file.split(".")[0].split("_")[2:]).replace(FASTQ_SUFFIX, "")
         if "mux_scan" in fastq_file:
             fastq_id = fastq_file + "_mux"
         else:
@@ -593,7 +601,7 @@ def get_fastq_files():
     global FASTQ_FILES
     FASTQ_FILES = [fastq_file
                    for fastq_file in os.listdir(FASTQ_DIR)
-                   if fastq_file.endswith(".fastq")]
+                   if fastq_file.endswith(FASTQ_SUFFIX)]
 
 
 def get_csv_files():

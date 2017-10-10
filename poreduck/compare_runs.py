@@ -155,7 +155,7 @@ def plot_yield_general():
     plt.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
     # Ensure labels are not missed.
-    plt.tight_layout()
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
 
 
