@@ -421,7 +421,7 @@ def plot_read_length_hist():
     seq_df = ALL_READS["seq_length"]
     if CLIP:
         # Filter out the top 1000th percentile.
-        seq_df = seq_df[seq_df < seq_df.quantile(0.9999)]
+        seq_df = seq_df[seq_df < seq_df.quantile(0.9995)]
 
     def y_hist_to_human_readable_seq(y, position):
         # Convert distribution to base pairs

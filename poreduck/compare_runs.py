@@ -88,6 +88,8 @@ def plot_read_length_hist():
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
         SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
+    for run, seq_df in zip(RUNS, SEQ_DFS):
+        seq_df.to_csv(f"{run}.csv", header=True)
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
