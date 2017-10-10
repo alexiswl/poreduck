@@ -269,6 +269,9 @@ def print_stats():
         if (seq_length_cumsum_as_series[index] <= total_bp*PERCENTILES[len(nx)] <=
                 seq_length_cumsum_as_series[index+1]):
             nx.append(seq_value)
+        if len(nx) == len(PERCENTILES):
+            # Found all the percentiles, no need to continue.
+            break
 
     nx_h = [reformat_human_friendly(humanfriendly.format_size(nX_value, binary=False))
             for nX_value in nx]
