@@ -349,6 +349,8 @@ def plot_yield_general():
     ax.set_title(f"Yield for {SAMPLE_NAME} over time")
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
+    # Ensure labels are not missed.
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_plot.png"))
 
 
@@ -442,6 +444,8 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Read length")
     ax.set_ylabel("Bases per bin")
+    # Ensure labels are not missed.
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_hist_read_length_by_basepair.png"))
 
 

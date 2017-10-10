@@ -156,7 +156,7 @@ def plot_yield_general():
     for run in RUNS:
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
-    plt.legend()
+    ax.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
     # Ensure labels are not missed.
     fig.tight_layout()
