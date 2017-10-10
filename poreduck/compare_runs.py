@@ -69,7 +69,7 @@ class Run:
 
         # Aggregate seqlength for each minute of sequencing. I love this resample command!
         self.yield_data.set_index(pd.DatetimeIndex(self.yield_data['time']), inplace=True)
-        self.yield_data = self.yield_data.resample("1T").sum()
+        self.yield_data = self.yield_data.resample("1T").sum().fillna(0)
         self.yield_data.reset_index(inplace=True)
         # Generate a cumulative sum of sequence data
         self.yield_data['cumsum_bp'] = self.yield_data['seq_length'].cumsum()
@@ -87,7 +87,7 @@ def plot_read_length_hist():
     if CLIP:
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9999)] for seq_df in SEQ_DFS]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
@@ -122,6 +122,8 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5) 
     """Need to have another 'regex' name"""
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    # Ensure labels are not missed.
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
 
 
@@ -152,6 +154,8 @@ def plot_yield_general():
                 linestyle="solid", markevery=[], label=run.name)
     plt.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    # Ensure labels are not missed.
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
 
 

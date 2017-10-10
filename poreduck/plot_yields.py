@@ -282,7 +282,7 @@ def print_stats():
     run_duration_h = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
-    with open(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}.run_stats.txt"), "w") as output_handle:
+    with open(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}.run_stats.txt"), "w") as output_handle:
         # Print total basepairs
         output_handle.write("Total basepairs:\n")
         output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
@@ -337,7 +337,7 @@ def plot_yield_general():
     ax.set_title(f"Yield for {SAMPLE_NAME} over time")
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_plot.png"))
 
 
 def plot_yield_by_quality():
@@ -395,7 +395,7 @@ def plot_yield_by_quality():
               QUALITY_DESCRIPTIONS, loc=2)
     # Ensure labels are not missed.
     plt.tight_layout()
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_plot_by_quality.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_plot_by_quality.png"))
 
 
 def plot_read_length_hist():
@@ -426,7 +426,7 @@ def plot_read_length_hist():
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_xlabel("Read length")
     ax.set_ylabel("Bases per bin")
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_hist_read_length_by_basepair.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_hist_read_length_by_basepair.png"))
 
 
 def plot_poremap():
@@ -486,7 +486,7 @@ def plot_poremap():
     ax.set_title("Map of Yield by Channel", fontsize=25)
     # Ensure labels are not missed.
     plt.tight_layout()
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_yield_map_by_pore.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_map_by_pore.png"))
 
 
 def plot_pore_yield_hist():
@@ -511,7 +511,7 @@ def plot_pore_yield_hist():
     ax.set_ylabel("Pores per bin")
     # Ensure labels are not missed.
     plt.tight_layout()
-    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME}_hist_yield_by_pore.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_hist_yield_by_pore.png"))
 
 
 def y_hist_to_human_readable(y, position):
