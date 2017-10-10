@@ -397,7 +397,7 @@ def plot_yield_by_quality():
                for colour in QUALITY_COLOURS],
               QUALITY_DESCRIPTIONS, loc=2)
     # Ensure labels are not missed.
-    plt.tight_layout()
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_plot_by_quality.png"))
 
 
@@ -488,7 +488,7 @@ def plot_poremap():
     # Nice big title!
     ax.set_title("Map of Yield by Channel", fontsize=25)
     # Ensure labels are not missed.
-    plt.tight_layout()
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_map_by_pore.png"))
 
 
@@ -513,7 +513,7 @@ def plot_pore_yield_hist():
     ax.set_xlabel("Yield in single pore")
     ax.set_ylabel("Pores per bin")
     # Ensure labels are not missed.
-    plt.tight_layout()
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_hist_yield_by_pore.png"))
 
 
