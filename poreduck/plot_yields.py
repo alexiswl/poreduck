@@ -48,7 +48,8 @@ DATEPARSE_CSV = lambda dates: [pd.datetime.strptime(d, '%a %b %d %H:%M:%S %Y') f
 DATEPARSE_FASTQ = lambda dates: [pd.datetime.strptime(d, "%Y-%m-%dT%H:%M:%SZ") for d in dates]
 SAMPLE_NAME = ""
 YIELD_DATA = None
-QUALITY_DESCRIPTIONS = ["bad", "alright", "better", "best"]
+QUALITY_DESCRIPTIONS = ["<80", "80-90", "90-95", "95+"]
+QUALITY_BINS = [6.99, 10, 13.01]  # 80, 90 and 95 respectively
 QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
 PERCENTILES = [0.1, 0.25, 0.5, 0.75, 0.9]
 QUALITY_DESCRIPTIONS.reverse()
@@ -360,7 +361,7 @@ def plot_yield_by_quality():
     # Read in seqlength and time from ALL_READS dataframe
     new_yield_data = ALL_READS[['time', "seq_length", "av_qual"]]
     # Bin qualities
-    qual_bins = [0, 9, 15, 22, new_yield_data["av_qual"].max()]
+    qual_bins = [0].extend(QUALITY_BINS).append(new_yield_data["av_qual"].max())
     # Cut yield data into quality bins
     new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
                                                    labels=QUALITY_DESCRIPTIONS)
