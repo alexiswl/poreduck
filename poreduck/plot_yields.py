@@ -247,7 +247,7 @@ def print_stats():
     """
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
-    total_bp_h = humanfriendly.format_size(total_bp, binary=False).replace("B", "").replace("bytes", "") + "b"
+    total_bp_h = reformat_human_friendly(humanfriendly.format_size(total_bp, binary=False))
     # Describe the seq_length histogram
     total_bp_describe = ALL_READS["seq_length"].describe(percentiles=PERCENTILES).to_string()
     # Describe the quality of the sequences
@@ -270,7 +270,7 @@ def print_stats():
                 seq_length_cumsum_as_series[index+1]):
             nx.append(seq_value)
 
-    nx_h = [humanfriendly.format_size(nX_value, binary=False).replace("B", "").replace("bytes", "") + "b"
+    nx_h = [reformat_human_friendly(humanfriendly.format_size(nX_value, binary=False))
             for nX_value in nx]
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
@@ -411,7 +411,7 @@ def plot_read_length_hist():
         if y == 0:
             return 0
         s = humanfriendly.format_size(seq_df.sum() * seq_df.count() * y / num_bins, binary=False)
-        return s.replace("B", "").replace("bytes", "") + "b"
+        return reformat_human_friendly(s)
 
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
@@ -501,7 +501,7 @@ def plot_pore_yield_hist():
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
         s = humanfriendly.format_size((bins[1]-bins[0])*y*new_yield_data.count(), binary=False)
-        return s.replace("B", "").replace("bytes", "")
+        return reformat_human_friendly(s)
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
     # Set the titles and axis labels
@@ -514,13 +514,27 @@ def plot_pore_yield_hist():
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_hist_yield_by_pore.png"))
 
 
+def reformat_human_friendly(s):
+    """
+    humanfriendly module returns with a few quirks
+    1 = 1 byte ==> 1 b
+    2 = 2 bytes ==> 2 bytes
+    1000 = 1 KB ==> 1 Kb
+    """
+    s = s.replace(" byte", "")
+    s = s.replace(" bytes", "")
+    s = s.replace("B", "")
+    s += "b"
+    return s
+
+
 def y_hist_to_human_readable(y, position):
     # Convert distribution to base pairs
     num_bins = 50
     if y == 0:
         return 0
     s = humanfriendly.format_size(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/num_bins, binary=False)
-    return s.replace("B", "").replace("bytes", "") + "b"
+    return reformat_human_friendly(s)
 
 
 def x_hist_to_human_readable(x, position):
@@ -528,7 +542,7 @@ def x_hist_to_human_readable(x, position):
     if x == 0:
         return 0
     s = humanfriendly.format_size(x, binary=False)
-    return s.replace("B", "").replace("bytes", "") + "b"
+    return reformat_human_friendly(s)
 
 
 def y_yield_to_human_readable(y, position):
@@ -536,7 +550,7 @@ def y_yield_to_human_readable(y, position):
     if y == 0:
         return 0
     s = humanfriendly.format_size(y, binary=False)
-    return s.replace("B", "").replace("bytes", "") + "b"
+    return reformat_human_friendly(s)
 
 
 def x_yield_to_human_readable(x, position):
