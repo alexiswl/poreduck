@@ -123,14 +123,13 @@ class Read_Set:
                            fastq_length, fastq_quality]
             self.df.loc[-1] = row_as_list
             self.df.index += 1
+        input_handle.close()
         # Convert columns to correct format
         self.df['seq_length'] = pd.to_numeric(self.df["seq_length"])
         self.df['av_qual'] = pd.to_numeric(self.df['av_qual'])
         self.df['time'] = pd.to_datetime(self.df['time'], format="%Y-%m-%dT%H:%M:%SZ")
-        # self.df['time'] = self.df['time'].apply(lambda x: pd.to_datetime(x, format="%Y-%m-%dT%H:%M:%SZ"))
         # Tick the box that we have added the fastq to a dataframe
         self.added_fastq_data = True
-        input_handle.close()
 
     def append_csv_data(self):
         # Set default columns
@@ -332,6 +331,8 @@ def assign_yield_data():
 
 
 def plot_yield_general():
+    # Close any previous plots
+    plt.close('all')
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
@@ -352,6 +353,8 @@ def plot_yield_general():
 
 
 def plot_yield_by_quality():
+    # Close any previous plots
+    plt.close('all')
     # Read in seqlength and time from ALL_READS dataframe
     new_yield_data = ALL_READS[['time', "seq_length", "av_qual"]]
     # Bin qualities
@@ -410,6 +413,8 @@ def plot_yield_by_quality():
 
 
 def plot_read_length_hist():
+    # Close any previous plots
+    plt.close('all')
     num_bins = 50
     seq_df = ALL_READS["seq_length"]
     if CLIP:
@@ -473,6 +478,8 @@ def plot_poremap():
 
     # The documentation for seaborn is pretty poor.
     # I will comment what I've done as best as possible.
+    # Close any previous plots
+    plt.close('all')
     fig, ax = plt.subplots()
 
     fig.set_size_inches(15, 7)
@@ -501,6 +508,8 @@ def plot_poremap():
 
 
 def plot_pore_yield_hist():
+    # Close any previous plots
+    plt.close('all')
     num_bins = 50
     new_yield_data = ALL_READS.groupby(["channel", "mux"])['seq_length'].sum()
     fig, ax = plt.subplots(1)
