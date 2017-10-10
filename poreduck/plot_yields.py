@@ -50,7 +50,7 @@ SAMPLE_NAME = ""
 YIELD_DATA = None
 QUALITY_DESCRIPTIONS = ["bad", "alright", "better", "best"]
 QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
-
+PERCENTILES = [0.1, 0.25, 0.5, 0.75, 0.9]
 QUALITY_DESCRIPTIONS.reverse()
 QUALITY_COLOURS.reverse()
 
@@ -247,29 +247,31 @@ def print_stats():
     """
     # Get total yield
     total_bp = ALL_READS["seq_length"].sum()
-    total_bp_h = humanfriendly.format_size(total_bp, binary=False).replace("B", "") + "b"
+    total_bp_h = humanfriendly.format_size(total_bp, binary=False).replace("B", "").replace("bytes", "") + "b"
     # Describe the seq_length histogram
-    total_bp_describe = ALL_READS["seq_length"].describe().to_string()
+    total_bp_describe = ALL_READS["seq_length"].describe(percentiles=PERCENTILES).to_string()
     # Describe the quality of the sequences
-    av_qual_describe = ALL_READS["av_qual"].describe().to_string()
+    av_qual_describe = ALL_READS["av_qual"].describe(percentiles=PERCENTILES).to_string()
 
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
     # ljust ensures that at least seven characters are used to make the description.
-    total_bp_describe = '\n'.join([qual_line.split()[0].ljust(7) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+    total_bp_describe = '\n'.join([qual_line.split()[0].ljust(9) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
                                    for qual_line in total_bp_describe.split("\n")])
-    av_qual_describe = '\n'.join([qual_line.split()[0].ljust(7) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+    av_qual_describe = '\n'.join([qual_line.split()[0].ljust(9) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
                                   for qual_line in av_qual_describe.split("\n")])
 
-    # Calculate the N50 of the read lengths
-    n50 = 0
+    # Calculate the NX of the read lengths where X is 0.1, 0.25, 0.5, 0.75, 0.9
+    nx = []
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
     seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
+
     for index, seq_value in seq_length_sorted_as_series.iteritems():
-        if (seq_length_cumsum_as_series[index] <= total_bp*0.5 <=
+        if (seq_length_cumsum_as_series[index] <= total_bp*PERCENTILES[len(nx)] <=
                 seq_length_cumsum_as_series[index+1]):
-            n50 = seq_value
-            break
-    n50_h = humanfriendly.format_size(n50, binary=False).replace("B", "") + "b"
+            nx.append(seq_value)
+
+    nx_h = [humanfriendly.format_size(nX_value, binary=False).replace("B", "").replace("bytes", "") + "b"
+            for nX_value in nx]
     # Get run duration, from first read to last read.
     run_duration = ALL_READS["time"].max() - ALL_READS["time"].min()
     days, seconds = run_duration.days, run_duration.seconds
@@ -282,7 +284,7 @@ def print_stats():
     with open(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}.run_stats.txt"), "w") as output_handle:
         # Print total basepairs
         output_handle.write("Total basepairs:\n")
-        output_handle.write(f"\t{total_bp}\t|\t{total_bp_h}\n")
+        output_handle.write(f"\t{total_bp:15d}\t|\t{total_bp_h.rjust(9)}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
         output_handle.writelines(f"\t{qual_line}\n"
@@ -291,8 +293,9 @@ def print_stats():
         # Tab indent each of the descriptor lines
         output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in av_qual_describe.split("\n"))
-        output_handle.write("N50 value:\n")
-        output_handle.write(f"\t{n50}\t|\t{n50_h}\n")
+        output_handle.write("NX values:\n")
+        output_handle.writelines(f"\t{nx_value:15d}\t|\t{nx_h_value.rjust(9)}\n"
+                                 for nx_value, nx_h_value in zip(nx, nx_h))
         output_handle.write("Run duration\n")
         output_handle.write(f"\t{run_duration.total_seconds()}\t|\t{run_duration_h}\n")
 
@@ -408,7 +411,7 @@ def plot_read_length_hist():
         if y == 0:
             return 0
         s = humanfriendly.format_size(seq_df.sum() * seq_df.count() * y / num_bins, binary=False)
-        return s + "b"
+        return s.replace("B", "").replace("bytes", "") + "b"
 
     # Define how many plots we want (1)
     fig, ax = plt.subplots(1)
@@ -498,7 +501,7 @@ def plot_pore_yield_hist():
     def y_muxhist_to_human_readable(y, position):
         # Get numbers of reads per bin in the histogram
         s = humanfriendly.format_size((bins[1]-bins[0])*y*new_yield_data.count(), binary=False)
-        return s.replace("B", "")
+        return s.replace("B", "").replace("bytes", "")
     ax.yaxis.set_major_formatter(FuncFormatter(y_muxhist_to_human_readable))
 
     # Set the titles and axis labels
@@ -517,8 +520,7 @@ def y_hist_to_human_readable(y, position):
     if y == 0:
         return 0
     s = humanfriendly.format_size(ALL_READS["seq_length"].sum()*ALL_READS["seq_length"].count()*y/num_bins, binary=False)
-
-    return s + "b"
+    return s.replace("B", "").replace("bytes", "") + "b"
 
 
 def x_hist_to_human_readable(x, position):
@@ -526,7 +528,7 @@ def x_hist_to_human_readable(x, position):
     if x == 0:
         return 0
     s = humanfriendly.format_size(x, binary=False)
-    return s + "b"
+    return s.replace("B", "").replace("bytes", "") + "b"
 
 
 def y_yield_to_human_readable(y, position):
@@ -534,8 +536,7 @@ def y_yield_to_human_readable(y, position):
     if y == 0:
         return 0
     s = humanfriendly.format_size(y, binary=False)
-
-    return s + "b"
+    return s.replace("B", "").replace("bytes", "") + "b"
 
 
 def x_yield_to_human_readable(x, position):
