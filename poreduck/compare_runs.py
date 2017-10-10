@@ -109,6 +109,8 @@ def plot_read_length_hist():
     # Although it is already numeric, we need to re-numerate this column.
     # Until the pull-request comes through!
     all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
+    # Close any previous plots
+    plt.close('all')
     # Plot the histogram using pyjoyplot
     ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist", order=sorted([run.name for run in RUNS]),
                   bins=bins, weights=True, figsize=[12, 12])
@@ -128,6 +130,8 @@ def plot_read_length_hist():
 
 
 def plot_yield_general():
+    # Close any previous plots
+    plt.close('all')
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
