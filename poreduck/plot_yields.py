@@ -255,9 +255,9 @@ def print_stats():
     print(total_bp_describe, av_qual_describe)
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
     try:
-        total_bp_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(qual_line.split()[1])
+        total_bp_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(float(qual_line.split()[1]))
                                        for qual_line in total_bp_describe.split("\n")])
-        av_qual_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(qual_line.split()[1])
+        av_qual_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(float(qual_line.split()[1]))
                                       for qual_line in av_qual_describe.split("\n")])
     except IndexError:
         print("index error", total_bp_describe, av_qual_describe)
