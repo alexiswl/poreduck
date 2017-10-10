@@ -305,7 +305,7 @@ def print_stats():
         output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in av_qual_describe.split("\n"))
         output_handle.write("NX values:\n")
-        output_handle.writelines(f"\tN{100*percentile:02d}:\t{nx_value:8d}\t|\t{nx_h_value.rjust(9)}\n"
+        output_handle.writelines(f"\tN{100*percentile:02.0f}:\t{nx_value:8d}\t|\t{nx_h_value.rjust(9)}\n"
                                  for percentile, nx_value, nx_h_value in zip(PERCENTILES, nx, nx_h))
         output_handle.write("Run duration\n")
         output_handle.write(f"\t{run_duration.total_seconds():16f}\t|\t{run_duration_h}\n")
