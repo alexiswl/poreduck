@@ -252,17 +252,14 @@ def print_stats():
     total_bp_describe = ALL_READS["seq_length"].describe().to_string()
     # Describe the quality of the sequences
     av_qual_describe = ALL_READS["av_qual"].describe().to_string()
-    print(total_bp_describe, av_qual_describe)
+
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
-    try:
-        total_bp_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(float(qual_line.split()[1]))
-                                       for qual_line in total_bp_describe.split("\n")])
-        av_qual_describe = '\n'.join([qual_line.split()[0] + "\t" + "{:10.2f}".format(float(qual_line.split()[1]))
-                                      for qual_line in av_qual_describe.split("\n")])
-    except IndexError:
-        print("index error", total_bp_describe, av_qual_describe)
-        print([my_line for my_line in total_bp_describe.split("\n")])
-        print([my_line for my_line in av_qual_describe.split("\n")])
+    # ljust ensures that at least seven characters are used to make the description.
+    total_bp_describe = '\n'.join([qual_line.split()[0].ljust(7) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+                                   for qual_line in total_bp_describe.split("\n")])
+    av_qual_describe = '\n'.join([qual_line.split()[0].ljust(7) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+                                  for qual_line in av_qual_describe.split("\n")])
+
     # Calculate the N50 of the read lengths
     n50 = 0
     seq_length_sorted_as_series = ALL_READS['seq_length'].sort_values().reset_index(drop=True)
@@ -278,7 +275,7 @@ def print_stats():
     days, seconds = run_duration.days, run_duration.seconds
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    seconds %= seconds
+    seconds %= 60
     run_duration_h = f"{days} days, {hours} hours, {minutes} minutes and {seconds} seconds"
 
     # Now print the stats
