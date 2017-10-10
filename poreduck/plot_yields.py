@@ -255,9 +255,9 @@ def print_stats():
 
     # Reformat each of the describe method outputs such that they're rounded to two decimal places.
     # ljust ensures that at least seven characters are used to make the description.
-    total_bp_describe = '\n'.join([qual_line.split()[0].ljust(9) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+    total_bp_describe = '\n'.join([qual_line.split()[0].ljust(8) + "\t" + "{:21.2f}".format(float(qual_line.split()[1]))
                                    for qual_line in total_bp_describe.split("\n")])
-    av_qual_describe = '\n'.join([qual_line.split()[0].ljust(9) + "\t" + "{:15.2f}".format(float(qual_line.split()[1]))
+    av_qual_describe = '\n'.join([qual_line.split()[0].ljust(8) + "\t" + "{:21.2f}".format(float(qual_line.split()[1]))
                                   for qual_line in av_qual_describe.split("\n")])
 
     # Calculate the NX of the read lengths where X is 0.1, 0.25, 0.5, 0.75, 0.9
@@ -287,7 +287,7 @@ def print_stats():
     with open(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}.run_stats.txt"), "w") as output_handle:
         # Print total basepairs
         output_handle.write("Total basepairs:\n")
-        output_handle.write(f"\t{total_bp:15d}\t|\t{total_bp_h.rjust(9)}\n")
+        output_handle.write(f"\t{total_bp:16d}\t|\t{total_bp_h.rjust(9)}\n")
         output_handle.write("Description of Read Lengths:\n")
         # Tab indent each of the descriptor lines
         output_handle.writelines(f"\t{qual_line}\n"
@@ -297,10 +297,10 @@ def print_stats():
         output_handle.writelines(f"\t{qual_line}\n"
                                  for qual_line in av_qual_describe.split("\n"))
         output_handle.write("NX values:\n")
-        output_handle.writelines(f"\t{nx_value:15d}\t|\t{nx_h_value.rjust(9)}\n"
-                                 for nx_value, nx_h_value in zip(nx, nx_h))
+        output_handle.writelines(f"\tN{100*percentile:02d}:\t{nx_value:8d}\t|\t{nx_h_value.rjust(9)}\n"
+                                 for percentile, nx_value, nx_h_value in zip(PERCENTILES, nx, nx_h))
         output_handle.write("Run duration\n")
-        output_handle.write(f"\t{run_duration.total_seconds()}\t|\t{run_duration_h}\n")
+        output_handle.write(f"\t{run_duration.total_seconds():16f}\t|\t{run_duration_h}\n")
 
 
 def assign_yield_data():
