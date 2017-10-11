@@ -343,13 +343,17 @@ def plot_yield_general():
     # Define axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-    # Set x and y labels and limits.
+    # Set x and y labels and title
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
-    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
     ax.set_title(f"Yield for {SAMPLE_NAME} over time")
+    # Produce plot
     ax.plot(YIELD_DATA['duration_float'], YIELD_DATA['cumsum_bp'],
             linestyle="solid", markevery=[])
+    # Limits must be set after the plot is created
+    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
+    ax.set_ylim(ymin=0)
+
     # Ensure labels are not missed.
     fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{SAMPLE_NAME.replace(' ', '_')}_yield_plot.png"))
@@ -397,15 +401,18 @@ def plot_yield_by_quality():
     # Define axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-    # Set x and y labels and limits.
+    # Set x and y labels and title.
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
-    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
     ax.set_title(f"Yield for {SAMPLE_NAME} over time by quality")
     ax.stackplot(YIELD_DATA['duration_float'],
                  [yield_data_by_quality[description]['cumsum_bp']
                   for description in QUALITY_DESCRIPTIONS],
                  colors=QUALITY_COLOURS)
+    # Limits must be set after the plot is created
+    ax.set_xlim(YIELD_DATA['duration_float'].min(), YIELD_DATA['duration_float'].max())
+    ax.set_ylim(ymin=0)
+
     # Add legend to plot.
     ax.legend([mpatches.Patch(color=colour)
                for colour in QUALITY_COLOURS],
