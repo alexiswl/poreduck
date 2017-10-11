@@ -361,7 +361,7 @@ def plot_yield_by_quality():
     # Read in seqlength and time from ALL_READS dataframe
     new_yield_data = ALL_READS[['time', "seq_length", "av_qual"]]
     # Bin qualities
-    qual_bins = [0].extend(QUALITY_BINS).append(new_yield_data["av_qual"].max())
+    qual_bins = [0] + QUALITY_BINS + [new_yield_data["av_qual"].max()]
     # Cut yield data into quality bins
     new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
                                                    labels=QUALITY_DESCRIPTIONS)
