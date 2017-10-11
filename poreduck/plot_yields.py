@@ -364,13 +364,13 @@ def plot_yield_by_quality():
     qual_bins = [0] + QUALITY_BINS + [new_yield_data["av_qual"].max()]
     # Cut yield data into quality bins
     new_yield_data["descriptive_quality"] = pd.cut(new_yield_data["av_qual"], qual_bins,
-                                                   labels=QUALITY_DESCRIPTIONS)
+                                                   labels=[description
+                                                           for description in reversed(QUALITY_DESCRIPTIONS)])
     # Time as index and drop av_qual column
     new_yield_data.set_index(pd.DatetimeIndex(new_yield_data['time']), inplace=True)
     new_yield_data.drop('av_qual', axis=1, inplace=True)
-    # Obtain cumulative sum by quality bin.
-    yield_data_grouped = new_yield_data.groupby("descriptive_quality").apply(lambda d: d.resample("1T").sum().fillna(0))[
-        'seq_length']
+    # Obtain cumulative sum by quality bin in each minute.
+    yield_data_grouped = new_yield_data.groupby("descriptive_quality").apply(lambda d: d.resample("1T").sum().fillna(0))['seq_length']
     # Create a dict of dataframes based on groups.
     yield_data_by_quality = {description: yield_data_grouped[description].to_frame().reset_index()
                              for description in
