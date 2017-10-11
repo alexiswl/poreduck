@@ -154,19 +154,18 @@ def plot_yield_general():
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
 
-    # Set x and y labels and limits.
-    ax.set_xlabel("Duration (HH:MM)")
-    ax.set_ylabel("Yield")
-
-    # Add title to plot
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Yield for {title_string} (B/Hour)")
-
     # Plot each yield plot through a for loop.
     """For loop here with SEQ_DFS here"""
     for run in RUNS:
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
+    # Add title to plot
+    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
+    ax.set_title(f"Yield for {title_string} (B/Hour)")
+
+    # Set x and y labels and limits.
+    ax.set_xlabel("Duration (HH:MM)")
+    ax.set_ylabel("Yield")
 
     # Set x,y limits
     ax.set_xlim(min_x, max_x)
