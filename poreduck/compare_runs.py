@@ -84,13 +84,8 @@ def plot_read_length_hist():
 
     # Filter out the top 2000th percentile.
     if CLIP:
-        # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
         SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
-
-    # Debug, print out each of the runs as csv files.
-    for run, seq_df in zip(RUNS, SEQ_DFS):
-        seq_df.to_csv(f"{run.name}.csv", header=True)
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
@@ -116,10 +111,6 @@ def plot_read_length_hist():
     else:
         bins = [math.ceil((max_by_run[run] - min_by_run[run])/3600)
                 for run in sorted(all_seq_dfs.Run.unique())]
-    # Although it is already numeric, we need to re-numerate this column.
-    # Until the pull-request comes through!
-    # We shouldn't need to convert to numeric, it should all now be numeric.
-    #all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
 
     # Close any previous plots
     plt.close('all')
@@ -185,7 +176,6 @@ def plot_yield_general():
     ax.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
 
-
     # Ensure labels are not missed.
     fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
@@ -226,4 +216,3 @@ def main(args):
     get_runs(args)
     plot_read_length_hist()
     plot_yield_general()
-
