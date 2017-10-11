@@ -79,29 +79,37 @@ class Run:
 
 
 def plot_read_length_hist():
-    """For loop of SEQ_DFS here"""
     global SEQ_DFS
     SEQ_DFS = [run.all_data["seq_length"] for run in RUNS]
-    print(SEQ_DFS[0].dtype)
-    # Define how many plots we want (1)
+
+    # Filter out the top 2000th percentile.
     if CLIP:
         # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
         SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
+
+    # Debug, print out each of the runs as csv files.
     for run, seq_df in zip(RUNS, SEQ_DFS):
         seq_df.to_csv(f"{run.name}.csv", header=True)
+
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
                             axis=0)
+
     # Drop the index levels except for 0 which represents 'Run'
     all_seq_dfs = all_seq_dfs.reset_index(level=0)
     all_seq_dfs.columns = ["Run", "seq_length"]
+
     # Reset the index to 0:nrow
     all_seq_dfs = all_seq_dfs.reset_index(drop=True)
+
     # Bins need to be malleable depending on the range of the run.
     max_by_run = all_seq_dfs.groupby("Run")["seq_length"].max().to_dict()
     min_by_run = all_seq_dfs.groupby("Run")["seq_length"].min().to_dict()
+
+    # Different bin numbers required depending on if the data has been clipped or not.
+    # Very much a trial and error thing.
     if CLIP:
         bins = [math.ceil((max_by_run[run] - min_by_run[run])/1800)
                 for run in sorted(all_seq_dfs.Run.unique())]
@@ -110,22 +118,29 @@ def plot_read_length_hist():
                 for run in sorted(all_seq_dfs.Run.unique())]
     # Although it is already numeric, we need to re-numerate this column.
     # Until the pull-request comes through!
-    all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
+    # We shouldn't need to convert to numeric, it should all now be numeric.
+    #all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
+
     # Close any previous plots
     plt.close('all')
     # Plot the histogram using pyjoyplot
-    ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist", order=sorted([run.name for run in RUNS]),
+    ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist",
+                  order=sorted([run.name for run in RUNS]),
                   bins=bins, weights=True, figsize=[12, 12])
+
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+
     # Set labels of axis.
     ax.set_xlabel("Read length") 
+
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Read Distribution Graph for {title_string}")
     ax.grid(color='black', linestyle=':', linewidth=0.5) 
     """Need to have another 'regex' name"""
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+
     # Ensure labels are not missed.
     plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
@@ -137,29 +152,36 @@ def plot_yield_general():
     # Set subplots.
     fig, ax = plt.subplots(1)
     # Create ticks using numpy linspace. Ideally will create 6 points between 0 and 48 hours.
-    num_points = 6
+    # But we need to add one more for the 0 point
+    num_points = 7
     min_x = min([run.yield_data['duration_float'].min() for run in RUNS])
     max_x = max([run.yield_data['duration_float'].max() for run in RUNS])
-    x_ticks = np.linspace(min_x,
-                          max_x,
-                          num_points)
+    x_ticks = np.linspace(min_x, max_x, num_points)
     ax.set_xticks(x_ticks)
 
     # Define axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+
     # Set x and y labels and limits.
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
     ax.set_xlim(min_x, max_x)
+
+    # Add title to plot
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Yield for {title_string} (B/Hour)")
+
+    # Plot each yield plot through a for loop.
     """For loop here with SEQ_DFS here"""
     for run in RUNS:
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
+
+    # Add legend to plot
     ax.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+
     # Ensure labels are not missed.
     fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
