@@ -166,7 +166,6 @@ def plot_yield_general():
     # Set x and y labels and limits.
     ax.set_xlabel("Duration (HH:MM)")
     ax.set_ylabel("Yield")
-    ax.set_xlim(min_x, max_x)
 
     # Add title to plot
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
@@ -178,9 +177,14 @@ def plot_yield_general():
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
 
+    # Set x,y limits
+    ax.set_xlim(min_x, max_x)
+    ax.set_ylim(ymin=0)
+
     # Add legend to plot
     ax.legend()
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+
 
     # Ensure labels are not missed.
     fig.tight_layout()
