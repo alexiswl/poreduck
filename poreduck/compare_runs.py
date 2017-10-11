@@ -68,7 +68,7 @@ class Run:
         self.yield_data = self.all_data[['time', "seq_length"]]
 
         # Aggregate seqlength for each minute of sequencing. I love this resample command!
-        self.yield_data.set_index(pd.DatetimeIndex(self.yield_data['time']), inplace=True)
+        self.yield_data.set_index('time', inplace=True)
         self.yield_data = self.yield_data.resample("1T").sum().fillna(0)
         self.yield_data.reset_index(inplace=True)
         # Generate a cumulative sum of sequence data
@@ -93,7 +93,6 @@ def plot_read_length_hist():
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
-                            ignore_index=True,
                             axis=0)
     # Drop the index levels except for 0 which represents 'Run'
     all_seq_dfs = all_seq_dfs.reset_index(level=0)
