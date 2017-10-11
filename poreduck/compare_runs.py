@@ -89,10 +89,11 @@ def plot_read_length_hist():
         """For loop of SEQ_DFS here"""
         SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        seq_df.to_csv(f"{run}.csv", header=True)
+        seq_df.to_csv(f"{run.name}.csv", header=True)
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
                             keys=[run.name for run in RUNS],
+                            ignore_index=True,
                             axis=0)
     # Drop the index levels except for 0 which represents 'Run'
     all_seq_dfs = all_seq_dfs.reset_index(level=0)
