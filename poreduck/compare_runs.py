@@ -151,7 +151,7 @@ def plot_read_length_hist():
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
-    ax.yticks([])
+    ax.set_yticks([])
 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
