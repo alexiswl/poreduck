@@ -145,8 +145,8 @@ def plot_read_length_hist():
     # Set subplots.
     fig, ax = plt.subplots(1)
 
-    ax = sns.FacetGrid(all_seq_dfs, hue="Run")
-    ax.map(sns.distplot("Read Length", label="Run"))
+    for run, seq_df in zip(RUNS, SEQ_DFS):
+        sns.distplot(seq_df, label=run.name)
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
