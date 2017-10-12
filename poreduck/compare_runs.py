@@ -145,6 +145,7 @@ def plot_read_length_hist():
 
     # Set subplots.
     fig, ax = plt.subplots(1)
+    fig.rcParams["figure.figsze"] = [12, 12]
 
     for run, seq_df in zip(RUNS, SEQ_DFS):
         sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
@@ -162,7 +163,7 @@ def plot_read_length_hist():
     plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
 
     # Ensure labels are not missed.
-    plt.tight_layout(fig)
+    fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
 
 
