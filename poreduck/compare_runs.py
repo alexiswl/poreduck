@@ -11,6 +11,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 import numpy as np
 import sys
+import seaborn as sns
 import pyjoyplot as pjp
 import math
 from poreduck.plot_yields import Read_Set
@@ -144,20 +145,18 @@ def plot_read_length_hist():
     # Set subplots.
     fig, ax = plt.subplots(1)
 
-    # Plot each yield plot through a for loop.
-    for run, seq_df in zip(RUNS, SEQ_DFS):
-        """For loop here with SEQ_DFS here"""
-        ax.hist(seq_df, label=run.name, bins=50, alpha=0.8)
+    ax = sns.FacetGrid(SEQ_DFS, hue="Run")
+    ax.map(sns.distplot("Read Length", label="Run"))
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
-    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
+    #ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Read Distribution Graph for {title_string}")
     ax.legend()
-    ax.grid(color='black', linestyle=':', linewidth=0.7)
+    #ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
     plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
 
