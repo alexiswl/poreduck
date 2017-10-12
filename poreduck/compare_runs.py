@@ -14,9 +14,10 @@ import sys
 import seaborn as sns
 import pyjoyplot as pjp
 import math
+import humanfriendly
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
-from poreduck.plot_yields import y_hist_to_human_readable
+#from poreduck.plot_yields import y_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
 
@@ -150,7 +151,7 @@ def plot_read_length_hist():
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
-    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
+    ax.yticks([])
 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
