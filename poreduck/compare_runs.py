@@ -146,7 +146,7 @@ def plot_read_length_hist():
     fig, ax = plt.subplots(1)
 
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        sns.distplot(seq_df, label=run.name, hist=False)
+        sns.distplot(seq_df, label=run.name, hist=False, ax=ax)
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
