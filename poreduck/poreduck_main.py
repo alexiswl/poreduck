@@ -157,6 +157,8 @@ def main():
                                 help="\"name of run 1\",\"name of run 2\", etc")
     compare_parser.add_argument("--plots_dir", type=str, required=True,
                                 help="where do you wish these plots to go?")
+    compare_parser.add_argument("--title", type=str, required=True,
+                                help="prefix for titles")
     compare_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
                                 help="Remove outliers from the historgram (0.999th percentile)")
 

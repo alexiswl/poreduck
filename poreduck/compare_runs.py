@@ -28,6 +28,7 @@ FASTQ_DIRS = []
 NAMES = []
 SEQ_DFS = []
 CLIP = False
+TITLE_PREFIX = ""
 
 """
 Take two runs, 
@@ -88,7 +89,7 @@ def plot_read_length_hist():
     # Filter out the top 2000th percentile.
     if CLIP:
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.995)] for seq_df in SEQ_DFS]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.99)] for seq_df in SEQ_DFS]
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
@@ -129,11 +130,10 @@ def plot_read_length_hist():
     ax.set_xlabel("Read length") 
 
     # Set the titles and add a legend.
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Read Distribution Graph for {title_string}")
+    ax.set_title(f"Read Distribution Graph for {TITLE_PREFIX}")
     ax.grid(color='black', linestyle=':', linewidth=0.5) 
     """Need to have another 'regex' name"""
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    plot_prefix = TITLE_PREFIX.replace(" ","_")
 
     # Ensure labels are not missed.
     plt.tight_layout()
@@ -144,25 +144,25 @@ def plot_read_length_hist():
     plt.close('all')
 
     # Set subplots.
-    ax = plt.figure(figsize=[12,12]).add_subplot(111)
+    #ax = plt.figure(figsize=[12,12]).add_subplot(111)
 
-    #fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True)
+    fig, ax = plt.subplots()
     #fig.rcParams["figure.figsze"] = [12, 12]
 
+    #for run, seq_df in zip(RUNS, SEQ_DFS):
+    #    sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
+    #                 hist_kws={'weights': seq_df}, bins=None)
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
-                     hist_kws={'weights': seq_df}, bins=None)
+        ax.hist(seq_df, weights=seq_df, histtype='step', label=run.name)
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     ax.set_yticks([])
 
     # Set the titles and add a legend.
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.title.set_text(f"Read Distribution Graph for {title_string}")
     ax.legend()
     ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
-    plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
+    plot_prefix = TITLE_PREFIX.replace(" ", "_")
 
     # Ensure labels are not missed.
     plt.tight_layout()
@@ -213,7 +213,7 @@ def plot_yield_general():
 
 
 def set_args(args):
-    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES
+    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX
     # Check to ensure that all fastq folders are there
     FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dirs.split(",")]
     NAMES = [name for name in args.run_names.split(",")]
@@ -226,6 +226,8 @@ def set_args(args):
     PLOTS_DIR = args.plots_dir
     if args.clip:
         CLIP = True
+    if args.title is not None:
+        TITLE_PREFIX = args.title
 
 
 def get_runs(args):
