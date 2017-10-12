@@ -88,7 +88,7 @@ def plot_read_length_hist():
     # Filter out the top 2000th percentile.
     if CLIP:
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.999)] for seq_df in SEQ_DFS]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.995)] for seq_df in SEQ_DFS]
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
