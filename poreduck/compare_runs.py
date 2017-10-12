@@ -162,7 +162,7 @@ def plot_read_length_hist():
     plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
 
     # Ensure labels are not missed.
-    fig.tight_layout()
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
 
 
