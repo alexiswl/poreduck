@@ -151,7 +151,7 @@ def plot_read_length_hist():
     #    sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
     #                 hist_kws={'weights': seq_df}, bins=None)
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        ax.hist(run.all_data['seq_length'], weights=seq_df, histtype='step',
+        ax.hist(run.all_data['seq_length'], weights=run.all_data['seq_length'], histtype='step',
                 label=run.name)
 
     # Set the axis formatters
