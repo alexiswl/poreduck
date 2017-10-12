@@ -162,7 +162,7 @@ def plot_read_length_hist():
     plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
 
     # Ensure labels are not missed.
-    plt.tight_layout()
+    plt.tight_layout(fig)
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
 
 
@@ -205,7 +205,7 @@ def plot_yield_general():
     plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
 
     # Ensure labels are not missed.
-    plt.tight_layout()
+    plt.tight_layout(fig)
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
 
 
