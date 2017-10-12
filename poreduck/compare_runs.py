@@ -144,26 +144,28 @@ def plot_read_length_hist():
     plt.close('all')
 
     # Set subplots.
-    fig, ax = plt.subplots(1)
-    fig.rcParams["figure.figsze"] = [12, 12]
+    plt.figure(1)
 
-    for run, seq_df in zip(RUNS, SEQ_DFS):
-        sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
+    #fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True)
+    #fig.rcParams["figure.figsze"] = [12, 12]
+
+    for run, seq_df in zip(ax, RUNS, SEQ_DFS):
+        sns.distplot(seq_df, label=run.name, hist=False,
                      hist_kws={'weights': seq_df}, bins=None)
     # Set the axis formatters
-    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
-    ax.set_yticks([])
+    plt.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    plt.set_yticks([])
 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Read Distribution Graph for {title_string}")
-    ax.legend()
-    ax.grid(color='black', linestyle=':', linewidth=0.7)
+    plt.set_title(f"Read Distribution Graph for {title_string}")
+    plt.legend()
+    plt.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
     plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
 
     # Ensure labels are not missed.
-    fig.tight_layout()
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
 
 
