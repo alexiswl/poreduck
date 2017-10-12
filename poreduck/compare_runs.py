@@ -145,20 +145,20 @@ def plot_read_length_hist():
 
     # Set subplots.
     #ax = plt.figure(figsize=[12,12]).add_subplot(111)
-
     fig, ax = plt.subplots()
     #fig.rcParams["figure.figsze"] = [12, 12]
-
     #for run, seq_df in zip(RUNS, SEQ_DFS):
     #    sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
     #                 hist_kws={'weights': seq_df}, bins=None)
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        ax.hist(seq_df, weights=seq_df, histtype='step', label=run.name)
+        ax.hist(run.all_data['seq_length'], weights=seq_df, histtype='step', label=run.name)
+
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     ax.set_yticks([])
 
     # Set the titles and add a legend.
+    ax.set_title(f"Read length Hist for {TITLE_PREFIX}")
     ax.legend()
     ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
@@ -192,8 +192,7 @@ def plot_yield_general():
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
     # Add title to plot
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Yield for {title_string} (B/Hour)")
+    ax.set_title(f"Yield for {TITLE_PREFIX} (B/Hour)")
 
     # Set x and y labels and limits.
     ax.set_xlabel("Duration (HH:MM)")
@@ -205,7 +204,7 @@ def plot_yield_general():
 
     # Add legend to plot
     ax.legend()
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    plot_prefix = TITLE_PREFIX.replace(" ","_")
 
     # Ensure labels are not missed.
     plt.tight_layout()
