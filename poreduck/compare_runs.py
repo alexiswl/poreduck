@@ -15,6 +15,7 @@ import pyjoyplot as pjp
 import math
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
+from poreduck.plot_yields import y_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
 
@@ -85,7 +86,7 @@ def plot_read_length_hist():
     # Filter out the top 2000th percentile.
     if CLIP:
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.999)] for seq_df in SEQ_DFS]
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
@@ -139,20 +140,27 @@ def plot_read_length_hist():
     # Plot the histogram using plt.plot
     # Close any previous plots
     plt.close('all')
+
     # Set subplots.
     fig, ax = plt.subplots(1)
+
+    # Plot each yield plot through a for loop.
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        # Plot each yield plot through a for loop.
         """For loop here with SEQ_DFS here"""
-        ax.hist(seq_df, label=run.name, bins=50)
+        ax.hist(seq_df, label=run.name, bins=50, alpha=0.8)
+
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
+
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
     ax.set_title(f"Read Distribution Graph for {title_string}")
+    ax.legend()
     ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    plot_prefix = '_'.join([name.replace(" ", "_") for name in NAMES])
+
     # Ensure labels are not missed.
     fig.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
