@@ -158,7 +158,7 @@ def plot_read_length_hist():
 
     # Set the titles and add a legend.
     title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Read Distribution Graph for {title_string}")
+    ax.title.set_text(f"Read Distribution Graph for {title_string}")
     ax.legend()
     ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
