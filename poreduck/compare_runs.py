@@ -152,7 +152,7 @@ def plot_read_length_hist():
     #                 hist_kws={'weights': seq_df}, bins=None)
     for run, seq_df in zip(RUNS, SEQ_DFS):
         ax.hist(run.all_data['seq_length'], weights=run.all_data['seq_length'], histtype='step',
-                label=run.name)
+                bins=50, label=run.name)
 
     # Set the axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
