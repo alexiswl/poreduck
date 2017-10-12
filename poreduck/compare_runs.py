@@ -144,7 +144,7 @@ def plot_read_length_hist():
     plt.close('all')
 
     # Set subplots.
-    ax = plt.figure(1).add_subplot(111)
+    ax = plt.figure(figsize=[12,12]).add_subplot(111)
 
     #fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True)
     #fig.rcParams["figure.figsze"] = [12, 12]
