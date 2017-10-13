@@ -11,6 +11,6 @@
 #$ -wd %WORKING_DIRECTORY%
 #$ -v OMP_NUM_THREADS=1
 # Insert your source files here around our 'command'. An example would be:
-source activate albacore_env
+source activate albacore_%VER%
 %COMMAND%
 source deactivate

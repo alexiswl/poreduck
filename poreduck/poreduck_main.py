@@ -114,6 +114,10 @@ def main():
                                       "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
     albacore_parser.add_argument("--barcoding", default=False, dest='barcoding', action='store_true',
                                  help="Use this option to demultiplex library?")
+    albacore_parser.add_argument("--albacore_version", type=str, required=True,
+                                 help="Albacore 2 comes with the pass and fail folders." +
+                                      "Albacore 1 does not. Also used in %VER% command in templates."
+                                      "Expressed as <majore_version>.<minor_version>.<patch>")
     albacore_parser.add_argument("--qsub_type", choices=QSUB_TYPES, default="SGE",
                                  help="What qsub system are you using?")
     albacore_parser.add_argument("--qsub_extraction_template", type=str, required=True,

@@ -11,6 +11,6 @@
 #SBATCH -D %WORKING_DIRECTORY%
 # Insert your source files here around our 'command'. An example would be:
 export OMP_NUM_THREADS=1
-source activate albacore_env
+source activate albacore_%ALBACORE_VER%
 %COMMAND%
 source deactivate
