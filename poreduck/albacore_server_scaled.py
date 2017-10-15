@@ -643,14 +643,14 @@ def move_fastq_file(subfolder):
                                                                                   barcode,
                                                                                   str(index),
                                                                                   "fastq"]))
+                # Create move command and run through subprocess.
+                shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
             else:
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
                                                                                   str(index),
                                                                                   "fastq"]))
-
-            # Create move command and run through subprocess.
-            LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
-            shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
+                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
+                shutil.move(fastq_file, os.path.join(FASTQ_DIR, new_fastq_file))
 
     # Set as complete so we don't try to do it again.
     subfolder.fastq_moved = True
