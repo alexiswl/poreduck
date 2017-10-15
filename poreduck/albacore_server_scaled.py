@@ -423,7 +423,7 @@ def extract_tarred_read_set(subfolder):
                              "HOSTNAME": QSUB_HOST, 
                              "COMMAND": tar_command,
                              "WORKING_DIRECTORY": READS_DIR,
-                             "VER": ALBACORE_VERSION_STRING}
+                             "ALBACORE_VER": ALBACORE_VERSION_STRING}
 
     # Copy the standard qsub file from the main folder to the qsub folder
     shutil.copy(QSUB_EXTRACTION_TEMPLATE, subfolder.extracted_submission_file)
