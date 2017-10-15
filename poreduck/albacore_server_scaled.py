@@ -684,7 +684,7 @@ def gzip_fastq_file(subfolder):
     for fastq_file in fastq_files:
         # Gzip fastq file with gzip python module
         fastq_gzipped = fastq_file + ".gz"
-        with open(fastq_file, 'rb') as f_in
+        with open(fastq_file, 'rb') as f_in:
             with gzip.open(fastq_gzipped, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
         # Remove fastq file
