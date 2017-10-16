@@ -29,6 +29,7 @@ NAMES = []
 SEQ_DFS = []
 CLIP = False
 TITLE_PREFIX = ""
+GZIPPED = False
 
 """
 Take two runs, 
@@ -213,7 +214,7 @@ def plot_yield_general():
 
 
 def set_args(args):
-    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX
+    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX, GZIPPED
     # Check to ensure that all fastq folders are there
     FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dirs.split(",")]
     NAMES = [name for name in args.run_names.split(",")]
@@ -228,6 +229,8 @@ def set_args(args):
         CLIP = True
     if args.title is not None:
         TITLE_PREFIX = args.title
+    if args.gzipped:
+        GZIPPED = True
 
 
 def get_runs(args):

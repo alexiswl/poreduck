@@ -60,7 +60,8 @@ STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
                            'albacore_commenced', 'albacore_complete',
-                           'folder_removed', 'fastq_moved']
+                           'albacore_tarred',
+                           'folder_removed', 'fastq_moved', 'fastq_gzipped']
 STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
@@ -128,7 +129,9 @@ class Subfolder:
                                str(self.extracted_commenced), str(self.extracted_complete),
                                str(self.albacore_submitted), self.albacore_jobid,
                                str(self.albacore_commenced), str(self.albacore_complete),
-                               str(self.folder_removed), str(self.fastq_moved)],
+                               str(self.albacore_tarred),
+                               str(self.folder_removed), str(self.fastq_moved),
+                               str(self.fastq_gzipped)],
                          index=STATUS_STANDARD_COLUMNS
                          )
 
@@ -690,6 +693,7 @@ def gzip_fastq_file(subfolder):
         # Remove fastq file
         os.remove(fastq_file)
     subfolder.fastq_gzipped = True
+    update_dataframe(subfolder)
 
 
 def tar_albacore_folder(subfolder):
@@ -698,7 +702,7 @@ def tar_albacore_folder(subfolder):
     It's really just a bunch of metadata anyway
     """
     os.chdir(ALBACORE_DIR)
-    tar_command = f"tar -cf - {os.path.basename(os.path.normpath(subfolder.albacore_dir))} --remove-files | " + \
+    tar_command = f"tar -cf - {subfolder.name} --remove-files | " + \
                   f"pigz -p 16 > {subfolder.albacore_zip_file}"
 
     # Run tar_command through subprocess.
@@ -710,6 +714,7 @@ def tar_albacore_folder(subfolder):
     if not stdout == "" or not stderr == "":
         LOGGER.info(f"Output of tar albacore folder command is:\n\"{stdout.rstrip()}\"\n\"{stderr.rstrip()}\"")
     subfolder.albacore_tarred = True
+    update_dataframe(subfolder)
     os.chdir(READS_DIR)
 
 

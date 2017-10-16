@@ -163,6 +163,8 @@ def main():
                                 help="where do you wish these plots to go?")
     compare_parser.add_argument("--title", type=str, required=True,
                                 help="prefix for titles")
+    compare_parser.add_argument("--gzipped", default=False, action='store_true', dest="gzipped",
+                                help="Are the fastq files gzipped. (Ends with fastq.gz)")
     compare_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
                                 help="Remove outliers from the historgram (0.999th percentile)")
 

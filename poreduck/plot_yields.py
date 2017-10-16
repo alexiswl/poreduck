@@ -108,9 +108,9 @@ class Read_Set:
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
         # Run through fastq file and add attributes to dataframe.
-        if GZIPPED:
+        if GZIPPED:  # Fastq files are gzipped
             input_handle = gzip.open(self.fastq_path, "rt")
-        else:
+        else:  # otherwise plain text files.
             input_handle = open(self.fastq_path, "r")
         for record in SeqIO.parse(input_handle, "fastq"):
             fastq_id = record.id.split()[0]
@@ -156,24 +156,6 @@ class Read_Set:
             self.df.set_value(index, "mux", mux)
         for index, duration in durations.items():
             self.df.set_value(index, "duration", durations)
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser(
-        description="This plot takes in the csv files along with the fastq files to produce a yield plot of the data")
-    parser.add_argument("--csv_dir", type=str, required=True,
-                        help="/path/to/csv_dir" +
-                             "Should have a bunch of csv files in it.")
-    parser.add_argument("--fastq_dir", type=str, required=True,
-                        help="/path/to/fastq/files")
-    parser.add_argument("--output_dir", type=str, required=True,
-                        help="/path/to/plots_dir" +
-                             "By default will be created in current working directory")
-    parser.add_argument("--sample_name", type=str, required=False,
-                        help="Name to add onto each of the plots")
-    args = parser.parse_args()
-    return args
-
 
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
