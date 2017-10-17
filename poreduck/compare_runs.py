@@ -56,7 +56,7 @@ class Run:
 
     def get_fastq_data(self):
         for read_set in self.read_sets:
-            read_set.read_fastq()
+            read_set.read_fastq(GZIPPED)
 
     def aggregate_dataframes(self):
         for read_set in self.read_sets:

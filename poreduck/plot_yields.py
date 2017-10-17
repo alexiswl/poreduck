@@ -97,7 +97,7 @@ class Read_Set:
         self.added_csv_data = False
         self.aggregated_to_global_dataframe = False
 
-    def read_fastq(self):
+    def read_fastq(self, gzipped):
         if not os.path.isfile(self.fastq_path):
             print("Could not find path")
             return
@@ -108,7 +108,7 @@ class Read_Set:
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
         # Run through fastq file and add attributes to dataframe.
-        if GZIPPED:  # Fastq files are gzipped
+        if gzipped:  # Fastq files are gzipped
             input_handle = gzip.open(self.fastq_path, "rt")
         else:  # otherwise plain text files.
             input_handle = open(self.fastq_path, "r")
@@ -203,7 +203,7 @@ def import_fastq():
             fastq_id = fastq_file + "_seq"
         if fastq_id not in READ_SETS.keys():
             READ_SETS[fastq_id] = Read_Set(FASTQ_DIR, fastq_file)
-            READ_SETS[fastq_id].read_fastq()
+            READ_SETS[fastq_id].read_fastq(GZIPPED)
 
 
 def add_csv_data_to_dataframes():
