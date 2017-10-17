@@ -30,7 +30,7 @@ SEQ_DFS = []
 CLIP = False
 TITLE_PREFIX = ""
 GZIPPED = False
-
+FASTQ_SUFFIX = ".fastq"
 """
 Take two runs, 
 create a histogram and a yield comparison between the two runs.
@@ -214,7 +214,7 @@ def plot_yield_general():
 
 
 def set_args(args):
-    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX, GZIPPED
+    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX, GZIPPED, FASTQ_SUFFIX
     # Check to ensure that all fastq folders are there
     FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dirs.split(",")]
     NAMES = [name for name in args.run_names.split(",")]
@@ -231,6 +231,7 @@ def set_args(args):
         TITLE_PREFIX = args.title
     if args.gzipped:
         GZIPPED = True
+        FASTQ_SUFFIX = ".fastq.gz"
 
 
 def get_runs(args):
