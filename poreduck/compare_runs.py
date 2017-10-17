@@ -50,7 +50,7 @@ class Run:
     def get_read_sets(self):
         # FASTQ_DIR used by readset class.
         fastq_files = [fastq_file for fastq_file in os.listdir(self.fastq_dir)
-                       if fastq_file.endswith(".fastq")]
+                       if fastq_file.endswith(FASTQ_SUFFIX)]
         for fastq_file in fastq_files:
             self.read_sets.append(Read_Set(fastq_dir=self.fastq_dir, fastq_file=fastq_file))
 
