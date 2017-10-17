@@ -90,7 +90,7 @@ def plot_read_length_hist():
     # Filter out the top 2000th percentile.
     if CLIP:
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.99)] for seq_df in SEQ_DFS]
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.999)] for seq_df in SEQ_DFS]
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
@@ -152,7 +152,7 @@ def plot_read_length_hist():
     #    sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
     #                 hist_kws={'weights': seq_df}, bins=None)
     for run, seq_df in zip(RUNS, SEQ_DFS):
-        ax.hist(run.all_data['seq_length'], weights=run.all_data['seq_length'], histtype='step',
+        ax.hist(seq_df, weights=seq_df, histtype='step',
                 bins=50, label=run.name)
 
     # Set the axis formatters
