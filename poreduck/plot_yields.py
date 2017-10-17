@@ -415,10 +415,9 @@ def plot_read_length_hist():
 
     def y_hist_to_human_readable_seq(y, position):
         # Convert distribution to base pairs
-        num_bins = 50
         if y == 0:
             return 0
-        s = humanfriendly.format_size(seq_df.sum() * seq_df.count() * y / num_bins, binary=False)
+        s = humanfriendly.format_size(seq_df.sum() * y, binary=False)
         return reformat_human_friendly(s)
 
     # Define how many plots we want (1)
