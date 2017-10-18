@@ -538,6 +538,7 @@ def reformat_human_friendly(s):
     s = s.replace(" byte", "")
     s = s.replace(" bytes", "")
     s = s.replace("B", "")
+    s = s.replace("s", "")
     s += "b"
     return s
 
