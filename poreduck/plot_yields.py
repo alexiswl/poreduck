@@ -428,10 +428,11 @@ def plot_read_length_hist():
     # Plot the histogram
     h, w, p = ax.hist(seq_df, num_bins, weights=seq_df,
                       normed=1, facecolor='blue', alpha=0.76)
+    bin_width = reformat_human_friendly(humanfriendly.format_size(w[1]-w[0], binary=False))
     # Set the titles and axis labels
     ax.set_title(f"Read Distribution Graph for {SAMPLE_NAME}")
     ax.grid(color='black', linestyle=':', linewidth=0.5)
-    ax.set_xlabel(f"Read length: Bin Widths={w[1]-w[0]}")
+    ax.set_xlabel(f"Read length: Bin Widths={bin_width}")
     ax.set_ylabel("Bases per bin")
     # Ensure labels are not missed.
     fig.tight_layout()

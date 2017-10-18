@@ -145,12 +145,8 @@ def plot_read_length_hist():
     plt.close('all')
 
     # Set subplots.
-    #ax = plt.figure(figsize=[12,12]).add_subplot(111)
     fig, ax = plt.subplots()
-    #fig.rcParams["figure.figsze"] = [12, 12]
-    #for run, seq_df in zip(RUNS, SEQ_DFS):
-    #    sns.distplot(seq_df, label=run.name, hist=False, ax=ax,
-    #                 hist_kws={'weights': seq_df}, bins=None)
+
     for run, seq_df in zip(RUNS, SEQ_DFS):
         ax.hist(seq_df, weights=seq_df, histtype='step',
                 bins=50, label=run.name)
