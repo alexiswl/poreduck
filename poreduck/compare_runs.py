@@ -20,6 +20,8 @@ from poreduck.plot_yields import x_hist_to_human_readable
 #from poreduck.plot_yields import y_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
+import statsmodels.api as sm
+
 
 CSV_DIR = ""
 PLOTS_DIR = ""
@@ -165,6 +167,30 @@ def plot_read_length_hist():
     # Ensure labels are not missed.
     plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
+
+    # Plot density
+    weighted_density = [sm.nonparametric.KDEUnivariate(seq_df) for seq_df in SEQ_DFS]
+    plt.close('all')
+
+    # Set subplots.
+    fig, ax = plt.subplots()
+
+    for run, seq_df in zip(RUNS, weighted_density):
+        seq_df.fit(fft=False, weights=seq_df)
+        ax.plot(seq_df, label=run.name)
+
+    # Set labels of axis.
+    ax.set_xlabel("Read length")
+
+    # Set the titles and add a legend.
+    ax.set_title(f"Read Distribution Graph for {TITLE_PREFIX}")
+    ax.grid(color='black', linestyle=':', linewidth=0.5)
+    """Need to have another 'regex' name"""
+    plot_prefix = TITLE_PREFIX.replace(" ", "_")
+
+    # Ensure labels are not missed.
+    plt.tight_layout()
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.pyjoy.png"))
 
 
 def plot_yield_general():
