@@ -224,6 +224,7 @@ def aggregate_dataframes():
             ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
         read_set.aggregated_to_global_dataframe = True
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True]).reset_index(drop=True)
+    ALL_READS.to_csv(os.path.join(PLOTS_DIR, SAMPLE_NAME.replace(" ", "_") + "all_reads.csv"), index=False)
 
 
 def print_stats():
