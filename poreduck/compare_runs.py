@@ -190,7 +190,7 @@ def plot_read_length_hist():
 
     # Ensure labels are not missed.
     plt.tight_layout()
-    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.pyjoy.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.density.png"))
 
 
 def plot_yield_general():
