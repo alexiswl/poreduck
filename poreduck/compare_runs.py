@@ -168,29 +168,38 @@ def plot_read_length_hist():
     plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
 
-    # Plot density
-    weighted_density = [sm.nonparametric.KDEUnivariate(seq_df) for seq_df in SEQ_DFS]
     plt.close('all')
+
+    # Plot Density histogram
 
     # Set subplots.
     fig, ax = plt.subplots()
 
-    for run, seq_df in zip(RUNS, weighted_density):
-        seq_df.fit(fft=False, weights=seq_df)
-        ax.plot(seq_df, label=run.name)
+    # Get weights of univariate system
+    weighted_densities = [sm.nonparametric.KDEUnivariate(seq_df) for seq_df in SEQ_DFS]
+    # Add weighting fit for each KDE
+    [weighted_density.fit(fft=False, weights=seq_df)
+     for weighted_density, seq_df in zip(weighted_densities, SEQ_DFS)]
 
-    # Set labels of axis.
-    ax.set_xlabel("Read length")
+    # Plot each run
+    for weighted_density, run in zip(weighted_densities, RUNS):
+        ax.plot(weighted_density, label=run.name)
+
+    # Set the axis formatters
+    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    ax.set_yticks([])
 
     # Set the titles and add a legend.
-    ax.set_title(f"Read Distribution Graph for {TITLE_PREFIX}")
-    ax.grid(color='black', linestyle=':', linewidth=0.5)
+    ax.set_title(f"Read length Density for {TITLE_PREFIX}")
+    ax.legend()
+    ax.grid(color='black', linestyle=':', linewidth=0.7)
     """Need to have another 'regex' name"""
     plot_prefix = TITLE_PREFIX.replace(" ", "_")
 
     # Ensure labels are not missed.
     plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.density.png"))
+    plt.close('all')
 
 
 def plot_yield_general():
