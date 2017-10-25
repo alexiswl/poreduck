@@ -121,7 +121,9 @@ def plot_read_length_hist():
 
     # Close any previous plots
     plt.close('all')
-    # Plot the histogram using pyjoyplot
+
+    """ Plot the histogram using pyjoyplot """
+
     ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist",
                   order=sorted([run.name for run in RUNS]),
                   bins=bins, weights=True, figsize=[12, 12])
@@ -142,7 +144,7 @@ def plot_read_length_hist():
     plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.pyjoy.png"))
 
-    # Plot the histogram using plt.plot
+    """ Plot the histogram using plt.hist """
     # Close any previous plots
     plt.close('all')
 
@@ -170,7 +172,7 @@ def plot_read_length_hist():
 
     plt.close('all')
 
-    # Plot Density histogram
+    """ Plot Density histogram """
 
     # Set subplots.
     fig, ax = plt.subplots()
