@@ -180,7 +180,7 @@ def plot_read_length_hist():
     # Get weights of univariate system
     weighted_densities = [sm.nonparametric.KDEUnivariate(seq_df) for seq_df in SEQ_DFS]
     # Add weighting fit for each KDE
-    [weighted_density.fit(fft=False, weights=seq_df)
+    [weighted_density.fit(fft=True, weights=seq_df)
      for weighted_density, seq_df in zip(weighted_densities, SEQ_DFS)]
 
     # Plot each run
