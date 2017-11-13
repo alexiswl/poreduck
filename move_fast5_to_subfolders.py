@@ -135,6 +135,3 @@ def standardise_int_length(my_integer):
     return "%04d" % int(my_integer)
 
 
-# Run the main function.
-main()
-

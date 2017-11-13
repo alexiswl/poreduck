@@ -15,7 +15,7 @@ each folder to 4000. This is done by creating sub-folders in the 'reads' directo
 0, 1, 2, as needed.
 
 However this comes with a couple of bugs and a couple more issues.
-Any scripts that relied on all reads being in one folder now have to implement a
+Any poreduck that relied on all reads being in one folder now have to implement a
 recursive stage, and the number of files isn't strictly 4000.
 Why? Because 'mux-reads' don't seem to count
 (so folder 0 will often have around 6000-7000 reads), and
@@ -71,7 +71,7 @@ class Run:
         self.rsync_proc = ""
 
 """
-Main scripts
+Main poreduck
 1. Main function
 2. Transfer fast5 files
 """
@@ -79,7 +79,7 @@ Main scripts
 
 def main():
     """
-    Runs initilisation scripts.
+    Runs initilisation poreduck.
     Main function, recursively calls the transfer_fast5_files until MinKNOW stops running.
     Then tars up the last folder and deletes the transferring lock file.
     """
@@ -142,7 +142,7 @@ def transfer_fast5_files(run):
         copy_across_csv_files(run)
 
 """
-Tranfer fast5 file sub scripts.
+Tranfer fast5 file sub poreduck.
 Includes:
 1. get_subdirs
 2. check_folder_status
@@ -360,7 +360,7 @@ def tar_up_last_folder(run):
 
 
 """
-Initialisation scripts.
+Initialisation poreduck.
 Includes:
 1. get_arguments
 2. set_global_variables
@@ -488,7 +488,7 @@ def remove_transferring_lock_file():
 
 
 """
-Miscellaneous scripts
+Miscellaneous poreduck
 1. is_int
 2. is_minknow_still_running
 3. check_directories

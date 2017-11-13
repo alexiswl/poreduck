@@ -15,7 +15,7 @@ each folder to 4000. This is done by creating sub-folders in the 'reads' directo
 0, 1, 2, as needed.
 
 However this comes with a couple of bugs and a couple more issues.
-Any scripts that relied on all reads being in one folder now have to implement a
+Any poreduck that relied on all reads being in one folder now have to implement a
 recursive stage, and the number of files isn't strictly 4000.
 Why? Because 'mux-reads' don't seem to count
 (so folder 0 will often have around 6000-7000 reads), and
@@ -70,7 +70,7 @@ RUNS = []
 MUX_PROCESSING_TIME = 600  # seconds
 THE_COUNT = 0  # mwhahaha (as in the one from sesame street)
 SUFFIX = ""
-NO_SSHPASS = False
+NO_SSHPASS = True
 SSHPASS_PREFIX = ""
 LOCAL = False  # Local basecalling
 
@@ -100,10 +100,10 @@ Main run files:
 """
 
 
-def main():
+def main(args):
     global THE_COUNT, MINKNOW_RUNNING
     # Get argument list, password for server and set directories.
-    args = get_arguments()
+    #args = get_arguments()
     set_global_variables(args)
     check_directories()
 
@@ -201,7 +201,7 @@ def check_folder_status(subdir, run, full=True):
     #       channel           - Channel ID of the run.
     #       read number       - What number read is this.
 
-    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no'])
+    fast5_pd = pd.DataFrame(columns=['filename', 'ctime', 'channel', 'read_no', 'mux', 'duration'])
     fast5_pd['filename'] = fast5_files
     fast5_pd['ctime'] = [time.ctime(os.path.getmtime(os.path.join(subdir, fast5_file)))
                          for fast5_file in fast5_files]
@@ -221,7 +221,12 @@ def check_folder_status(subdir, run, full=True):
     # Add them to the table
     fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
     fast5_pd['duration'] = fast5_pd['filename'].apply(lambda x: duration[x])
+<<<<<<< HEAD:transfer_fast5_to_server.py
    
+=======
+
+
+>>>>>>> yield_plot:poreduck/transfer_fast5_to_server.py
     # If this is the final folder, we will move regardless of if it is full:
     if not full:
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
@@ -400,7 +405,7 @@ def rsync_across_csv_files(run):
 
 
 """
-Initialisation scripts:
+Initialisation poreduck:
 1. get_arguments
 2. set_global_variables
 3. set_runs
@@ -431,7 +436,7 @@ def get_arguments():
                         help="Sample name that you typed into MinKNOW.")
     parser.add_argument("--suffix", type=str, required=False, default=None,
                         help="Would you like a suffix at the end of each of your csv and tar files?")
-    parser.add_argument("--no-sshpass", default=False, dest='no_sshpass', action='store_true',
+    parser.add_argument("--sshpass", default=False, dest='sshpass', action='store_true',
                         help="ssh-pass is rather poor practise and quite a security risk." +
                              "Tick this option and set up an id_rsa key if you'd prefer." +
                              "You will still be required to enter your password for set-up purposes.")
@@ -454,8 +459,8 @@ def set_global_variables(args):
     SAMPLE_NAME = args.sample_name
     if args.suffix is not None:
         SUFFIX = args.suffix
-    NO_SSHPASS = args.no_sshpass
-    if not NO_SSHPASS:
+    if args.sshpass:
+        NO_SSHPASS = False
         SSHPASS_PREFIX = "sshpass -p %s " % PASSWORD
     LOCAL = args.local
 
@@ -544,7 +549,7 @@ def create_transferring_lock_file():
     s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
 
     # Command to check if folder is there.
-    cd_and_touch_command = "bash -c \"cd %s && touch %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    cd_and_touch_command = f"bash -c \"cd {DEST_DIRECTORY} && touch {TRANSFER_LOCK_FILE}\""
     stdin, stdout, stderr = s.exec_command(cd_and_touch_command)
     static_stdout = stdout.read().decode()
     static_stderr = stderr.read().decode()
@@ -559,7 +564,7 @@ def remove_transferring_lock_file():
     s.connect(SERVER_NAME, username=SERVER_USERNAME, password=PASSWORD)
 
     # Command to check if folder is there.
-    cd_and_remove_command = "bash -c \"cd %s && rm %s\"" % (DEST_DIRECTORY, TRANSFER_LOCK_FILE)
+    cd_and_remove_command = f"bash -c \"cd {DEST_DIRECTORY} && rm {TRANSFER_LOCK_FILE}\""
     stdin, stdout, stderr = s.exec_command(cd_and_remove_command)
     static_stdout = stdout.read().decode()
     static_stderr = stderr.read().decode()
@@ -741,4 +746,3 @@ def standardise_int_length(my_integer):
     # Input of 15 returns 0015
     return f"{int(my_integer):04}"
 
-main()

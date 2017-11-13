@@ -2,9 +2,12 @@
   <dictionary name="Lucatta">
     <words>
       <w>barcodes</w>
+      <w>barcoding</w>
       <w>basecaller</w>
       <w>dest</w>
       <w>fastq</w>
+      <w>flowcells</w>
+      <w>formatters</w>
       <w>jobid</w>
       <w>minknow</w>
       <w>mwhahaha</w>
@@ -12,9 +15,12 @@
       <w>poretools</w>
       <w>proc</w>
       <w>qsub</w>
+      <w>qual</w>
       <w>rstrip</w>
       <w>runmux</w>
+      <w>sacct</w>
       <w>seqid</w>
+      <w>slurm</w>
       <w>sshpass</w>
       <w>taxid</w>
       <w>tracejob</w>
