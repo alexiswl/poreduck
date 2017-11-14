@@ -221,12 +221,7 @@ def check_folder_status(subdir, run, full=True):
     # Add them to the table
     fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
     fast5_pd['duration'] = fast5_pd['filename'].apply(lambda x: duration[x])
-<<<<<<< HEAD:transfer_fast5_to_server.py
-   
-=======
 
-
->>>>>>> yield_plot:poreduck/transfer_fast5_to_server.py
     # If this is the final folder, we will move regardless of if it is full:
     if not full:
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
