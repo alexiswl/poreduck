@@ -94,13 +94,10 @@ class Subfolder:
             self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
         else:
             self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
-<<<<<<< HEAD:albacore_server_scaled.py
-=======
         if ALBACORE_MAJOR_VERSION > 1:
             self.workspace_pass_dir = os.path.join(self.workspace_dir, "pass")
         else:
             self.workspace_pass_dir = self.workspace_dir
->>>>>>> yield_plot:poreduck/albacore_server_scaled.py
         self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
         self.fastq_file = name + ".fastq"
