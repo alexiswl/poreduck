@@ -114,6 +114,10 @@ def main():
                                       "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
     albacore_parser.add_argument("--barcoding", default=False, dest='barcoding', action='store_true',
                                  help="Use this option to demultiplex library?")
+    albacore_parser.add_argument("--albacore_version", type=str, required=True,
+                                 help="Albacore 2 comes with the pass and fail folders." +
+                                      "Albacore 1 does not. Also used in %VER% command in templates."
+                                      "Expressed as <majore_version>.<minor_version>.<patch>")
     albacore_parser.add_argument("--qsub_type", choices=QSUB_TYPES, default="SGE",
                                  help="What qsub system are you using?")
     albacore_parser.add_argument("--qsub_extraction_template", type=str, required=True,
@@ -157,6 +161,10 @@ def main():
                                 help="\"name of run 1\",\"name of run 2\", etc")
     compare_parser.add_argument("--plots_dir", type=str, required=True,
                                 help="where do you wish these plots to go?")
+    compare_parser.add_argument("--title", type=str, required=True,
+                                help="prefix for titles")
+    compare_parser.add_argument("--gzipped", default=False, action='store_true', dest="gzipped",
+                                help="Are the fastq files gzipped. (Ends with fastq.gz)")
     compare_parser.add_argument("--clip", default=False, action='store_true', dest="clip",
                                 help="Remove outliers from the historgram (0.999th percentile)")
 

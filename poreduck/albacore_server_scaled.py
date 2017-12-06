@@ -60,7 +60,8 @@ STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
                            'extracted_commenced', 'extracted_complete',
                            'albacore_submitted', 'albacore_jobid',
                            'albacore_commenced', 'albacore_complete',
-                           'folder_removed', 'fastq_moved']
+                           'albacore_tarred',
+                           'folder_removed', 'fastq_moved', 'fastq_gzipped']
 STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
@@ -76,6 +77,8 @@ LOGGER = None
 LOGGER_DIR = ""
 LOGGER_PATH = ""
 BARCODING = False
+ALBACORE_MAJOR_VERSION = 0
+ALBACORE_VERSION_STRING = ""
 
 
 class Subfolder:
@@ -91,7 +94,10 @@ class Subfolder:
             self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
         else:
             self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
-        self.workspace_pass_dir = os.path.join(self.workspace_dir, "pass")
+        if ALBACORE_MAJOR_VERSION > 1:
+            self.workspace_pass_dir = os.path.join(self.workspace_dir, "pass")
+        else:
+            self.workspace_pass_dir = self.workspace_dir
         self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
         self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
         self.fastq_file = name + ".fastq"
@@ -123,7 +129,9 @@ class Subfolder:
                                str(self.extracted_commenced), str(self.extracted_complete),
                                str(self.albacore_submitted), self.albacore_jobid,
                                str(self.albacore_commenced), str(self.albacore_complete),
-                               str(self.folder_removed), str(self.fastq_moved)],
+                               str(self.albacore_tarred),
+                               str(self.folder_removed), str(self.fastq_moved),
+                               str(self.fastq_gzipped)],
                          index=STATUS_STANDARD_COLUMNS
                          )
 
@@ -257,6 +265,7 @@ def set_global_variables(args):
     global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
     global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
     global LOGGER_DIR, BARCODING, QSUB_TYPE, QSUB_ALBACORE_TEMPLATE, QSUB_EXTRACTION_TEMPLATE
+    global ALBACORE_MAJOR_VERSION, ALBACORE_VERSION_STRING
     READS_DIR = args.reads_dir
     if args.output_dir is not None:
         ALBACORE_DIR = args.output_dir
@@ -280,6 +289,8 @@ def set_global_variables(args):
     QSUB_EXTRACTION_TEMPLATE = os.path.abspath(args.qsub_extraction_template)
     QSUB_ALBACORE_TEMPLATE = os.path.abspath(args.qsub_albacore_template)
     QSUB_TYPE = args.qsub_type
+    ALBACORE_VERSION_STRING = args.albacore_version
+    ALBACORE_MAJOR_VERSION = int(ALBACORE_VERSION_STRING.split(".")[0])
 
 
 def check_directories():
@@ -414,7 +425,8 @@ def extract_tarred_read_set(subfolder):
                              "STDERR": subfolder.extracted_qsub_error_log,
                              "HOSTNAME": QSUB_HOST, 
                              "COMMAND": tar_command,
-                             "WORKING_DIRECTORY": READS_DIR}
+                             "WORKING_DIRECTORY": READS_DIR
+                             }
 
     # Copy the standard qsub file from the main folder to the qsub folder
     shutil.copy(QSUB_EXTRACTION_TEMPLATE, subfolder.extracted_submission_file)
@@ -500,7 +512,8 @@ def run_albacore(subfolder):
                              "HOSTNAME": QSUB_HOST,
                              "MEM": memory_allocation, 
                              "COMMAND": basecaller_command,
-                             "WORKING_DIRECTORY": ALBACORE_DIR}
+                             "WORKING_DIRECTORY": ALBACORE_DIR,
+                             "ALBACORE_VER": ALBACORE_VERSION_STRING}
 
     # Copy the standard qsub file from the main folder to the qsub folder
     shutil.copy(QSUB_ALBACORE_TEMPLATE, subfolder.albacore_submission_file)
@@ -613,8 +626,10 @@ def move_fastq_file(subfolder):
     if CHOSEN_KIT == "SQK-LSK308":
         # Get the 1dsq fastq file as well
         fastq_folder_1dsq = os.path.join(subfolder.albacore_dir, "1dsq_analysis", "1dsq_analysis", "workspace")
-        fastq_files_list = [os.path.join(fastq_folder_1dsq, "pass", fastq)
-                            for fastq in os.listdir(os.path.join(fastq_folder_1dsq, "pass"))
+        if ALBACORE_MAJOR_VERSION > 1:
+            fastq_folder_1dsq = os.path.join(fastq_folder_1dsq, "pass")
+        fastq_files_list = [os.path.join(fastq_folder_1dsq, fastq)
+                            for fastq in os.listdir(os.path.join(fastq_folder_1dsq))
                             if fastq.endswith(".fastq")]
         fastq_files_dict["1dsq"] = fastq_files_list
 
@@ -632,14 +647,14 @@ def move_fastq_file(subfolder):
                                                                                   barcode,
                                                                                   str(index),
                                                                                   "fastq"]))
+                # Create move command and run through subprocess.
+                shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
             else:
                 new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
                                                                                   str(index),
                                                                                   "fastq"]))
-
-            # Create move command and run through subprocess.
-            LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
-            shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
+                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
+                shutil.move(fastq_file, os.path.join(FASTQ_DIR, new_fastq_file))
 
     # Set as complete so we don't try to do it again.
     subfolder.fastq_moved = True
@@ -672,11 +687,13 @@ def gzip_fastq_file(subfolder):
     for fastq_file in fastq_files:
         # Gzip fastq file with gzip python module
         fastq_gzipped = fastq_file + ".gz"
-        with open(fastq_file) as f_in, gzip.open(fastq_gzipped, 'wb') as f_out:
-            f_out.writelines(f_in)
+        with open(fastq_file, 'rb') as f_in:
+            with gzip.open(fastq_gzipped, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
         # Remove fastq file
         os.remove(fastq_file)
     subfolder.fastq_gzipped = True
+    update_dataframe(subfolder)
 
 
 def tar_albacore_folder(subfolder):
@@ -685,7 +702,7 @@ def tar_albacore_folder(subfolder):
     It's really just a bunch of metadata anyway
     """
     os.chdir(ALBACORE_DIR)
-    tar_command = f"tar -cf - {os.path.basename(os.path.normpath(subfolder.albacore_dir))} --remove-files | " + \
+    tar_command = f"tar -cf - {subfolder.name} --remove-files | " + \
                   f"pigz -p 16 > {subfolder.albacore_zip_file}"
 
     # Run tar_command through subprocess.
@@ -697,6 +714,7 @@ def tar_albacore_folder(subfolder):
     if not stdout == "" or not stderr == "":
         LOGGER.info(f"Output of tar albacore folder command is:\n\"{stdout.rstrip()}\"\n\"{stderr.rstrip()}\"")
     subfolder.albacore_tarred = True
+    update_dataframe(subfolder)
     os.chdir(READS_DIR)
 
 

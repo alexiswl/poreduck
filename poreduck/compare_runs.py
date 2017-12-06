@@ -11,12 +11,17 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 import numpy as np
 import sys
+import seaborn as sns
 import pyjoyplot as pjp
 import math
+import humanfriendly
 from poreduck.plot_yields import Read_Set
 from poreduck.plot_yields import x_hist_to_human_readable
+#from poreduck.plot_yields import y_hist_to_human_readable
 from poreduck.plot_yields import y_yield_to_human_readable
 from poreduck.plot_yields import x_yield_to_human_readable
+import statsmodels.api as sm
+
 
 CSV_DIR = ""
 PLOTS_DIR = ""
@@ -25,7 +30,9 @@ FASTQ_DIRS = []
 NAMES = []
 SEQ_DFS = []
 CLIP = False
-
+TITLE_PREFIX = ""
+GZIPPED = False
+FASTQ_SUFFIX = ".fastq"
 """
 Take two runs, 
 create a histogram and a yield comparison between the two runs.
@@ -45,13 +52,13 @@ class Run:
     def get_read_sets(self):
         # FASTQ_DIR used by readset class.
         fastq_files = [fastq_file for fastq_file in os.listdir(self.fastq_dir)
-                       if fastq_file.endswith(".fastq")]
+                       if fastq_file.endswith(FASTQ_SUFFIX)]
         for fastq_file in fastq_files:
             self.read_sets.append(Read_Set(fastq_dir=self.fastq_dir, fastq_file=fastq_file))
 
     def get_fastq_data(self):
         for read_set in self.read_sets:
-            read_set.read_fastq()
+            read_set.read_fastq(GZIPPED)
 
     def aggregate_dataframes(self):
         for read_set in self.read_sets:
@@ -84,13 +91,8 @@ def plot_read_length_hist():
 
     # Filter out the top 2000th percentile.
     if CLIP:
-        # Filter out the top 1000th percentile.
         """For loop of SEQ_DFS here"""
-        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.9995)] for seq_df in SEQ_DFS]
-
-    # Debug, print out each of the runs as csv files.
-    for run, seq_df in zip(RUNS, SEQ_DFS):
-        seq_df.to_csv(f"{run.name}.csv", header=True)
+        SEQ_DFS = [seq_df[seq_df < seq_df.quantile(0.999)] for seq_df in SEQ_DFS]
 
     # Merge all the SEQ_DFS.
     all_seq_dfs = pd.concat([seq_df for seq_df in SEQ_DFS],
@@ -116,14 +118,12 @@ def plot_read_length_hist():
     else:
         bins = [math.ceil((max_by_run[run] - min_by_run[run])/3600)
                 for run in sorted(all_seq_dfs.Run.unique())]
-    # Although it is already numeric, we need to re-numerate this column.
-    # Until the pull-request comes through!
-    # We shouldn't need to convert to numeric, it should all now be numeric.
-    #all_seq_dfs['seq_length'] = pd.to_numeric(all_seq_dfs['seq_length'])
 
     # Close any previous plots
     plt.close('all')
-    # Plot the histogram using pyjoyplot
+
+    """ Plot the histogram using pyjoyplot """
+
     ax = pjp.plot(data=all_seq_dfs, x='seq_length', hue='Run', kind="hist",
                   order=sorted([run.name for run in RUNS]),
                   bins=bins, weights=True, figsize=[12, 12])
@@ -135,15 +135,73 @@ def plot_read_length_hist():
     ax.set_xlabel("Read length") 
 
     # Set the titles and add a legend.
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Read Distribution Graph for {title_string}")
+    ax.set_title(f"Read Distribution Graph for {TITLE_PREFIX}")
     ax.grid(color='black', linestyle=':', linewidth=0.5) 
     """Need to have another 'regex' name"""
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
+    plot_prefix = TITLE_PREFIX.replace(" ","_")
 
     # Ensure labels are not missed.
     plt.tight_layout()
-    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.png"))
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.pyjoy.png"))
+
+    """ Plot the histogram using plt.hist """
+    # Close any previous plots
+    plt.close('all')
+
+    # Set subplots.
+    fig, ax = plt.subplots()
+
+    for run, seq_df in zip(RUNS, SEQ_DFS):
+        ax.hist(seq_df, weights=seq_df, histtype='step',
+                bins=50, label=run.name)
+
+    # Set the axis formatters
+    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    ax.set_yticks([])
+
+    # Set the titles and add a legend.
+    ax.set_title(f"Read length Hist for {TITLE_PREFIX}")
+    ax.legend()
+    ax.grid(color='black', linestyle=':', linewidth=0.7)
+    """Need to have another 'regex' name"""
+    plot_prefix = TITLE_PREFIX.replace(" ", "_")
+
+    # Ensure labels are not missed.
+    plt.tight_layout()
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.overlap.png"))
+
+    plt.close('all')
+
+    """ Plot Density histogram """
+
+    # Set subplots.
+    fig, ax = plt.subplots()
+
+    # Get weights of univariate system
+    weighted_densities = [sm.nonparametric.KDEUnivariate(seq_df) for seq_df in SEQ_DFS]
+    # Add weighting fit for each KDE
+    [weighted_density.fit(fft=True, weights=seq_df)
+     for weighted_density, seq_df in zip(weighted_densities, SEQ_DFS)]
+
+    # Plot each run
+    for weighted_density, run in zip(weighted_densities, RUNS):
+        ax.plot(weighted_density, label=run.name)
+
+    # Set the axis formatters
+    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    ax.set_yticks([])
+
+    # Set the titles and add a legend.
+    ax.set_title(f"Read length Density for {TITLE_PREFIX}")
+    ax.legend()
+    ax.grid(color='black', linestyle=':', linewidth=0.7)
+    """Need to have another 'regex' name"""
+    plot_prefix = TITLE_PREFIX.replace(" ", "_")
+
+    # Ensure labels are not missed.
+    plt.tight_layout()
+    savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_read_length_hist.density.png"))
+    plt.close('all')
 
 
 def plot_yield_general():
@@ -163,19 +221,17 @@ def plot_yield_general():
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
 
-    # Set x and y labels and limits.
-    ax.set_xlabel("Duration (HH:MM)")
-    ax.set_ylabel("Yield")
-
-    # Add title to plot
-    title_string = ", ".join([name for name in NAMES[:-1]]) + " and " + NAMES[-1]
-    ax.set_title(f"Yield for {title_string} (B/Hour)")
-
     # Plot each yield plot through a for loop.
     """For loop here with SEQ_DFS here"""
     for run in RUNS:
         ax.plot(run.yield_data['duration_float'], run.yield_data['cumsum_bp'],
                 linestyle="solid", markevery=[], label=run.name)
+    # Add title to plot
+    ax.set_title(f"Yield for {TITLE_PREFIX} (B/Hour)")
+
+    # Set x and y labels and limits.
+    ax.set_xlabel("Duration (HH:MM)")
+    ax.set_ylabel("Yield")
 
     # Set x,y limits
     ax.set_xlim(min_x, max_x)
@@ -183,16 +239,15 @@ def plot_yield_general():
 
     # Add legend to plot
     ax.legend()
-    plot_prefix = '_'.join([name.replace(" ","_") for name in NAMES])
-
+    plot_prefix = TITLE_PREFIX.replace(" ","_")
 
     # Ensure labels are not missed.
-    fig.tight_layout()
+    plt.tight_layout()
     savefig(os.path.join(PLOTS_DIR, f"{plot_prefix}_general_yield_plot.png"))
 
 
 def set_args(args):
-    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES
+    global PLOTS_DIR, CLIP, FASTQ_DIRS, NAMES, TITLE_PREFIX, GZIPPED, FASTQ_SUFFIX
     # Check to ensure that all fastq folders are there
     FASTQ_DIRS = [fastq_dir for fastq_dir in args.fastq_dirs.split(",")]
     NAMES = [name for name in args.run_names.split(",")]
@@ -205,6 +260,11 @@ def set_args(args):
     PLOTS_DIR = args.plots_dir
     if args.clip:
         CLIP = True
+    if args.title is not None:
+        TITLE_PREFIX = args.title
+    if args.gzipped:
+        GZIPPED = True
+        FASTQ_SUFFIX = ".fastq.gz"
 
 
 def get_runs(args):
@@ -226,4 +286,3 @@ def main(args):
     get_runs(args)
     plot_read_length_hist()
     plot_yield_general()
-

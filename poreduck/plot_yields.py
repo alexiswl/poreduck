@@ -48,8 +48,8 @@ DATEPARSE_CSV = lambda dates: [pd.datetime.strptime(d, '%a %b %d %H:%M:%S %Y') f
 DATEPARSE_FASTQ = lambda dates: [pd.datetime.strptime(d, "%Y-%m-%dT%H:%M:%SZ") for d in dates]
 SAMPLE_NAME = ""
 YIELD_DATA = None
-QUALITY_DESCRIPTIONS = ["<80", "80-90", "90-95", "95+"]
-QUALITY_BINS = [6.99, 10, 13.01]  # 80, 90 and 95 respectively
+QUALITY_DESCRIPTIONS = ["<7", "7-10", "10-15", "15+"]
+QUALITY_BINS = [7, 10, 15]  # 80, 90 and 97 respectively
 QUALITY_COLOURS = ['#e51400', '#fa6800', '#a4c400', '#60A917']
 PERCENTILES = [0.1, 0.25, 0.5, 0.75, 0.9]
 QUALITY_DESCRIPTIONS.reverse()
@@ -97,7 +97,7 @@ class Read_Set:
         self.added_csv_data = False
         self.aggregated_to_global_dataframe = False
 
-    def read_fastq(self):
+    def read_fastq(self, gzipped):
         if not os.path.isfile(self.fastq_path):
             print("Could not find path")
             return
@@ -108,9 +108,9 @@ class Read_Set:
         # Create the columns we will write to fastq_id, and seq_length
         self.df = pd.DataFrame(data=None, columns=["fastq_id", "read", "channel", "time", "seq_length", "av_qual"])
         # Run through fastq file and add attributes to dataframe.
-        if GZIPPED:
+        if gzipped:  # Fastq files are gzipped
             input_handle = gzip.open(self.fastq_path, "rt")
-        else:
+        else:  # otherwise plain text files.
             input_handle = open(self.fastq_path, "r")
         for record in SeqIO.parse(input_handle, "fastq"):
             fastq_id = record.id.split()[0]
@@ -156,24 +156,6 @@ class Read_Set:
             self.df.set_value(index, "mux", mux)
         for index, duration in durations.items():
             self.df.set_value(index, "duration", durations)
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser(
-        description="This plot takes in the csv files along with the fastq files to produce a yield plot of the data")
-    parser.add_argument("--csv_dir", type=str, required=True,
-                        help="/path/to/csv_dir" +
-                             "Should have a bunch of csv files in it.")
-    parser.add_argument("--fastq_dir", type=str, required=True,
-                        help="/path/to/fastq/files")
-    parser.add_argument("--output_dir", type=str, required=True,
-                        help="/path/to/plots_dir" +
-                             "By default will be created in current working directory")
-    parser.add_argument("--sample_name", type=str, required=False,
-                        help="Name to add onto each of the plots")
-    args = parser.parse_args()
-    return args
-
 
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
@@ -221,7 +203,7 @@ def import_fastq():
             fastq_id = fastq_file + "_seq"
         if fastq_id not in READ_SETS.keys():
             READ_SETS[fastq_id] = Read_Set(FASTQ_DIR, fastq_file)
-            READ_SETS[fastq_id].read_fastq()
+            READ_SETS[fastq_id].read_fastq(GZIPPED)
 
 
 def add_csv_data_to_dataframes():
@@ -242,6 +224,7 @@ def aggregate_dataframes():
             ALL_READS = ALL_READS.append(read_set.df, ignore_index=True)
         read_set.aggregated_to_global_dataframe = True
     ALL_READS = ALL_READS.sort_values(['time'], ascending=[True]).reset_index(drop=True)
+    ALL_READS.to_csv(os.path.join(PLOTS_DIR, SAMPLE_NAME.replace(" ", "_") + "all_reads.csv"), index=False)
 
 
 def print_stats():
@@ -433,10 +416,9 @@ def plot_read_length_hist():
 
     def y_hist_to_human_readable_seq(y, position):
         # Convert distribution to base pairs
-        num_bins = 50
         if y == 0:
             return 0
-        s = humanfriendly.format_size(seq_df.sum() * seq_df.count() * y / num_bins, binary=False)
+        s = humanfriendly.format_size(seq_df.sum() * y, binary=False)
         return reformat_human_friendly(s)
 
     # Define how many plots we want (1)
@@ -445,12 +427,13 @@ def plot_read_length_hist():
     ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable_seq))
     ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
     # Plot the histogram
-    ax.hist(seq_df, num_bins, weights=seq_df,
-            normed=1, facecolor='blue', alpha=0.76)
+    h, w, p = ax.hist(seq_df, num_bins, weights=seq_df,
+                      normed=1, facecolor='blue', alpha=0.76)
+    bin_width = reformat_human_friendly(humanfriendly.format_size(w[1]-w[0], binary=False))
     # Set the titles and axis labels
     ax.set_title(f"Read Distribution Graph for {SAMPLE_NAME}")
     ax.grid(color='black', linestyle=':', linewidth=0.5)
-    ax.set_xlabel("Read length")
+    ax.set_xlabel(f"Read length: Bin Widths={bin_width}")
     ax.set_ylabel("Bases per bin")
     # Ensure labels are not missed.
     fig.tight_layout()
@@ -556,6 +539,7 @@ def reformat_human_friendly(s):
     s = s.replace(" byte", "")
     s = s.replace(" bytes", "")
     s = s.replace("B", "")
+    s = s.replace("s", "")
     s += "b"
     return s
 
