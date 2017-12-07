@@ -448,15 +448,18 @@ def plot_poremap():
     # The following four lines of code create an array that is a top-down, left-right 2D array of MinKNOW.
 
     # Split into chunks of 64 (rows of 4)
-    chunks = [1, 2, 3, 4, 5, 6, 7, 0]
-    # In which each row has the follow multiplication factor
-    row_factors = [3, 2, 1, 0]
+    c_w = 10
+    c_l = 25
+    c_num = 12
+
     # Create the values that make up the numbers on the far-right column of the grid.
-    rh_values = [64 * chunk + 8 * row_factor for chunk in chunks for row_factor in row_factors]
+    channels_by_array = np.array([[c_no*c_w*c_l + c_w*l_no + w_no + 1
+                                   for c_no in c_num
+                                   for w_no in np.arange(c_w)]
+                                 for l_no in c_l])
+
     # Use the minknow_column_order function which reference the far-right column for a given row
     # to fill in the rest of the values for each row.
-    channels_by_order_array = np.array([[j for j in minknow_column_order(i)] for i in rh_values])
-    # Create an array of the same dimensions but filled with zeroes.
     channels_by_yield_array = np.zeros(channels_by_order_array.shape)
     # Sum the values for each channel.
     channels_by_yield_df = pd.DataFrame(ALL_READS.groupby("channel")["seq_length"].sum())
@@ -493,8 +496,8 @@ def plot_poremap():
                 # Format keyword args for the side bar.
                 cbar_kws={"format": formatter_y,
                           "label": "Bases per channel"})
-    # Create line down the middle as shown in MinKNOW.
-    ax.axvline([8], color='white', lw=15)
+    # Create three lines down the middle as shown in PromethION MinKNOW.
+    ax.axvline([10, 20, 30], color='white', lw=15)
     # Nice big title!
     ax.set_title("Map of Yield by Channel", fontsize=25)
     # Ensure labels are not missed.
