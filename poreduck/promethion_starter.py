@@ -5,8 +5,12 @@ Given a sample sheet and a run directory, tar up a PromethION run.
 """
 
 import argparse
-import hdf5
+import h5py
 from datetime import datetime, timedelta
+import pandas as pd
+import os
+import shutil
+import subprocess
 
 """
 Class types
@@ -48,48 +52,61 @@ class Fast5file:
         self.read = post_seq_pivot[-4]
         self.rnumber = post_seq_pivot[-6]
         self.sample_id = post_seq_pivot[0:-6]
+        self.corrupted = False
         # Now get inside the fast5 file
         with h5py.File(self.filepath) as f:
             # Get attributes from /Raw/Reads/
-            read_attributes = dict(f['Raw/Reads/Read_%s' % self.read].attrs.items())
+            try:
+                read_attributes = dict(f['Raw/Reads/Read_%s' % self.read].attrs.items())
+            except KeyError:
+                self.corrupted = True
+                print("%s is corrupted" % self.filename)
+                return
             # Get values from inside the fast5 value
             self.mux_id = read_attributes["start_mux"]
             self.read_id = read_attributes["read_id"]
             # Get the Experiment duration from the context tags.
-            if is_mux:
+            try:
+                context_tags = dict(f['UniqueGlobalKey/context_tags'].attrs.items())
+                tracking_id = dict(f['UniqueGlobalKey/tracking_id'].attrs.items())
+                channel_id = dict(f['UniqueGlobalKey/channel_id'].attrs.items())
+            except KeyError:
+                self.corrupted=True
+                print("%s is corrupted" % self.filename)
                 return
-            context_tags = dict(f['UniqueGlobalKey/context_tags'].attrs.items())
-            tracking_id = dict(f['UniqueGlobalKey/tracking_id'].attrs.items())
-            channel_id = dict(f['UniqueGlobalKey/channel_id'].attrs.items())
-            # Time format
-            self.exp_start_time = datetime.datetime.strptime(tracking_id['exp_start_time'].decode(), 
-                                                             "%Y-%m-%dT%H:%M:%SZ") 
-            # Minute format and in byte strings.
-            self.exp_duration_set = timedelta(minutes=context_tags['experiment_duration_set'].decode()))
+            # Time (even mux have start times)
+            self.exp_start_time = datetime.strptime(tracking_id['exp_start_time'].decode(), 
+                                                    "%Y-%m-%dT%H:%M:%SZ") 
+            # Minute format and in byte strings (not found in mux)
+            if not is_mux:
+                self.exp_duration_set = timedelta(minutes=int(context_tags['experiment_duration_set'].decode()))
+            else:
+                self.exp_duration_set = timedelta(minutes=10)
             # Read start time = start_time / sampling rate + exp_start_time
-            self.duration_time = read_attributes["duration"]/channel_id["sampling_rate"]
-            self.pore_start_time = timedelta(seconds=read_attributes["start_time"]/channel_id["sampling_rate"]) + self.exp_start_time
+            self.duration_time = int(read_attributes["duration"])/int(channel_id["sampling_rate"])
+            self.pore_start_time = timedelta(seconds=int(read_attributes["start_time"])/int(channel_id["sampling_rate"])) + self.exp_start_time
             self.pore_end_time = self.pore_start_time + timedelta(seconds=self.duration_time)
            
             
     def to_series(self):
-        series_columns = ["Name", "Channel", "Read", "RNumber" # From file name
+        series_columns = ["Name", "Channel", "Read", "RNumber", # From file name
                           "MuxID", "StartTime", "EndTime"]  # From fast5 file - requried for plots
 
-        return pd.series(data=[self.filename, self.channel, self.read, self.rnumber,
+        return pd.Series(data=[self.filename, self.channel, self.read, self.rnumber,
                                self.mux_id, self.pore_start_time, self.pore_end_time],
                          index=series_columns)
 
 
 class Subfolder:
-    def __init__(self, reads_path, number, is_mux=False, threshold=4000):
+    def __init__(self, reads_path, number, metadata_dir, is_mux=False, threshold=4000):
         # Int name of the fast5 file
-        self.number = int(number)
-        self.standard_int = f"{int(my_integer):04}"
-        self.ismux = is_mux
+        self.number = number
+        self.standard_int = self.number.zfill(4)
+        self.is_mux = is_mux
         self.pardir = reads_path
-        self.path = os.path.join(self.pardir, number)
-        self.fast5_path = os.path.join(self.path, "fast5")
+        self.path = os.path.join(self.pardir, number) 
+        self.metadata_dir = metadata_dir
+        self.metadata_path = ""
         # Initialise the stage parameters. 
         self.is_full = False
         self.is_tarred = False
@@ -98,24 +115,26 @@ class Subfolder:
         self.fast5_files = []
         self.pd = None
         # Initiliase start and end times
-        self.rnumber = 0
+        self.rnumber = ""
         self.start_time = None
         self.end_time = None
         self.threshold = threshold
-        
+    
+    def get_new_folder_name(self): 
         # Create the new folder name
-        if is_mux:
+        if self.is_mux:
             mux_seq = "mux_scan"
         else:
             mux_seq = "sequencing_run"
         self.new_folder_name = '_'.join([self.standard_int, mux_seq, self.rnumber])
         self.new_folder_path = os.path.join(self.pardir, self.new_folder_name)
         self.tar_file = self.new_folder_name + ".tar.gz"
-        
+        self.metadata_path = os.path.join(self.metadata_dir, self.new_folder_name+".tsv")
+
     def get_fast5_files(self):
         # Fast5 class
-        self.fast5_files = [Fast5file(fast5_file, self.fast5_path, is_mux=is_mux)
-                            for fast5_file in os.listdir(self.fast5_path)
+        self.fast5_files = [Fast5file(fast5_file, self.path, is_mux=self.is_mux)
+                            for fast5_file in os.listdir(self.path)
                             if fast5_file.endswith(".fast5")]
         self.num_fast5_files = len(self.fast5_files)
     
@@ -123,19 +142,29 @@ class Subfolder:
         # Generate dataframe for subfolder
         self.pd = None
         for fast5_file in self.fast5_files:
+            if fast5_file.corrupted:
+                continue
             if self.pd is None:
-                self.pd = pd.DataFrame(data=fast5_file.to_series())
+                first_series = fast5_file.to_series()
+                
+                self.pd = pd.DataFrame(data=[first_series])
+
             else:
                 self.pd = self.pd.append(fast5_file.to_series(),
                                          ignore_index=True)
-                
+
+    def write_dataframe(self):
+        self.pd.to_csv(self.metadata_path, header=True, index=False, sep="\t")        
+   
     def check_if_full(self):    
         if self.is_full:
             # We shouldn't be calling this twice.
             return
-        self.run_complete = self.is_run_complete()
+        raw_fast5_count = len([fast5 
+                               for fast5 in os.listdir(self.path) 
+                               if fast5.endswith(".fast5")])
         # Determine if this folder is still being written to
-        if self.num_fast5_files < self.threshold or not self.run_complete:
+        if raw_fast5_count < self.threshold and not self.is_mux:
             self.is_full = False
             return
         self.is_full = True
@@ -143,18 +172,42 @@ class Subfolder:
         self.get_fast5_files()
         # Get dataframe
         self.get_dataframe()
+        # May still be full if run has stopped and last bin.
+        self.run_complete = self.is_run_complete()
+        # Redetermine if bin is full
+        if not self.is_full and self.run_complete:
+            # Get fast5 files
+            self.get_fast5_files()
+            # Get data frame
+            self.get_dataframe()
+
         # Set values of rnumber, start_time and end_time
-        self.rnumber = self.pd.Rnumber.unique().item()
+        try:
+            self.rnumber = self.pd.RNumber.unique().item()
+        except ValueError:
+            print(self.pd.RNumber.unique())
         self.start_time = self.pd.StartTime.min()
         self.end_time = self.pd.EndTime.max()
+        # Get new folder name
+        self.get_new_folder_name()
+        self.write_dataframe()
     
     def is_run_complete(self):
-        # Get expected finish time
-        exp_finished_time = self.get_run_finish_time(self.fast5_files[0])
+        # We cannot complete this operation is the bin is not full
+        if not self.is_full:
+            return False
+        # Get standard fast5 file (not that simple)
+        while True:
+            fast5_files_iter = iter(self.fast5_files)
+            fast5_file = next(fast5_files_iter)
+            if not fast5_file.corrupted:
+                break
+        # Get expected finish time from fast5 file
+        exp_finished_time = self.get_run_finish_time(fast5_file)
         # Determine if run is complete.
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
-        diff = exp_finished_time - current_time
+        diff = exp_finished_time - current_time 
         if diff.total_seconds() < 0:
             return True
         else:
@@ -178,33 +231,44 @@ class Subfolder:
         oldpwd = os.getcwd()
         os.chdir(self.pardir)
         # Now declare tar and pigz command
-        tar_command = ["tar", "-cf", "-", self.path, "--remove-files"]
-        pigz_command = ["pigz", "-9", "-p", "16", ">", self.tar_file]
-        # Pipe output of tar command into pigz command.
-        tar_proc = subprocess.run(tar_command, stdout=subprocess.PIPE)
-        pigz_command = subprocess.run(pigz_command, stdin=tar_proc.stdout,
-                                      stderr=subprocess.PIPE)
+        tar_command = ["tar", "-cf", '-', self.new_folder_name, "--remove-files"]
+        pigz_command = ["pigz", "-9", "-p", "16"]
+        # Pipe output of tar command into pigz command. 
+        with open(self.tar_file, 'w') as output_h:
+            tar_proc = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
+            pigz_proc = subprocess.Popen(pigz_command, stdin=tar_proc.stdout,
+                                         stdout=output_h, stderr=subprocess.PIPE)
         tar_proc.stdout.close()
-        if not pigz_command.returncode == 0:
+        pigz_output = pigz_proc.communicate()
+        print(pigz_output)
+        if not pigz_proc.returncode == 0:
             print(pigz_command.stderr.decode())
         os.chdir(oldpwd)
         self.is_tarred = True
 
         
 class Run:
-    def __init__(self, date, start_time, path, is_mux = False):
-        self.start_date = date
-        self.start_time = start_time
-        self.path = path
+    def __init__(self, path, is_mux = False):
+        self.path = path 
+        self.fast5_path = os.path.join(self.path, "fast5")
         self.is_mux = is_mux
         self.complete = False
         self.subfolders = []
 
-    def get_subfolders(self):
-        for folder in os.listdir(self.path):
+    def get_subfolders(self, metadata_dir):
+
+        # Get all folders
+        folders = [folder 
+                   for folder in os.listdir(self.fast5_path)
+                   if os.path.isdir(os.path.join(self.fast5_path, folder))
+                   and folder.isdigit()
+                  ]
+        for folder in folders:
+            # Don't readd folders
             if folder in [subfolder.number for subfolder in self.subfolders]:
-                continue
-            self.subfolders.append(Subfolder(self, self.path, self.number, is_mux = False))
+                continue 
+            # Append new folders
+            self.subfolders.append(Subfolder(self.fast5_path, folder, metadata_dir, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
@@ -216,6 +280,8 @@ class Run:
                 folder.tar_folder()
      
     def is_run_complete(self):
+        if not self.subfolders[0].is_full:
+            return False
         if self.subfolders[0].is_run_complete():
             return True
 
@@ -225,16 +291,16 @@ class Sample:
         self.pd = samplesheet.query("SampleName=='%s'" % sample_name)
         self.runs = []
         self.is_running = True
-        for run in self.pd.iterrows():
-            mux_path = os.path.join(run_dir, run.slurm_id, '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
-            seq_path = os.path.join(run_dir, run.slurm_id, '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
-            self.runs.append(Run(run.date, run.greenwich_mux_start_time, run.mux_path, is_mux=True))
-            self.runs.append(Run(run.date, run.greenwich_seq_start_time, run.seq_path, is_mux=False))
+        for index, run in self.pd.iterrows():  
+            mux_path = os.path.join(run_dir, run.SlurmID, "reads", '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
+            seq_path = os.path.join(run_dir, run.SlurmID, "reads", '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
+            self.runs.append(Run(mux_path, is_mux=True))
+            self.runs.append(Run(seq_path, is_mux=False))
     
-    def is_still_running(self):
+    def is_run_complete(self):
         # All ports must be complete to return true.
-        for run in self.runs():
-            if not run.is_run_complete():
+        for run in self.runs:
+            if not run.is_run_complete(): 
                 return False
         return True
 
@@ -255,36 +321,43 @@ def get_args():
     1. Path to PCA directory
     2. Samplesheet
     """
-    parser = argparse.ArgumentParser(description="Tar up the run folders of the PromethION)
+    parser = argparse.ArgumentParser(description="Tar up the run folders of the PromethION")
     parser.add_argument("--samplesheet", type=str, required=True,
-                        help="Path to tab delimited samplesheet. Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, GrnwchSeqStartDate, GrnwchSeqStartTime")
+                        help="Path to tab delimited samplesheet. Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
     parser.add_argument("--pca_dir", type=str, required=True,
                         help="/path/to/PCA00XX/")
+    parser.add_argument("--metadata_dir", type=str, required=True,
+                        help="Where is the metadata to be stored")
     args = parser.parse_args()
     return args                                
                
                                      
 def is_still_running(samples):
     for sample in samples:
-        if sample.is_still_running():
+        if not sample.is_run_complete():
             return True
     return False
             
 
 def samplesheet_to_pd(samplesheet):
-    return pd.read_csv(samplesheet, header=0, sep="\t")
+    return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str) #{"GrnwchMuxStartDate": str,
+                                                                    # "GrnwchMuxStartTime": str,
+                                                                    # "GrnwchSeqStartDate": str,
+                                                                     #     "GrnwchSeqStartTime": str})
 
 
 def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
-    samples = [Sample(sample_name, samplesheet, args.data_dir)
+    if not os.path.isdir(args.metadata_dir):
+        os.mkdir(args.metadata_dir)
+    samples = [Sample(sample, samplesheet, args.pca_dir)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     while running:
         for sample in samples:
             for run in sample.runs:
-                run.get_subfolders()
+                run.get_subfolders(metadata_dir=args.metadata_dir)
                 run.tar_subfolders()
         running = is_still_running(samples)
 
