@@ -453,10 +453,10 @@ def plot_poremap():
     c_num = 12
 
     # Create the values that make up the numbers on the far-right column of the grid.
-    channels_by_array = np.array([[c_no*c_w*c_l + c_w*l_no + w_no + 1
-                                   for c_no in c_num
-                                   for w_no in np.arange(c_w)]
-                                 for l_no in c_l])
+    channels_by_order_array = np.array([[c_no*c_w*c_l + c_w*l_no + w_no + 1
+                                         for c_no in np.arange(c_num)
+                                         for w_no in np.arange(c_w)]
+                                       for l_no in np.arange(c_l)])
 
     # Use the minknow_column_order function which reference the far-right column for a given row
     # to fill in the rest of the values for each row.
@@ -497,7 +497,7 @@ def plot_poremap():
                 cbar_kws={"format": formatter_y,
                           "label": "Bases per channel"})
     # Create three lines down the middle as shown in PromethION MinKNOW.
-    ax.axvline([10, 20, 30], color='white', lw=15)
+    [ax.axvline([x], color='white', lw=15) for x in [30, 60, 90]]
     # Nice big title!
     ax.set_title("Map of Yield by Channel", fontsize=25)
     # Ensure labels are not missed.

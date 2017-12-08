@@ -234,7 +234,7 @@ class Subfolder:
         tar_command = ["tar", "-cf", '-', self.new_folder_name, "--remove-files"]
         pigz_command = ["pigz", "-9", "-p", "16"]
         # Pipe output of tar command into pigz command. 
-        with open(self.tar_file, 'w') as output_h:
+        with open(self.tar_file+".tmp", 'w') as output_h:
             tar_proc = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
             pigz_proc = subprocess.Popen(pigz_command, stdin=tar_proc.stdout,
                                          stdout=output_h, stderr=subprocess.PIPE)
@@ -243,6 +243,7 @@ class Subfolder:
         print(pigz_output)
         if not pigz_proc.returncode == 0:
             print(pigz_command.stderr.decode())
+        shutil.move(self.tar_file+".tmp", self.tar_file)
         os.chdir(oldpwd)
         self.is_tarred = True
 
@@ -254,8 +255,11 @@ class Run:
         self.is_mux = is_mux
         self.complete = False
         self.subfolders = []
+        self.metadata_dir = os.path.join(self.path, "metadata")
+        if not os.path.isdir(self.metadata_dir):
+            os.mkdir(self.metadata_dir)
 
-    def get_subfolders(self, metadata_dir):
+    def get_subfolders(self):
 
         # Get all folders
         folders = [folder 
@@ -264,11 +268,11 @@ class Run:
                    and folder.isdigit()
                   ]
         for folder in folders:
-            # Don't readd folders
+            # Don't read folders
             if folder in [subfolder.number for subfolder in self.subfolders]:
                 continue 
             # Append new folders
-            self.subfolders.append(Subfolder(self.fast5_path, folder, metadata_dir, is_mux=self.is_mux))
+            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
@@ -326,8 +330,6 @@ def get_args():
                         help="Path to tab delimited samplesheet. Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
     parser.add_argument("--pca_dir", type=str, required=True,
                         help="/path/to/PCA00XX/")
-    parser.add_argument("--metadata_dir", type=str, required=True,
-                        help="Where is the metadata to be stored")
     args = parser.parse_args()
     return args                                
                
@@ -349,15 +351,13 @@ def samplesheet_to_pd(samplesheet):
 def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
-    if not os.path.isdir(args.metadata_dir):
-        os.mkdir(args.metadata_dir)
     samples = [Sample(sample, samplesheet, args.pca_dir)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     while running:
         for sample in samples:
             for run in sample.runs:
-                run.get_subfolders(metadata_dir=args.metadata_dir)
+                run.get_subfolders()
                 run.tar_subfolders()
         running = is_still_running(samples)
 
