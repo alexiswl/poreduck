@@ -130,6 +130,7 @@ class Subfolder:
         self.new_folder_name = ""
         self.new_folder_path = ""
         self.tar_file = ""
+        self.tar_path = ""
         self.num_fast5_files = 0
 
     def get_new_folder_name(self): 
@@ -141,6 +142,7 @@ class Subfolder:
         self.new_folder_name = '_'.join([self.standard_int, mux_seq, self.rnumber])
         self.new_folder_path = os.path.join(self.pardir, self.new_folder_name)
         self.tar_file = self.new_folder_name + ".tar.gz"
+        self.tar_path = os.path.join(self.pardir, self.tar_file)
         self.metadata_path = os.path.join(self.metadata_dir, self.new_folder_name+".tsv")
 
     def get_fast5_files(self):
@@ -168,7 +170,12 @@ class Subfolder:
                                          ignore_index=True)
 
     def write_dataframe(self):
-        self.pd.to_csv(self.metadata_path, header=True, index=False, sep="\t")        
+        open_sftp = self.slave.ssh_client.open_sftp()
+        tsv_ftpfile = open_sftp.file(self.metadata_path, 'w')
+        self.pd.to_csv(tsv_ftpfile, header=True, index=False, sep="\t")
+        tsv_ftpfile.flush()
+        tsv_ftpfile.close()
+        open_sftp.close()
    
     def check_if_full(self):    
         if self.is_full:
@@ -179,6 +186,7 @@ class Subfolder:
         raw_fast5_count = len([fast5
                                for fast5 in open_sftp.listdir(path=self.path)
                                if fast5.endswith(".fast5")])
+        open_sftp.close()
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.is_mux:
             self.is_full = False
@@ -242,6 +250,7 @@ class Subfolder:
         # First move the folder to the new folder path location through opensftp
         open_sftp = self.slave.ssh_client.open_sftp()
         open_sftp.rename(self.path, self.new_folder_path)
+        open_sftp.close()
 
         """Tar folder using pigz"""
         # When tarring we need to be in the directory, rather than use the absolute path
@@ -252,9 +261,11 @@ class Subfolder:
         # Use openssh client to run tar gzip through ssh
         stdin, stdout, stderr = self.slave.ssh_client.exec_command('; '.join(["cd %s" % self.pardir,
                                                                               tar_and_gzip_command]))
+        print(stdin.__dict__, stdout.__dict__, stderr.__dict__)
         # Move output from .tmp to tar file
         open_sftp = self.slave.ssh_client.open_sftp()
-        open_sftp.rename(self.tar_file+".tmp", self.tar_file)
+        open_sftp.rename(self.tar_path+".tmp", self.tar_path)
+        open_sftp.close()
         self.is_tarred = True
 
         
@@ -290,7 +301,7 @@ class Run:
             if folder in [subfolder.number for subfolder in self.subfolders]:
                 continue 
             # Append new folders
-            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, slave, is_mux=self.is_mux))
+            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, self.slave, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
@@ -313,7 +324,7 @@ class Sample:
         self.pd = samplesheet.query("SampleName=='%s'" % sample_name)
         # Get the active slaves for this run.
         self.slaves = [Slave(slurm_id, config_pd, pca_value)
-                       for slurm_id in self.pd.query('SlurmID').tolist()]
+                       for slurm_id in self.pd.SlurmID.tolist()]
         self.runs = []
         self.is_running = True
         for index, run in self.pd.iterrows():
@@ -337,14 +348,15 @@ class Slave:
     """Use the slave node config to access the data from the master node."""
     def __init__(self, slurm_id, config_pd, pca_value):
         self.slurm_id = slurm_id
-        self.ssh_ip = config_pd.query("IP=='%s'" % self.slurm_id).item()
+        self.ssh_ip = config_pd.query("SlurmID=='%s'" % self.slurm_id)['IP'].item()
+        print(self.ssh_ip)
         self.ssh_client = None
         self.reads_path = os.path.join("/media/data/", pca_value, self.slurm_id, "reads")
 
     def connect(self):
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh_connect(self.ssh_ip, key_filename='~/.ssh/id.pub')
+        self.ssh_client.connect(self.ssh_ip, key_filename='/home/prom/.ssh/id_rsa.pub')
 
 """
 General process:
