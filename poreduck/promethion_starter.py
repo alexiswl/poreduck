@@ -365,7 +365,7 @@ def get_args():
                         help="Path to tab delimited samplesheet. "
                              "Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, "
                              "GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
-    parser.add_argument("--pca_dir", type=str, required=True,
+    parser.add_argument("--pca_id", type=str, required=True,
                         help="/path/to/PCA00XX/")
     parser.add_argument("--ip_config", type=str, required=True,
                         help="path/to/tab-delimited-config file. "
@@ -393,7 +393,7 @@ def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
     config_pd = config_to_pd(args.ip_config)
-    samples = [Sample(sample, samplesheet, config_pd, args.pca_dir)
+    samples = [Sample(sample, samplesheet, config_pd, args.pca_id)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     while running:
