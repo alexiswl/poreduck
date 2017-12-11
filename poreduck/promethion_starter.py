@@ -105,7 +105,7 @@ class Fast5file:
 
 
 class Subfolder:
-    def __init__(self, reads_path, number, metadata_dir, slave, is_mux=False, threshold=4000):
+    def __init__(self, reads_path, number, metadata_dir, slave, run, is_mux=False, threshold=4000):
         # Int name of the fast5 file
         self.number = number
         self.standard_int = self.number.zfill(4)
@@ -132,6 +132,7 @@ class Subfolder:
         self.tar_file = ""
         self.tar_path = ""
         self.num_fast5_files = 0
+        self.run = run
 
     def get_new_folder_name(self): 
         # Create the new folder name
@@ -178,6 +179,8 @@ class Subfolder:
         open_sftp.close()
    
     def check_if_full(self):    
+        if self.run.is_complete:
+            self.run_complete = True
         if self.is_full:
             # We shouldn't be calling this twice.
             return
@@ -217,7 +220,7 @@ class Subfolder:
         self.write_dataframe()
     
     def is_run_complete(self):
-        # We cannot complete this operation is the bin is not full
+        # We cannot complete this operation if the bin is not full
         if not self.is_full:
             return False
         # Get standard fast5 file (not that simple)
@@ -301,7 +304,7 @@ class Run:
             if folder in [subfolder.number for subfolder in self.subfolders]:
                 continue 
             # Append new folders
-            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, self.slave, is_mux=self.is_mux))
+            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, self.slave, self, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
