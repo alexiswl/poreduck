@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import paramiko
+from tempfile import NamedTemporaryFile
 
 """
 Class types
