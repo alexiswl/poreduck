@@ -11,6 +11,7 @@ import pandas as pd
 import os
 import shutil
 import subprocess
+import paramiko
 
 """
 Class types
@@ -32,8 +33,9 @@ Along with the expected finish time of the run.
 
 """
 
+
 class Fast5file:
-    def __init__(self, filename, input_folder, is_mux=False):
+    def __init__(self, filename, input_folder, open_sftp, is_mux=False):
         self.filename = filename
         self.filepath = os.path.join(input_folder, self.filename)
         # To get the rest of the attributes from the filename,
@@ -53,8 +55,11 @@ class Fast5file:
         self.rnumber = post_seq_pivot[-6]
         self.sample_id = post_seq_pivot[0:-6]
         self.corrupted = False
+        # Download the fast5file to /tmp.
+        tmp_file = NamedTemporaryFile(delete=False)  # We will delete at the end
+        open_sftp.get(self.filepath, tmp_file.name)
         # Now get inside the fast5 file
-        with h5py.File(self.filepath) as f:
+        with h5py.File(tmp_file.name) as f:
             # Get attributes from /Raw/Reads/
             try:
                 read_attributes = dict(f['Raw/Reads/Read_%s' % self.read].attrs.items())
@@ -71,7 +76,7 @@ class Fast5file:
                 tracking_id = dict(f['UniqueGlobalKey/tracking_id'].attrs.items())
                 channel_id = dict(f['UniqueGlobalKey/channel_id'].attrs.items())
             except KeyError:
-                self.corrupted=True
+                self.corrupted = True
                 print("%s is corrupted" % self.filename)
                 return
             # Time (even mux have start times)
@@ -86,8 +91,9 @@ class Fast5file:
             self.duration_time = int(read_attributes["duration"])/int(channel_id["sampling_rate"])
             self.pore_start_time = timedelta(seconds=int(read_attributes["start_time"])/int(channel_id["sampling_rate"])) + self.exp_start_time
             self.pore_end_time = self.pore_start_time + timedelta(seconds=self.duration_time)
-           
-            
+        # Now remove the link to the file (essentially delete it!)
+        os.unlink(tmp_file.name)
+
     def to_series(self):
         series_columns = ["Name", "Channel", "Read", "RNumber", # From file name
                           "MuxID", "StartTime", "EndTime"]  # From fast5 file - requried for plots
@@ -98,7 +104,7 @@ class Fast5file:
 
 
 class Subfolder:
-    def __init__(self, reads_path, number, metadata_dir, is_mux=False, threshold=4000):
+    def __init__(self, reads_path, number, metadata_dir, slave, is_mux=False, threshold=4000):
         # Int name of the fast5 file
         self.number = number
         self.standard_int = self.number.zfill(4)
@@ -114,12 +120,17 @@ class Subfolder:
         # Initiliase fast5_file list and dataframe
         self.fast5_files = []
         self.pd = None
+        self.slave = slave
         # Initiliase start and end times
         self.rnumber = ""
         self.start_time = None
         self.end_time = None
         self.threshold = threshold
-    
+        self.new_folder_name = ""
+        self.new_folder_path = ""
+        self.tar_file = ""
+        self.num_fast5_files = 0
+
     def get_new_folder_name(self): 
         # Create the new folder name
         if self.is_mux:
@@ -132,9 +143,11 @@ class Subfolder:
         self.metadata_path = os.path.join(self.metadata_dir, self.new_folder_name+".tsv")
 
     def get_fast5_files(self):
+        # Reopen up open_sftp
+        open_sftp = self.slave.ssh_client.open_sftp()
         # Fast5 class
-        self.fast5_files = [Fast5file(fast5_file, self.path, is_mux=self.is_mux)
-                            for fast5_file in os.listdir(self.path)
+        self.fast5_files = [Fast5file(fast5_file, self.path, open_sftp, is_mux=self.is_mux)
+                            for fast5_file in open_sftp.listdir(path=self.path)
                             if fast5_file.endswith(".fast5")]
         self.num_fast5_files = len(self.fast5_files)
     
@@ -160,8 +173,10 @@ class Subfolder:
         if self.is_full:
             # We shouldn't be calling this twice.
             return
-        raw_fast5_count = len([fast5 
-                               for fast5 in os.listdir(self.path) 
+        # Use opensftp to get the current status of the directory.
+        open_sftp = self.slave.ssh_client.open_sftp()
+        raw_fast5_count = len([fast5
+                               for fast5 in open_sftp.listdir(path=self.path)
                                if fast5.endswith(".fast5")])
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.is_mux:
@@ -212,67 +227,69 @@ class Subfolder:
             return True
         else:
             return False
-        
+
     def get_run_finish_time(self, fast5_file):
         start_time = fast5_file.exp_start_time
         minutes = fast5_file.exp_duration_set
-        return(start_time + minutes)
+        return start_time + minutes
 
     def tar_folder(self):
         # Always ensure the previous stage has been completed
         if not self.is_full:
             return
         # Always ensure the this stage has been 
-        # First move the folder to the new folder path location.
-        shutil.move(self.path, self.new_folder_path)
-        
+        # First move the folder to the new folder path location through opensftp
+        open_sftp = self.slave.ssh_client.open_sftp()
+        open_sftp.rename(self.path, self.new_folder_path)
+
         """Tar folder using pigz"""
         # When tarring we need to be in the directory, rather than use the absolute path
-        oldpwd = os.getcwd()
-        os.chdir(self.pardir)
         # Now declare tar and pigz command
-        tar_command = ["tar", "-cf", '-', self.new_folder_name, "--remove-files"]
-        pigz_command = ["pigz", "-9", "-p", "16"]
-        # Pipe output of tar command into pigz command. 
-        with open(self.tar_file+".tmp", 'w') as output_h:
-            tar_proc = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
-            pigz_proc = subprocess.Popen(pigz_command, stdin=tar_proc.stdout,
-                                         stdout=output_h, stderr=subprocess.PIPE)
-        tar_proc.stdout.close()
-        pigz_output = pigz_proc.communicate()
-        print(pigz_output)
-        if not pigz_proc.returncode == 0:
-            print(pigz_command.stderr.decode())
-        shutil.move(self.tar_file+".tmp", self.tar_file)
-        os.chdir(oldpwd)
+        tar_command = ' '.join(["tar", "-cf", '-', self.new_folder_name, "--remove-files"])
+        gzip_command = ' '.join(["gzip", "-", '>', self.tar_file+".tmp"])
+        tar_and_gzip_command = ' | '.join([tar_command, gzip_command])
+        # Use openssh client to run tar gzip through ssh
+        stdin, stdout, stderr = self.slave.ssh_client.exec_command('; '.join(["cd %s" % self.pardir,
+                                                                              tar_and_gzip_command]))
+        # Move output from .tmp to tar file
+        open_sftp = self.slave.ssh_client.open_sftp()
+        open_sftp.rename(self.tar_file+".tmp", self.tar_file)
         self.is_tarred = True
 
         
 class Run:
-    def __init__(self, path, is_mux = False):
+    def __init__(self, path, slave, is_mux=False):
         self.path = path 
         self.fast5_path = os.path.join(self.path, "fast5")
         self.is_mux = is_mux
         self.complete = False
         self.subfolders = []
         self.metadata_dir = os.path.join(self.path, "metadata")
-        if not os.path.isdir(self.metadata_dir):
-            os.mkdir(self.metadata_dir)
+        # Slave object for run. Use to connect to data.
+        self.slave = slave
+        self.slave.connect()
+        # Create metadata directory through the slave clients opensftp
+        opensftp = self.slave.ssh_client.open_sftp()
+        try:  # Try change to the directory, create if does not exist
+            opensftp.chdir(self.metadata_dir)
+        except IOError:  # Directory does not exist.
+            opensftp.mkdir(self.metadata_dir)
+        opensftp.close()
 
     def get_subfolders(self):
-
-        # Get all folders
+        # Get all folders through opensftp
+        opensftp = self.slave.ssh_client.open_sftp()
+        folders = opensftp.listdir(path=self.fast5_path)
         folders = [folder 
-                   for folder in os.listdir(self.fast5_path)
-                   if os.path.isdir(os.path.join(self.fast5_path, folder))
-                   and folder.isdigit()
+                   for folder in folders
+                   if folder.isdigit()
                   ]
         for folder in folders:
-            # Don't read folders
+            # Don't read in folders
             if folder in [subfolder.number for subfolder in self.subfolders]:
                 continue 
             # Append new folders
-            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, is_mux=self.is_mux))
+            self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, slave, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
@@ -291,15 +308,21 @@ class Run:
 
 
 class Sample:
-    def __init__(self, sample_name, samplesheet, run_dir):
+    def __init__(self, sample_name, samplesheet, config_pd, pca_value):
         self.pd = samplesheet.query("SampleName=='%s'" % sample_name)
+        # Get the active slaves for this run.
+        self.slaves = [Slave(slurm_id, config_pd, pca_value)
+                       for slurm_id in self.pd.query('SlurmID').tolist()]
         self.runs = []
         self.is_running = True
-        for index, run in self.pd.iterrows():  
-            mux_path = os.path.join(run_dir, run.SlurmID, "reads", '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
-            seq_path = os.path.join(run_dir, run.SlurmID, "reads", '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
-            self.runs.append(Run(mux_path, is_mux=True))
-            self.runs.append(Run(seq_path, is_mux=False))
+        for index, run in self.pd.iterrows():
+            slave = [slave
+                     for slave in self.slaves
+                     if slave.slurm_id == run.SlurmID][0]
+            mux_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
+            seq_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
+            self.runs.append(Run(mux_path, slave, is_mux=True))
+            self.runs.append(Run(seq_path, slave, is_mux=False))
     
     def is_run_complete(self):
         # All ports must be complete to return true.
@@ -309,14 +332,25 @@ class Sample:
         return True
 
 
+class Slave:
+    """Use the slave node config to access the data from the master node."""
+    def __init__(self, slurm_id, config_pd, pca_value):
+        self.slurm_id = slurm_id
+        self.ssh_ip = config_pd.query("IP=='%s'" % self.slurm_id).item()
+        self.ssh_client = None
+        self.reads_path = os.path.join("/media/data/", pca_value, self.slurm_id, "reads")
+
+    def connect(self):
+        self.ssh_client = paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh_connect(self.ssh_ip, key_filename='~/.ssh/id.pub')
+
 """
 General process:
 1. Get runs.
 2. Each run has a boolean attribute - running.
 3. While each run is running, continue to tar up subfolders but not those that don't have 4000 reads.
 """
-
-
 
 
 def get_args():
@@ -327,9 +361,14 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description="Tar up the run folders of the PromethION")
     parser.add_argument("--samplesheet", type=str, required=True,
-                        help="Path to tab delimited samplesheet. Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
+                        help="Path to tab delimited samplesheet. "
+                             "Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, "
+                             "GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
     parser.add_argument("--pca_dir", type=str, required=True,
                         help="/path/to/PCA00XX/")
+    parser.add_argument("--ip_config", type=str, required=True,
+                        help="path/to/tab-delimited-config file. "
+                             "One column of IP addresses ==> one column of slave nodes.")
     args = parser.parse_args()
     return args                                
                
@@ -342,16 +381,18 @@ def is_still_running(samples):
             
 
 def samplesheet_to_pd(samplesheet):
-    return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str) #{"GrnwchMuxStartDate": str,
-                                                                    # "GrnwchMuxStartTime": str,
-                                                                    # "GrnwchSeqStartDate": str,
-                                                                     #     "GrnwchSeqStartTime": str})
+    return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str)
+
+
+def config_to_pd(config):
+    return pd.read_csv(config, header=0, sep="\t", dtype=str)
 
 
 def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
-    samples = [Sample(sample, samplesheet, args.pca_dir)
+    config_pd = config_to_pd(args.ip_config)
+    samples = [Sample(sample, samplesheet, config_pd, args.pca_dir)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     while running:
