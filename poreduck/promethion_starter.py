@@ -13,6 +13,8 @@ import shutil
 import subprocess
 import paramiko
 from tempfile import NamedTemporaryFile
+import time
+import sys
 
 """
 Class types
@@ -264,11 +266,24 @@ class Subfolder:
         # Use openssh client to run tar gzip through ssh
         stdin, stdout, stderr = self.slave.ssh_client.exec_command('; '.join(["cd %s" % self.pardir,
                                                                               tar_and_gzip_command]))
-        print(stdin.__dict__, stdout.__dict__, stderr.__dict__)
+
         # Move output from .tmp to tar file
-        open_sftp = self.slave.ssh_client.open_sftp()
-        open_sftp.rename(self.tar_path+".tmp", self.tar_path)
-        open_sftp.close()
+        # On the rare occasion, the open_sftp may not be able to find this file even if it exists.
+        # Generate a while loop and exit after fifteen seconds if no file is found.
+        index = 0
+        while True:
+            if index > 3:
+                sys.exit("Error, could not found %s.tmp" % self.tar_path)
+            try:
+                open_sftp = self.slave.ssh_client.open_sftp()
+                open_sftp.rename(self.tar_path+".tmp", self.tar_path)
+                open_sftp.close()
+                break
+            except IOError:
+                print("Warning: %s.tmp not found." % self.tar_path)
+                print("Attempting to find again in fifteen seconds")
+                time.sleep(15)
+                index += 1
         self.is_tarred = True
 
         
