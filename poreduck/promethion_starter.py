@@ -142,7 +142,7 @@ class Subfolder:
             mux_seq = "sequencing_run"
         self.new_folder_name = '_'.join([self.standard_int, mux_seq, self.rnumber])
         self.new_folder_path = os.path.join(self.pardir, self.new_folder_name)
-        self.tar_file = self.new_folder_name + ".tar.gz"
+        self.tar_file = self.new_folder_name + ".fast5.tar.gz"
         self.tar_path = os.path.join(self.pardir, self.tar_file)
         self.metadata_path = os.path.join(self.metadata_dir, self.new_folder_name+".tsv")
 
