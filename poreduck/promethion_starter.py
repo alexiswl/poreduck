@@ -92,7 +92,8 @@ class Fast5file:
                 self.exp_duration_set = timedelta(minutes=10)
             # Read start time = start_time / sampling rate + exp_start_time
             self.duration_time = int(read_attributes["duration"])/int(channel_id["sampling_rate"])
-            self.pore_start_time = timedelta(seconds=int(read_attributes["start_time"])/int(channel_id["sampling_rate"])) + self.exp_start_time
+            self.pore_start_time = timedelta(seconds=int(read_attributes["start_time"])/int(channel_id["sampling_rate"])) \
+                                   + self.exp_start_time
             self.pore_end_time = self.pore_start_time + timedelta(seconds=self.duration_time)
         # Now remove the link to the file (essentially delete it!)
         os.unlink(tmp_file.name)
@@ -120,11 +121,11 @@ class Subfolder:
         self.is_full = False
         self.is_tarred = False
         self.run_complete = False
-        # Initiliase fast5_file list and dataframe
+        # Initialise fast5_file list and dataframe
         self.fast5_files = []
         self.pd = None
         self.slave = slave
-        # Initiliase start and end times
+        # Initialise start and end times
         self.rnumber = ""
         self.start_time = None
         self.end_time = None
@@ -135,6 +136,7 @@ class Subfolder:
         self.tar_path = ""
         self.num_fast5_files = 0
         self.run = run
+        self.removed = False
 
     def get_new_folder_name(self): 
         # Create the new folder name
@@ -156,6 +158,9 @@ class Subfolder:
                             for fast5_file in open_sftp.listdir(path=self.path)
                             if fast5_file.endswith(".fast5")]
         self.num_fast5_files = len(self.fast5_files)
+        if self.num_fast5_files == 0:
+            # We get in here when empty folders exist post run.
+            self.is_full = False
     
     def get_dataframe(self):
         # Generate dataframe for subfolder
@@ -179,7 +184,36 @@ class Subfolder:
         tsv_ftpfile.flush()
         tsv_ftpfile.close()
         open_sftp.close()
-   
+
+    def folder_exists(self):
+        opensftp = self.slave.ssh_client.open_sftp()
+        try:  # Try change to the directory, create if does not exist
+            opensftp.chdir(self.path)
+            return True
+        except IOError:  # Directory does not exist.
+            return False
+        opensftp.close()
+
+    def is_empty(self):
+        # Use opensftp to determine if there are actually any files in this directory at all.
+        open_sftp = self.slave.ssh_client.open_sftp()
+        all_files_count = len([any_file
+                               for any_file in open_sftp.listdir(path=self.path)
+                              ])
+        open_sftp.close()
+        if all_files_count == 0:
+            return True
+        else:
+            return False
+
+    def remove_folder(self):
+        # Delete folder through open sftp.
+        open_sftp = self.slave.ssh_client.open_sftp()
+        open_sftp.rmdir(path=self.path)
+        open_sftp.close()
+        # Delete folder from run.
+        self.removed = True
+
     def check_if_full(self):    
         if self.run.is_complete:
             self.run_complete = True
@@ -192,6 +226,11 @@ class Subfolder:
                                for fast5 in open_sftp.listdir(path=self.path)
                                if fast5.endswith(".fast5")])
         open_sftp.close()
+
+        # Determine if this folder needs deleting
+        if self.is_empty():
+            self.remove_folder()
+
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.is_mux:
             self.is_full = False
@@ -249,9 +288,9 @@ class Subfolder:
 
     def tar_folder(self):
         # Always ensure the previous stage has been completed
-        if not self.is_full:
+        if not self.is_full and not self.run_complete:
             return
-        # Always ensure the this stage has been 
+        # Always ensure the this stage has been
         # First move the folder to the new folder path location through opensftp
         open_sftp = self.slave.ssh_client.open_sftp()
         open_sftp.rename(self.path, self.new_folder_path)
@@ -285,8 +324,12 @@ class Subfolder:
                 time.sleep(15)
                 index += 1
         self.is_tarred = True
+        # After tarring, we should check if the folder still exists.
+        # It can for some reason, with no files in it.
+        if self.folder_exists() and self.is_empty():
+            self.remove_folder()
 
-        
+
 class Run:
     def __init__(self, path, slave, is_mux=False):
         self.path = path 
@@ -316,14 +359,17 @@ class Run:
                   ]
         for folder in folders:
             # Don't read in folders
-            if folder in [subfolder.number for subfolder in self.subfolders]:
-                continue 
+            if folder in [subfolder.number
+                          for subfolder in self.subfolders]:
+                continue
             # Append new folders
             self.subfolders.append(Subfolder(self.fast5_path, folder, self.metadata_dir, self.slave, self, is_mux=self.is_mux))
 
     def tar_subfolders(self):
         for folder in self.subfolders:
             if folder.is_tarred:
+                continue
+            if folder.removed:
                 continue
             if not folder.is_full:
                 folder.check_if_full()
