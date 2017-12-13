@@ -85,7 +85,7 @@ class Subfolder:
     def __init__(self, name):
         self.name = name
         # Get the relative name of the tar file
-        self.tar_filename = name + ".tar.gz"
+        self.tar_filename = name + ".fast5.tar.gz"
         # Set personal directories up
         self.reads_dir = os.path.join(READS_DIR, name)
         self.albacore_dir = os.path.join(ALBACORE_DIR, name)
