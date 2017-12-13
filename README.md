@@ -11,20 +11,38 @@ poreduck currently can be used for two key steps of handling MinION data:
 1.  Transferring of reads from a laptop to a local server or hard-drive in real-time.
 2.  Running of a local-basecalling algorithm with
 
-## Tutorials (see below)
+## Tutorials
+See the bottom of this page.
+Or checkout this repo: https://alexiswl.github.io/ASimpleNanoporeTutorial/index.html
 
 ## Examples
 An examples of poreduck usage is shown below:
-`transfer_fast5_to_server.py --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
---dest_dir /data/storage/MinION/my_MinION_run`
+
+### Transfer the data across to the server
+`poreduck transfer_to_server --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
+--dest_dir /data/storage/MinION/my_MinION_run --sample_name lambda`
 where `/var/lib/MinKNOW/data/reads` contains a list of runs in `YYYYMMDD_HHMM_SAMPLE_NAME` format.
 This then exports each of the fast5 files into `/data/storage/MinION/my_MinION_run/fast5` in .tar.gz format.
+The sample_name adds lambda to the suffix of each 4000 bin.
 
-`albacore_server_scaled.py --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
-where `/data/storage/MinION/sample_name/fast5` contains a list of .tar.gz files each comprising 4000 fast5 files within them.
+### Basecall the fast5 files.  
+`poreduck albacore_on_server --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
+where `/data/storage/MinION/sample_name/fast5` contains a list of .tar.gz files each of which holds 4000 fast5 files.
+
+#### Run some qc metrics and plots.
+`poreduck qc_plots --no_csv --fastq_dir ./fastq/ --gzipped --output_dir qc_plots/ --clip --sample_name "Lambda Run"`
+
+Let's go through some of the less intuitive parameters listed.
+
+The --no_csv is used if you do not have a list of metadata files from transferring the data from poreduck.  
+If you do, then you will have access to the mux number and duration times which add on a couple of extra plots.
+The gzipped parameter is used if the fastq files are gzipped. 
+Clip is used to prevent squishing of the histogram. Some reads are extra-long 
+(but most likely pseudo reads, these are omitted from the plot)
+
 
 ## MinKNOW version compatibility
-Last tested on MinKNOW version 1.7.10
+Last tested on MinKNOW version 1.7.14
 
 ## transfer_fast5_to_server.py dependencies
 ### Dependencies (Windows specific)
@@ -32,7 +50,7 @@ Last tested on MinKNOW version 1.7.10
 
 2.  Install sshpass (or don't and see 'how to make an id_rsa key' below):
     *  Re-run the setup of Cygwin, selecting for 'make' and 'gcc' as these don't seem to be in the default installation. 
-    * Read through the link below to install sshpass. https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
+    *  Read through the link below to install sshpass. https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
 
 3.  Install pigz:
     * Download the pigz source file.
@@ -151,7 +169,7 @@ If you're already using conda and you're not on python3.6,
 try the following command:
 `conda install python==3.6`
 
-### Creating a python environment:
+### Creating a python environment for albacore:
 As stated before, albacore puts us in a dilemma.
 Here we can create an environment for albacore.
 ```bash

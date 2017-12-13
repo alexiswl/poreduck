@@ -89,7 +89,7 @@ class Subfolder:
         # Set personal directories up
         self.reads_dir = os.path.join(READS_DIR, name)
         self.albacore_dir = os.path.join(ALBACORE_DIR, name)
-        # Albacore related files
+        # Albacore related files 1dsq_analysis
         if CHOSEN_KIT == "SQK-LSK308":
             self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
         else:
