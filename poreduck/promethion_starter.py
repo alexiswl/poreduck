@@ -230,7 +230,7 @@ class Subfolder:
             return
 
         # Determine if this folder is still being written to
-        if raw_fast5_count < self.threshold and not self.is_mux:
+        if raw_fast5_count < self.threshold and not self.is_mux and not self.run.complete:
             self.is_full = False
             return
         self.is_full = True
@@ -348,13 +348,21 @@ class Run:
             if folder.is_full and not folder.is_tarred:
                 folder.tar_folder()
      
-    def get_run_finish_time(self)
+    def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
+        print(self.subfolders)
         for subfolder in self.subfolders:
-            fast5_files_iter = iter(self.subfolder.fast5_files)
-            fast5_file = next(fast5_files_iter)
-            if not fast5_file.corrupted:
+            print(subfolder.number)
+            fast5_files_iter = iter(subfolder.fast5_files)
+            fast5_file = None
+            while fast5_file is None or not fast5_file.corrupted:
+                try:
+                    fast5_file = next(fast5_files_iter)
+                except StopIteration:
+                    break
+            if fast5_file is not None:
                 break
+
         start_time = fast5_file.exp_start_time
         minutes = fast5_file.exp_duration_set
         return start_time + minutes
@@ -362,13 +370,13 @@ class Run:
     def is_run_complete(self):
         # Get expected finish time from fast5 file
         if self.completion_time is None:
-            self.completion_time = self.get_run_finish_time(fast5_file)
+            self.completion_time = self.get_run_finish_time()
         # Determine if run is complete.
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
         diff = self.completion_time - current_time 
         if diff.total_seconds() < 0:
-            run.complete = True
+            self.complete = True
             return True
         else:
             return False
@@ -463,11 +471,15 @@ def main():
     samples = [Sample(sample, samplesheet, config_pd, args.pca_id)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
+    first_pass = True
     while running:
+        if not first_pass:
+            running = is_still_running(samples)
+        else:
+            first_pass = False
         for sample in samples:
             for run in sample.runs:
                 run.get_subfolders()
                 run.tar_subfolders()
-        running = is_still_running(samples)
 
 main()
