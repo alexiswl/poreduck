@@ -222,7 +222,6 @@ def check_folder_status(subdir, run, full=True):
     fast5_pd['mux'] = fast5_pd['filename'].apply(lambda x: mux[x])
     fast5_pd['duration'] = fast5_pd['filename'].apply(lambda x: duration[x])
 
-
     # If this is the final folder, we will move regardless of if it is full:
     if not full:
         move_fast5_files(subdir, fast5_pd['filename'].tolist(), run)
@@ -605,8 +604,10 @@ def is_minknow_still_running():
     # last folder and perform one last rsync command.
 
     is_running = False  # Now to disprove this.
-
-    psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
+    if os.name == 'nt':
+         psef_command = "ps -efW | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
+    else:
+         psef_command = "ps -ef | grep MinKNOW | grep experiment | grep sequencing | grep -v \"grep\" | wc -l"
     psef_proc = subprocess.Popen(psef_command, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
     stdout, stderr = psef_proc.communicate()

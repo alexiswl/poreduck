@@ -157,6 +157,7 @@ class Read_Set:
         for index, duration in durations.items():
             self.df.set_value(index, "duration", durations)
 
+
 def set_arguments(args):
     global CSV_DIR, FASTQ_DIR, PLOTS_DIR
     global CSV_FILES, SAMPLE_NAME, CLIP, GZIPPED, FASTQ_SUFFIX

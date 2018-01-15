@@ -85,11 +85,11 @@ class Subfolder:
     def __init__(self, name):
         self.name = name
         # Get the relative name of the tar file
-        self.tar_filename = name + ".tar.gz"
+        self.tar_filename = name + ".fast5.tar.gz"
         # Set personal directories up
         self.reads_dir = os.path.join(READS_DIR, name)
         self.albacore_dir = os.path.join(ALBACORE_DIR, name)
-        # Albacore related files
+        # Albacore related files 1dsq_analysis
         if CHOSEN_KIT == "SQK-LSK308":
             self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
         else:
@@ -740,8 +740,8 @@ def get_subfolders():
     """
     global SUBFOLDERS
     # Get a list of tarballs
-    subfolders = sorted([tarred_folder.replace(".tar.gz", "") for tarred_folder
-                         in os.listdir(READS_DIR) if tarred_folder.endswith(".tar.gz")])
+    subfolders = sorted([tarred_folder.replace(".fast5.tar.gz", "") for tarred_folder
+                         in os.listdir(READS_DIR) if tarred_folder.endswith(".fast5.tar.gz")])
     for subfolder in subfolders:
         is_initialised = False
         for initialised_subfolder in SUBFOLDERS:

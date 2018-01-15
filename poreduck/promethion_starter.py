@@ -120,7 +120,6 @@ class Subfolder:
         # Initialise the stage parameters. 
         self.is_full = False
         self.is_tarred = False
-        self.run_complete = False
         # Initialise fast5_file list and dataframe
         self.fast5_files = []
         self.pd = None
@@ -208,15 +207,13 @@ class Subfolder:
 
     def remove_folder(self):
         # Delete folder through open sftp.
-        open_sftp = self.slave.ssh_client.open_sftp()
-        open_sftp.rmdir(path=self.path)
-        open_sftp.close()
+        #open_sftp = self.slave.ssh_client.open_sftp()
+        #open_sftp.rmdir(path=self.path)
+        #open_sftp.close()
         # Delete folder from run.
         self.removed = True
 
     def check_if_full(self):    
-        if self.run.is_complete:
-            self.run_complete = True
         if self.is_full:
             # We shouldn't be calling this twice.
             return
@@ -230,9 +227,10 @@ class Subfolder:
         # Determine if this folder needs deleting
         if self.is_empty():
             self.remove_folder()
+            return
 
         # Determine if this folder is still being written to
-        if raw_fast5_count < self.threshold and not self.is_mux:
+        if raw_fast5_count < self.threshold and not self.is_mux and not self.run.complete:
             self.is_full = False
             return
         self.is_full = True
@@ -240,10 +238,8 @@ class Subfolder:
         self.get_fast5_files()
         # Get dataframe
         self.get_dataframe()
-        # May still be full if run has stopped and last bin.
-        self.run_complete = self.is_run_complete()
         # Redetermine if bin is full
-        if not self.is_full and self.run_complete:
+        if not self.is_full and self.run.complete:
             # Get fast5 files
             self.get_fast5_files()
             # Get data frame
@@ -259,36 +255,10 @@ class Subfolder:
         # Get new folder name
         self.get_new_folder_name()
         self.write_dataframe()
-    
-    def is_run_complete(self):
-        # We cannot complete this operation if the bin is not full
-        if not self.is_full:
-            return False
-        # Get standard fast5 file (not that simple)
-        while True:
-            fast5_files_iter = iter(self.fast5_files)
-            fast5_file = next(fast5_files_iter)
-            if not fast5_file.corrupted:
-                break
-        # Get expected finish time from fast5 file
-        exp_finished_time = self.get_run_finish_time(fast5_file)
-        # Determine if run is complete.
-        current_time = datetime.utcnow()
-        # If difference is less than zero, run is finished
-        diff = exp_finished_time - current_time 
-        if diff.total_seconds() < 0:
-            return True
-        else:
-            return False
-
-    def get_run_finish_time(self, fast5_file):
-        start_time = fast5_file.exp_start_time
-        minutes = fast5_file.exp_duration_set
-        return start_time + minutes
 
     def tar_folder(self):
         # Always ensure the previous stage has been completed
-        if not self.is_full and not self.run_complete:
+        if not self.is_full and not self.run.complete:
             return
         # Always ensure the this stage has been
         # First move the folder to the new folder path location through opensftp
@@ -336,6 +306,8 @@ class Run:
         self.fast5_path = os.path.join(self.path, "fast5")
         self.is_mux = is_mux
         self.complete = False
+        self.start_time = None
+        self.completion_time = None
         self.subfolders = []
         self.metadata_dir = os.path.join(self.path, "metadata")
         # Slave object for run. Use to connect to data.
@@ -376,11 +348,38 @@ class Run:
             if folder.is_full and not folder.is_tarred:
                 folder.tar_folder()
      
+    def get_run_finish_time(self):
+        # Get standard fast5 file (not that simple)
+        print(self.subfolders)
+        for subfolder in self.subfolders:
+            print(subfolder.number)
+            fast5_files_iter = iter(subfolder.fast5_files)
+            fast5_file = None
+            while fast5_file is None or not fast5_file.corrupted:
+                try:
+                    fast5_file = next(fast5_files_iter)
+                except StopIteration:
+                    break
+            if fast5_file is not None:
+                break
+
+        start_time = fast5_file.exp_start_time
+        minutes = fast5_file.exp_duration_set
+        return start_time + minutes
+        
     def is_run_complete(self):
-        if not self.subfolders[0].is_full:
-            return False
-        if self.subfolders[0].is_run_complete():
+        # Get expected finish time from fast5 file
+        if self.completion_time is None:
+            self.completion_time = self.get_run_finish_time()
+        # Determine if run is complete.
+        current_time = datetime.utcnow()
+        # If difference is less than zero, run is finished
+        diff = self.completion_time - current_time 
+        if diff.total_seconds() < 0:
+            self.complete = True
             return True
+        else:
+            return False
 
 
 class Sample:
@@ -472,11 +471,15 @@ def main():
     samples = [Sample(sample, samplesheet, config_pd, args.pca_id)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
+    first_pass = True
     while running:
+        if not first_pass:
+            running = is_still_running(samples)
+        else:
+            first_pass = False
         for sample in samples:
             for run in sample.runs:
                 run.get_subfolders()
                 run.tar_subfolders()
-        running = is_still_running(samples)
 
 main()
