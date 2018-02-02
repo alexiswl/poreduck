@@ -457,11 +457,11 @@ def is_still_running(samples):
             
 
 def samplesheet_to_pd(samplesheet):
-    return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str)
+    return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str, comment='#')
 
 
 def config_to_pd(config):
-    return pd.read_csv(config, header=0, sep="\t", dtype=str)
+    return pd.read_csv(config, header=0, sep="\t", dtype=str, comment='#')
 
 
 def main():
