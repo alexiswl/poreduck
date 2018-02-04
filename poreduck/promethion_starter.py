@@ -230,7 +230,9 @@ class Subfolder:
             return
 
         # Determine if this folder is still being written to
-        if raw_fast5_count < self.threshold and not self.is_mux and not self.run.complete:
+        if raw_fast5_count < self.threshold and not self.run.complete:
+            if self.is_mux and run.is_run_transfer_complete():
+                self.is_full = True
             self.is_full = False
             return
         self.is_full = True
@@ -375,11 +377,28 @@ class Run:
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
         diff = self.completion_time - current_time 
-        if diff.total_seconds() < 0:
+        if diff.total_seconds() < 0 and self.is_run_transfer_complete():
             self.complete = True
             return True
         else:
             return False
+
+    def is_run_transfer_complete(self):
+        # Has the run finished transferring from tmp
+        # Check that the tmp path is not empty
+        tmp_path = os.path.join("/tmp/output/reads/", os.path.normpath(os.path.basename(self.path)))
+        tmp_fast5_path = os.path.join(tmp_path, "fast5")
+        open_sftp = self.slave.ssh_client.open_sftp()
+        folders = [folder for folder in open_sftp.listdir(tmp_fast5_path)
+                   if folder.isdigit()]
+        # For each folder, check if there exists fast5 files in the folder
+        for folder in folders:
+            fast5_files = [fast5_file
+                           for fast5_file in open_sftp.listdir(path=os.path.join(tmp_fast5_path, folder))
+                           if fast5_file.endswith(".fast5")]
+            if len(fast5_files) > 0:
+                return False
+        return True
 
 
 class Sample:
