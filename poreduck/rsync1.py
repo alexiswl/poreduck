@@ -61,7 +61,7 @@ class Sample:
     Each sample class has a list of runs using the samplesheet input
     """
     def __init__(self, sample_name, samplesheet, config_pd, pca_value, output_dir, log_df):
-        self.pd = samplesheet.query("SampleName=='%s'" % sample_name)
+        self.pd = log_df
         # Get the active slaves for this run.
         self.slaves = [Slave(slurm_id, config_pd, pca_value)
                        for slurm_id in self.pd.SlurmID.tolist()]
@@ -151,13 +151,13 @@ def get_files(run, log_df):
     return subfolders
 
 
-def get_samples(samplesheet, config_pd, pca_id):
+def get_samples(samplesheet, config_pd, pca_id, output_dir, log_df):
     """
     Grab the list of samples from the sample sheet
     :param samplesheet:
     :return: List of class Sample
     """
-    samples = [Sample(sample, samplesheet, config_pd, pca_id)
+    samples = [Sample(sample, samplesheet, config_pd, pca_id, output_dir, log_df.query("SampleName=='%s'" % sample))
                for sample in samplesheet.SampleName.unique().tolist()]
     return samples
 
@@ -209,12 +209,27 @@ def wait_for_file_download_to_complete():
                             subfolder.tar_file_removed = True
 
 
+def write_to_log(samples, log_file, log_df):
+    """
+    Append all of the series in one log.
+    :param samples:
+    :param log_file:
+    :return:
+    """
+    for sample in samples:
+        for run in sample.runs:
+            for subfolder in run.subfolders:
+                log_df = log_df.append(subfolder.to_series())
+    log_df.to_csv(log_file, sep="\t", header=True, index=False)
+
+
 def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
     config = config_to_pd(args.config)
-    get_prev_transfer_log(samplesheet, os.path.join(args.outdir, "prom_transfers.log"))
-    samples = get_samples(samplesheet, config, args.pca_id)
+    log_file = os.path.join(args.outdir, "prom_transfers.log")
+    log_df = get_prev_transfer_log(samplesheet, log_file)
+    samples = get_samples(samplesheet, config, args.pca_id, args.output_dir, log_df)
     # Generate the while loop:
     transferring = True
     while transferring:
@@ -226,7 +241,8 @@ def main():
             for run in sample.runs:
                 for subfolder in run.subfolders:
                     if not subfolder.tar_file_transferred:
-                        transferring = False
+                        transferring = True
+    write_to_log(samples, log_file, log_df)
 
 
 
