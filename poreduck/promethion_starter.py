@@ -199,7 +199,7 @@ class Subfolder:
         all_files_count = len([any_file
                                for any_file in open_sftp.listdir(path=self.path)
                               ])
-        open_sftp.close()
+        open_sftp.close() 
         if all_files_count == 0:
             return True
         else:
@@ -226,7 +226,7 @@ class Subfolder:
 
         # Determine if this folder needs deleting
         if self.is_empty():
-            self.remove_folder()
+            #self.remove_folder()
             return
 
         # Determine if this folder is still being written to
@@ -297,7 +297,7 @@ class Subfolder:
         # After tarring, we should check if the folder still exists.
         # It can for some reason, with no files in it.
         if self.folder_exists() and self.is_empty():
-            self.remove_folder()
+            pass # when rync issue is cleared: self.remove_folder()
 
 
 class Run:
