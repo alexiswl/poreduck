@@ -233,7 +233,8 @@ class Subfolder:
         if raw_fast5_count < self.threshold and not self.run.complete:
             if self.is_mux and run.is_run_transfer_complete():
                 self.is_full = True
-            self.is_full = False
+	    if not run.is_run_transfer_complete():
+	        self.is_full = False
             return
         self.is_full = True
         # Get fast5 files
