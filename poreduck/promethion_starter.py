@@ -233,7 +233,11 @@ class Subfolder:
         if raw_fast5_count < self.threshold and not self.run.complete:
             if self.is_mux and self.run.is_run_transfer_complete():
                 self.is_full = True
+<<<<<<< HEAD
         if not self.run.is_run_transfer_complete():
+=======
+        if not run.is_run_transfer_complete():
+>>>>>>> ccbfc2bdace1c21e5c6fd542321c88f83ff3e826
             self.is_full = False
             return
         self.is_full = True
@@ -333,7 +337,7 @@ class Run:
                    if folder.isdigit()
                   ]
         for folder in folders:
-            # Don't read in folders
+            # Don't read in current folders
             if folder in [subfolder.number
                           for subfolder in self.subfolders]:
                 continue
@@ -363,7 +367,7 @@ class Run:
                     fast5_file = next(fast5_files_iter)
                 except StopIteration:
                     break
-            if fast5_file is not None:
+            if fast5_file is not None and not fast5_file.corrupted:
                 break
 
         start_time = fast5_file.exp_start_time
