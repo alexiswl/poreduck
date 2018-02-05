@@ -231,11 +231,11 @@ class Subfolder:
 
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.run.complete:
-            if self.is_mux and run.is_run_transfer_complete():
+            if self.is_mux:
                 self.is_full = True
-        if not run.is_run_transfer_complete():
-            self.is_full = False
-            return
+            else:
+                self.is_full = False
+                return
         self.is_full = True
         # Get fast5 files
         self.get_fast5_files()
@@ -300,7 +300,7 @@ class Subfolder:
         # After tarring, we should check if the folder still exists.
         # It can for some reason, with no files in it.
         if self.folder_exists() and self.is_empty():
-            pass # when rync issue is cleared: self.remove_folder()
+            pass  # when rync issue is cleared: self.remove_folder()
 
 
 class Run:
@@ -378,35 +378,18 @@ class Run:
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
         diff = self.completion_time - current_time 
-        if diff.total_seconds() < 0 and self.is_run_transfer_complete():
+        if diff.total_seconds() < 0:
             self.complete = True
             return True
         else:
             return False
 
-    def is_run_transfer_complete(self):
-        # Has the run finished transferring from tmp
-        # Check that the tmp path is not empty
-        tmp_path = os.path.join("/tmp/output/reads/", os.path.normpath(os.path.basename(self.path)))
-        tmp_fast5_path = os.path.join(tmp_path, "fast5")
-        open_sftp = self.slave.ssh_client.open_sftp()
-        folders = [folder for folder in open_sftp.listdir(tmp_fast5_path)
-                   if folder.isdigit()]
-        # For each folder, check if there exists fast5 files in the folder
-        for folder in folders:
-            fast5_files = [fast5_file
-                           for fast5_file in open_sftp.listdir(path=os.path.join(tmp_fast5_path, folder))
-                           if fast5_file.endswith(".fast5")]
-            if len(fast5_files) > 0:
-                return False
-        return True
-
 
 class Sample:
-    def __init__(self, sample_name, samplesheet, config_pd, pca_value):
+    def __init__(self, sample_name, samplesheet, config_pd):
         self.pd = samplesheet.query("SampleName=='%s'" % sample_name)
         # Get the active slaves for this run.
-        self.slaves = [Slave(slurm_id, config_pd, pca_value)
+        self.slaves = [Slave(slurm_id, config_pd)
                        for slurm_id in self.pd.SlurmID.tolist()]
         self.runs = []
         self.is_running = True
@@ -429,12 +412,12 @@ class Sample:
 
 class Slave:
     """Use the slave node config to access the data from the master node."""
-    def __init__(self, slurm_id, config_pd, pca_value):
+    def __init__(self, slurm_id, config_pd):
         self.slurm_id = slurm_id
         self.ssh_ip = config_pd.query("SlurmID=='%s'" % self.slurm_id)['IP'].item()
         print(self.ssh_ip)
         self.ssh_client = None
-        self.reads_path = os.path.join("/media/data/", pca_value, self.slurm_id, "reads")
+        self.reads_path = "/tmp/output/reads"
 
     def connect(self):
         self.ssh_client = paramiko.SSHClient()
@@ -460,8 +443,6 @@ def get_args():
                         help="Path to tab delimited samplesheet. "
                              "Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, "
                              "GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
-    parser.add_argument("--pca_id", type=str, required=True,
-                        help="/path/to/PCA00XX/")
     parser.add_argument("--ip_config", type=str, required=True,
                         help="path/to/tab-delimited-config file. "
                              "One column of IP addresses ==> one column of slave nodes.")
@@ -488,7 +469,7 @@ def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
     config_pd = config_to_pd(args.ip_config)
-    samples = [Sample(sample, samplesheet, config_pd, args.pca_id)
+    samples = [Sample(sample, samplesheet, config_pd)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     first_pass = True
@@ -502,4 +483,5 @@ def main():
                 run.get_subfolders()
                 run.tar_subfolders()
 
-main()
+if __name__ == "__main__":
+    main()
