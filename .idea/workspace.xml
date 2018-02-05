@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="47b4cf6d-88b9-4fb0-9a87-4a8f710b93f5" name="Default" comment="Added write_to_log function at the end of the script.">
+    <list default="true" id="47b4cf6d-88b9-4fb0-9a87-4a8f710b93f5" name="Default" comment="">
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/poreduck/manipulate_rsync.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/poreduck/rsync1.py" afterPath="$PROJECT_DIR$/poreduck/rsync1.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/poreduck/promethion_starter.py" afterPath="$PROJECT_DIR$/poreduck/promethion_starter.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -16,36 +17,20 @@
   <component name="CreatePatchCommitExecutor">
     <option name="PATCH_PATH" value="" />
   </component>
-  <component name="DockManager">
-    <window id="1">
-      <content type="file-editors">
-        <state>
-          <leaf>
-            <file leaf-file-name="rsync1.py" pinned="false" current-in-tab="true">
-              <entry file="file://$PROJECT_DIR$/poreduck/rsync1.py">
-                <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="510">
-                    <caret line="243" column="43" lean-forward="false" selection-start-line="243" selection-start-column="43" selection-end-line="243" selection-end-column="43" />
-                    <folding>
-                      <element signature="e#175#194#0" expanded="true" />
-                    </folding>
-                  </state>
-                </provider>
-              </entry>
-            </file>
-          </leaf>
-        </state>
-      </content>
-    </window>
-  </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="default_target" />
+  <component name="ExportToHTMLSettings">
+    <option name="printScope" value="1" />
+    <option name="PRINT_LINE_NUMBERS" value="true" />
+    <option name="OPEN_IN_BROWSER" value="true" />
+    <option name="OUTPUT_DIRECTORY" value="C:\Users\lucatta\Documents\GitHub\poreduck\exportToHTML" />
+  </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file leaf-file-name="plot_yields.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/plot_yields.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="267">
-              <caret line="325" column="26" lean-forward="true" selection-start-line="325" selection-start-column="26" selection-end-line="325" selection-end-column="26" />
+            <state relative-caret-position="5406">
+              <caret line="325" column="26" lean-forward="false" selection-start-line="325" selection-start-column="26" selection-end-line="325" selection-end-column="26" />
               <folding />
             </state>
           </provider>
@@ -64,7 +49,7 @@
       <file leaf-file-name="albacore_server_scaled.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/albacore_server_scaled.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="202">
+            <state relative-caret-position="13192">
               <caret line="786" column="35" lean-forward="false" selection-start-line="786" selection-start-column="33" selection-end-line="786" selection-end-column="35" />
               <folding />
             </state>
@@ -74,20 +59,32 @@
       <file leaf-file-name="transfer_fast5_to_server.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="202">
+            <state relative-caret-position="4726">
               <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="promethion_starter.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="promethion_starter.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/promethion_starter.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="202">
-              <caret line="181" column="60" lean-forward="false" selection-start-line="181" selection-start-column="49" selection-end-line="181" selection-end-column="60" />
+            <state relative-caret-position="125">
+              <caret line="147" column="61" lean-forward="false" selection-start-line="147" selection-start-column="55" selection-end-line="147" selection-end-column="61" />
               <folding>
                 <element signature="e#100#115#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="manipulate_rsync.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/poreduck/manipulate_rsync.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="370">
+              <caret line="37" column="0" lean-forward="true" selection-start-line="37" selection-start-column="0" selection-end-line="37" selection-end-column="0" />
+              <folding>
+                <element signature="e#172#203#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -104,7 +101,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>lambda</find>
       <find>h5py.</find>
       <find>fileinput</find>
       <find>tar</find>
@@ -119,7 +115,6 @@
       <find>samplesheet</find>
       <find>paramiko</find>
       <find>listdir</find>
-      <find>slave</find>
       <find>Slave</find>
       <find>log_df</find>
       <find>sep=&quot;\t</find>
@@ -129,8 +124,13 @@
       <find>sep=</find>
       <find>to_csv</find>
       <find>outer</find>
-      <find>Sample</find>
       <find>index=False</find>
+      <find>is_run_transfer</find>
+      <find>args</find>
+      <find>pca_id</find>
+      <find>Sample</find>
+      <find>slave</find>
+      <find>tar.gz</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -140,14 +140,15 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/poreduck/plot_yields.py" />
-        <option value="$PROJECT_DIR$/poreduck/promethion_starter.py" />
         <option value="$PROJECT_DIR$/poreduck/rsync1.py" />
+        <option value="$PROJECT_DIR$/poreduck/promethion_starter.py" />
+        <option value="$PROJECT_DIR$/poreduck/manipulate_rsync.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="1" />
-    <option name="y" value="98" />
+    <option name="x" value="119" />
+    <option name="y" value="69" />
     <option name="width" value="1180" />
     <option name="height" value="799" />
   </component>
@@ -169,6 +170,7 @@
   </component>
   <component name="PropertiesComponent">
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="SearchEverywhereHistoryKey" value="&#9;FILE&#9;file://C:/Users/lucatta/Documents/GitHub/poreduck/poreduck/promethion_starter.py" />
   </component>
   <component name="RestoreUpdateTree" date="Moments ago" ActionInfo="_Update">
     <UpdatedFiles>
@@ -497,19 +499,32 @@
       <option name="project" value="LOCAL" />
       <updated>1517725328537</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop.">
+      <created>1517726220610</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1517726220610</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop.">
+      <created>1517811356906</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1517811356906</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1" y="98" width="1180" height="799" extended-state="0" />
+    <frame x="119" y="69" width="1180" height="799" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Debug Logs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32991204" sideWeight="0.50687283" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289855" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3347826" sideWeight="0.49312714" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3347826" sideWeight="0.49312714" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Execute Anonymous" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
@@ -522,6 +537,7 @@
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3289855" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
     </layout>
@@ -554,7 +570,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Some transfers from tmp will finish well after the run has finished. Therefore it is paramount that we check that there are no files left in /tmp first before writing tar folders with less than 4000 reads." />
     <MESSAGE value="Created rsync1.py which will transfer data from the prom_storage to the aarnet storage." />
-    <option name="LAST_COMMIT_MESSAGE" value="Created rsync1.py which will transfer data from the prom_storage to the aarnet storage." />
+    <MESSAGE value="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop." />
+    <option name="LAST_COMMIT_MESSAGE" value="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -569,6 +586,48 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/poreduck/plot_yields.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="5406">
+          <caret line="325" column="26" lean-forward="false" selection-start-line="325" selection-start-column="26" selection-end-line="325" selection-end-column="26" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/poreduck_main.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="816">
+          <caret line="51" column="34" lean-forward="false" selection-start-line="51" selection-start-column="34" selection-end-line="51" selection-end-column="34" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/albacore_server_scaled.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13192">
+          <caret line="786" column="35" lean-forward="false" selection-start-line="786" selection-start-column="33" selection-end-line="786" selection-end-column="35" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="4726">
+          <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/promethion_starter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2890">
+          <caret line="180" column="61" lean-forward="false" selection-start-line="180" selection-start-column="61" selection-end-line="180" selection-end-column="61" />
+          <folding>
+            <element signature="e#100#115#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/plot_yields.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -675,15 +734,15 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/plot_yields.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="267">
-          <caret line="325" column="26" lean-forward="true" selection-start-line="325" selection-start-column="26" selection-end-line="325" selection-end-column="26" />
+        <state relative-caret-position="5406">
+          <caret line="325" column="26" lean-forward="false" selection-start-line="325" selection-start-column="26" selection-end-line="325" selection-end-column="26" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="202">
+        <state relative-caret-position="4726">
           <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
           <folding />
         </state>
@@ -691,28 +750,35 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/albacore_server_scaled.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="202">
+        <state relative-caret-position="13192">
           <caret line="786" column="35" lean-forward="false" selection-start-line="786" selection-start-column="33" selection-end-line="786" selection-end-column="35" />
           <folding />
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/rsync1.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="224" column="0" lean-forward="false" selection-start-line="224" selection-start-column="0" selection-end-line="224" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/promethion_starter.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="202">
-          <caret line="181" column="60" lean-forward="false" selection-start-line="181" selection-start-column="49" selection-end-line="181" selection-end-column="60" />
+        <state relative-caret-position="125">
+          <caret line="147" column="61" lean-forward="false" selection-start-line="147" selection-start-column="55" selection-end-line="147" selection-end-column="61" />
           <folding>
             <element signature="e#100#115#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/poreduck/rsync1.py">
+    <entry file="file://$PROJECT_DIR$/poreduck/manipulate_rsync.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="510">
-          <caret line="243" column="43" lean-forward="false" selection-start-line="243" selection-start-column="43" selection-end-line="243" selection-end-column="43" />
+        <state relative-caret-position="370">
+          <caret line="37" column="0" lean-forward="true" selection-start-line="37" selection-start-column="0" selection-end-line="37" selection-end-column="0" />
           <folding>
-            <element signature="e#175#194#0" expanded="true" />
+            <element signature="e#172#203#0" expanded="true" />
           </folding>
         </state>
       </provider>
