@@ -231,19 +231,11 @@ class Subfolder:
 
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.run.complete:
-<<<<<<< HEAD
-            if self.is_mux and self.run.is_run_transfer_complete():
-                self.is_full = True
-        if not self.run.is_run_transfer_complete():
-            self.is_full = False
-            return
-=======
             if self.is_mux:
                 self.is_full = True
             else:
                 self.is_full = False
                 return
->>>>>>> 6b0026bccc40db7c28563d478efc0f5471b3171b
         self.is_full = True
         # Get fast5 files
         self.get_fast5_files()
@@ -329,6 +321,7 @@ class Run:
         try:  # Try change to the directory, create if does not exist
             opensftp.chdir(self.metadata_dir)
         except IOError:  # Directory does not exist.
+            print(self.metadata_dir)
             opensftp.mkdir(self.metadata_dir)
         opensftp.close()
 
@@ -362,8 +355,8 @@ class Run:
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
         if len(self.subfolders) == 0:
-            print("Unable to obtain subfolder, cannot establish end time")
-            return None
+            print("No subfolders, assuming run has been moved previously")
+            return datetime.utcnow() - timedelta(days=1) 
         for subfolder in self.subfolders:
             print(subfolder.number)
             fast5_files_iter = iter(subfolder.fast5_files)
@@ -375,6 +368,8 @@ class Run:
                     break
             if fast5_file is not None and not fast5_file.corrupted:
                 break
+	    # If we are here, it means no folder is full. We expect run is complete
+            return datetime.utcnow() - timedelta(days=1)
 
         start_time = fast5_file.exp_start_time
         minutes = fast5_file.exp_duration_set
@@ -384,8 +379,6 @@ class Run:
         # Get expected finish time from fast5 file
         if self.completion_time is None:
             self.completion_time = self.get_run_finish_time()
-        if self.completion_time is None:
-            return False
         # Determine if run is complete.
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
@@ -396,29 +389,6 @@ class Run:
         else:
             return False
 
-<<<<<<< HEAD
-    def is_run_transfer_complete(self):
-        # Has the run finished transferring from tmp
-        # Check that the tmp path is not empty
-        tmp_path = os.path.join("/tmp/output/reads/", os.path.normpath(os.path.basename(self.path)))
-        tmp_fast5_path = os.path.join(tmp_path, "fast5") 
-        open_sftp = self.slave.ssh_client.open_sftp()
-        try:
-                  folders = [folder for folder in open_sftp.listdir(tmp_fast5_path)
-                             if folder.isdigit()]
-        except FileNotFoundError:
-               return True
-        # For each folder, check if there exists fast5 files in the folder
-        for folder in folders:
-            fast5_files = [fast5_file
-                           for fast5_file in open_sftp.listdir(path=os.path.join(tmp_fast5_path, folder))
-                           if fast5_file.endswith(".fast5")]
-            if len(fast5_files) > 0:
-                return False
-        return True
-
-=======
->>>>>>> 6b0026bccc40db7c28563d478efc0f5471b3171b
 
 class Sample:
     def __init__(self, sample_name, samplesheet, config_pd):
