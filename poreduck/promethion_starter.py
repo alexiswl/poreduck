@@ -233,11 +233,7 @@ class Subfolder:
         if raw_fast5_count < self.threshold and not self.run.complete:
             if self.is_mux and self.run.is_run_transfer_complete():
                 self.is_full = True
-<<<<<<< HEAD
         if not self.run.is_run_transfer_complete():
-=======
-        if not run.is_run_transfer_complete():
->>>>>>> ccbfc2bdace1c21e5c6fd542321c88f83ff3e826
             self.is_full = False
             return
         self.is_full = True
@@ -357,7 +353,9 @@ class Run:
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
-        print(self.subfolders)
+        if len(self.subfolders) == 0:
+            print("Unable to obtain subfolder, cannot establish end time")
+            return None
         for subfolder in self.subfolders:
             print(subfolder.number)
             fast5_files_iter = iter(subfolder.fast5_files)
@@ -378,6 +376,8 @@ class Run:
         # Get expected finish time from fast5 file
         if self.completion_time is None:
             self.completion_time = self.get_run_finish_time()
+        if self.completion_time is None:
+            return False
         # Determine if run is complete.
         current_time = datetime.utcnow()
         # If difference is less than zero, run is finished
