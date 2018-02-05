@@ -231,10 +231,10 @@ class Subfolder:
 
         # Determine if this folder is still being written to
         if raw_fast5_count < self.threshold and not self.run.complete:
-            if self.is_mux and run.is_run_transfer_complete():
+            if self.is_mux and self.run.is_run_transfer_complete():
                 self.is_full = True
-	    if not run.is_run_transfer_complete():
-	        self.is_full = False
+        if not self.run.is_run_transfer_complete():
+            self.is_full = False
             return
         self.is_full = True
         # Get fast5 files
@@ -358,7 +358,7 @@ class Run:
             print(subfolder.number)
             fast5_files_iter = iter(subfolder.fast5_files)
             fast5_file = None
-            while fast5_file is None or not fast5_file.corrupted:
+            while fast5_file is None or fast5_file.corrupted:
                 try:
                     fast5_file = next(fast5_files_iter)
                 except StopIteration:
@@ -388,10 +388,13 @@ class Run:
         # Has the run finished transferring from tmp
         # Check that the tmp path is not empty
         tmp_path = os.path.join("/tmp/output/reads/", os.path.normpath(os.path.basename(self.path)))
-        tmp_fast5_path = os.path.join(tmp_path, "fast5")
+        tmp_fast5_path = os.path.join(tmp_path, "fast5") 
         open_sftp = self.slave.ssh_client.open_sftp()
-        folders = [folder for folder in open_sftp.listdir(tmp_fast5_path)
-                   if folder.isdigit()]
+        try:
+                  folders = [folder for folder in open_sftp.listdir(tmp_fast5_path)
+                             if folder.isdigit()]
+        except FileNotFoundError:
+               return True
         # For each folder, check if there exists fast5 files in the folder
         for folder in folders:
             fast5_files = [fast5_file
@@ -431,6 +434,8 @@ class Slave:
     """Use the slave node config to access the data from the master node."""
     def __init__(self, slurm_id, config_pd, pca_value):
         self.slurm_id = slurm_id
+        print(config_pd)
+        print(slurm_id)
         self.ssh_ip = config_pd.query("SlurmID=='%s'" % self.slurm_id)['IP'].item()
         print(self.ssh_ip)
         self.ssh_client = None
