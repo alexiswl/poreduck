@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="47b4cf6d-88b9-4fb0-9a87-4a8f710b93f5" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/poreduck/manipulate_rsync.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/poreduck/promethion_starter.py" afterPath="$PROJECT_DIR$/poreduck/promethion_starter.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/poreduck/manipulate_rsync.py" afterPath="$PROJECT_DIR$/poreduck/manipulate_rsync.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -59,9 +58,11 @@
       <file leaf-file-name="transfer_fast5_to_server.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4726">
-              <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
-              <folding />
+            <state relative-caret-position="-5348">
+              <caret line="287" column="60" lean-forward="true" selection-start-line="287" selection-start-column="60" selection-end-line="287" selection-end-column="60" />
+              <folding>
+                <element signature="e#1627#1674#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -69,8 +70,8 @@
       <file leaf-file-name="promethion_starter.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/promethion_starter.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="125">
-              <caret line="147" column="61" lean-forward="false" selection-start-line="147" selection-start-column="55" selection-end-line="147" selection-end-column="61" />
+            <state relative-caret-position="341">
+              <caret line="423" column="75" lean-forward="true" selection-start-line="423" selection-start-column="75" selection-end-line="423" selection-end-column="75" />
               <folding>
                 <element signature="e#100#115#0" expanded="true" />
               </folding>
@@ -81,8 +82,8 @@
       <file leaf-file-name="manipulate_rsync.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/poreduck/manipulate_rsync.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="370">
-              <caret line="37" column="0" lean-forward="true" selection-start-line="37" selection-start-column="0" selection-end-line="37" selection-end-column="0" />
+            <state relative-caret-position="306">
+              <caret line="27" column="3" lean-forward="true" selection-start-line="27" selection-start-column="3" selection-end-line="27" selection-end-column="3" />
               <folding>
                 <element signature="e#172#203#0" expanded="true" />
               </folding>
@@ -101,8 +102,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>h5py.</find>
-      <find>fileinput</find>
       <find>tar</find>
       <find>get_subfolders</find>
       <find>complete</find>
@@ -113,7 +112,6 @@
       <find>is_run_transfer_complete</find>
       <find>exit</find>
       <find>samplesheet</find>
-      <find>paramiko</find>
       <find>listdir</find>
       <find>Slave</find>
       <find>log_df</find>
@@ -131,6 +129,9 @@
       <find>Sample</find>
       <find>slave</find>
       <find>tar.gz</find>
+      <find>args.</find>
+      <find>args.ip_config</find>
+      <find>paramiko</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -513,7 +514,14 @@
       <option name="project" value="LOCAL" />
       <updated>1517811356906</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Created manipulate_rsync.py function">
+      <created>1517816176147</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1517816176147</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -571,7 +579,8 @@
     <MESSAGE value="Some transfers from tmp will finish well after the run has finished. Therefore it is paramount that we check that there are no files left in /tmp first before writing tar folders with less than 4000 reads." />
     <MESSAGE value="Created rsync1.py which will transfer data from the prom_storage to the aarnet storage." />
     <MESSAGE value="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added write_to_log function at the end of the script. And reversed illogical boolean in while loop." />
+    <MESSAGE value="Created manipulate_rsync.py function" />
+    <option name="LAST_COMMIT_MESSAGE" value="Created manipulate_rsync.py function" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -614,7 +623,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="4726">
           <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
-          <folding />
+          <folding>
+            <element signature="e#1627#1674#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -656,7 +667,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="4505">
           <caret line="275" column="7" lean-forward="false" selection-start-line="275" selection-start-column="4" selection-end-line="275" selection-end-column="7" />
-          <folding />
+          <folding>
+            <element signature="e#1627#1674#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -688,7 +701,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="4505">
           <caret line="275" column="7" lean-forward="false" selection-start-line="275" selection-start-column="4" selection-end-line="275" selection-end-column="7" />
-          <folding />
+          <folding>
+            <element signature="e#1627#1674#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -720,7 +735,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3587">
           <caret line="221" column="55" lean-forward="false" selection-start-line="221" selection-start-column="49" selection-end-line="221" selection-end-column="55" />
-          <folding />
+          <folding>
+            <element signature="e#1627#1674#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -740,14 +757,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4726">
-          <caret line="288" column="66" lean-forward="false" selection-start-line="288" selection-start-column="63" selection-end-line="288" selection-end-column="66" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/albacore_server_scaled.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="13192">
@@ -763,10 +772,20 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/poreduck/transfer_fast5_to_server.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-5348">
+          <caret line="287" column="60" lean-forward="true" selection-start-line="287" selection-start-column="60" selection-end-line="287" selection-end-column="60" />
+          <folding>
+            <element signature="e#1627#1674#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/promethion_starter.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="125">
-          <caret line="147" column="61" lean-forward="false" selection-start-line="147" selection-start-column="55" selection-end-line="147" selection-end-column="61" />
+        <state relative-caret-position="341">
+          <caret line="423" column="75" lean-forward="true" selection-start-line="423" selection-start-column="75" selection-end-line="423" selection-end-column="75" />
           <folding>
             <element signature="e#100#115#0" expanded="true" />
           </folding>
@@ -775,8 +794,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/manipulate_rsync.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="370">
-          <caret line="37" column="0" lean-forward="true" selection-start-line="37" selection-start-column="0" selection-end-line="37" selection-end-column="0" />
+        <state relative-caret-position="306">
+          <caret line="27" column="3" lean-forward="true" selection-start-line="27" selection-start-column="3" selection-end-line="27" selection-end-column="3" />
           <folding>
             <element signature="e#172#203#0" expanded="true" />
           </folding>
