@@ -226,7 +226,6 @@ class Subfolder:
 
         # Determine if this folder needs deleting
         if self.is_empty():
-            #self.remove_folder()
             return
 
         # Determine if this folder is still being written to
@@ -297,10 +296,6 @@ class Subfolder:
                 time.sleep(15)
                 index += 1
         self.is_tarred = True
-        # After tarring, we should check if the folder still exists.
-        # It can for some reason, with no files in it.
-        if self.folder_exists() and self.is_empty():
-            pass  # when rync issue is cleared: self.remove_folder()
 
 
 class Run:
@@ -351,6 +346,12 @@ class Run:
                 folder.check_if_full()
             if folder.is_full and not folder.is_tarred:
                 folder.tar_folder()
+
+    def unlink_tarred_subfolders(self):
+        # Remove tarred folder from run object
+        self.subfolders = [subfolder
+                           for subfolder in self.subfolders
+                           if not folder.is_tarred]
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
@@ -368,7 +369,7 @@ class Run:
                     break
             if fast5_file is not None and not fast5_file.corrupted:
                 break
-	    # If we are here, it means no folder is full. We expect run is complete
+            # If we are here, it means no folder is full. We expect run is complete
             return datetime.utcnow() - timedelta(days=1)
 
         start_time = fast5_file.exp_start_time
@@ -487,6 +488,7 @@ def main():
             first_pass = False
         for sample in samples:
             for run in sample.runs:
+                run.unlink_tarred_subfolders()
                 run.get_subfolders()
                 run.tar_subfolders()
 
