@@ -34,6 +34,19 @@ Fastq File:
 Grabs meta data about each fastq file.
 Along with the expected finish time of the run.
 
+Issues:
+
+Pending:
+About 0.5% of tar folders are corrupted. Add 3 seconds prior to  tarring to allow disk io to catch up.
+Run rsync --checksum on the script to ensure the transfer write is smoother. 
+If a run is cancelled before 64 hours, the script will not recognise this.
+Use the slve to infer if MinKNOW is still running internally.
+
+Testing:
+time.sleep(3) to prevent
+
+Solved:
+
 """
 
 
@@ -135,7 +148,6 @@ class Subfolder:
         self.tar_path = ""
         self.num_fast5_files = 0
         self.run = run
-        self.removed = False
 
     def get_new_folder_name(self): 
         # Create the new folder name
@@ -205,14 +217,6 @@ class Subfolder:
         else:
             return False
 
-    def remove_folder(self):
-        # Delete folder through open sftp.
-        #open_sftp = self.slave.ssh_client.open_sftp()
-        #open_sftp.rmdir(path=self.path)
-        #open_sftp.close()
-        # Delete folder from run.
-        self.removed = True
-
     def check_if_full(self):    
         if self.is_full:
             # We shouldn't be calling this twice.
@@ -270,6 +274,7 @@ class Subfolder:
 
         """Tar folder using pigz"""
         # When tarring we need to be in the directory, rather than use the absolute path
+        time.sleep(3)  # Sleep three seconds before starting the tar command
         # Now declare tar and pigz command
         tar_command = ' '.join(["tar", "-cf", '-', self.new_folder_name, "--remove-files"])
         gzip_command = ' '.join(["gzip", "-", '>', self.tar_file+".tmp"])
@@ -339,9 +344,7 @@ class Run:
     def tar_subfolders(self):
         for folder in self.subfolders:
             if folder.is_tarred:
-                continue
-            if folder.removed:
-                continue
+                continue # Only the first folder will get to here.
             if not folder.is_full:
                 folder.check_if_full()
             if folder.is_full and not folder.is_tarred:
@@ -351,7 +354,8 @@ class Run:
         # Remove tarred folder from run object
         self.subfolders = [subfolder
                            for subfolder in self.subfolders
-                           if not folder.is_tarred]
+                           if not subfolder.is_tarred
+                           and not subfolder == self.subfolders[0]]
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
