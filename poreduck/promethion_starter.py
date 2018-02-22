@@ -271,6 +271,7 @@ class Subfolder:
         """Tar folder using pigz"""
         # When tarring we need to be in the directory, rather than use the absolute path
         # Now declare tar and pigz command
+        time.sleep(3)
         tar_command = ' '.join(["tar", "-cf", '-', self.new_folder_name, "--remove-files"])
         gzip_command = ' '.join(["gzip", "-", '>', self.tar_file+".tmp"])
         tar_and_gzip_command = ' | '.join([tar_command, gzip_command])
@@ -351,7 +352,8 @@ class Run:
         # Remove tarred folder from run object
         self.subfolders = [subfolder
                            for subfolder in self.subfolders
-                           if not folder.is_tarred]
+                           if not subfolder.is_tarred
+			   or subfolder == self.subfolders[0]]
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
