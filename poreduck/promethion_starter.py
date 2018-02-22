@@ -355,7 +355,7 @@ class Run:
         self.subfolders = [subfolder
                            for subfolder in self.subfolders
                            if not subfolder.is_tarred
-                           and not subfolder == self.subfolders[0]]
+                           or subfolder == self.subfolders[0]]
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
