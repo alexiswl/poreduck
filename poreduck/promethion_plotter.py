@@ -24,6 +24,7 @@ class Sample:
         self.runs = []
         self.concatenated_data = None
 
+
 class Slave:
     """Use the slave node config to access the data from the master node."""
     def __init__(self, slurm_id, ip):
@@ -133,21 +134,59 @@ def plot_samples(names, samples_df):
     samples_df.set_index("RunDurationTime", inplace=True)
     samples_df.sort_index(inplace=True)
     # Generate a cumulative yield
-    sample_df["CumYield"] = sample_df["EstLength"].cumsum()
+    samples_df["CumYield"] = samples_df.groupby(["SampleName"])["EstLength"].apply(lambda x: x.cumsum())
+    # Pivot dataframe using SampleName as pivot, CumYield as column. Save as yield_df
+    yield_df = samples_df.pivot(index="SampleName",
+                                columns='CumYield',
+                                values='CumYields').filter(regex=r'^CumYields\.', axis=1)
     # Plot cumulative yield over time.
-    sample_df["CumYield"].plot(ax=ax)
+    yield_df.plot(ax=ax)
     # Define axis formatters
     ax.xaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     # Set x and y labels
     ax.set_xlabel("Duration of run (HH:MM")
     ax.set_ylabel("Yield")
-    ax.set_title("Yield for sample %s over time" % name)
+    ax.set_title("Yield over time by sample")
     # Set x and y limits
-    ax.set_xlim(sample_df["DurationTime"].min(), sample_df["DurationTime"].max())
+    ax.set_xlim(samples_df["DurationTime"].min(), samples_df["DurationTime"].max())
     ax.set_ylim(ymin=0)
-    # Ensure labels are not mised
+    # Ensure labels are not missed
     fig.tight_layout()
-    savefig("%s.combined_yield.png" % name)
+    savefig("%s.combined_yield.png" % '.'.join([samples_df['SampleName'].tolist()]))
+
+
+def plot_histograms(names, samples_df):
+    # Generate a weighted histogram for each sample
+    # Histogram
+    # Set up plotting structure
+    plt.close('all')
+    fig, ax = plt.subplots(1)
+    num_bins = 50
+    # Reset the index of the dataframe
+    samples_df.reset_index(drop=True, inplace=True)
+    # Clip data and plot histogram
+    lengths = samples_df['EstLength']
+    samples_df['EstLength'] = samples_df[lengths < lengths.quantile(0.995)]
+    # Pivot dataframe using SampleName as pivot, save the EstLengths
+    hist_df = samples_df.pivot(index="SampleName",
+                               columns='EstLength',
+                               values='EstLengths').filter(regex=r'^EstLengths\.', axis=1)
+    hist_df.plot(type='hist', ax=ax, normed=1, facecolor='blue', alpha=0.75)
+    def y_hist_to_human_readable_seq(y, position):
+        # Convert distribution to base pairs
+        if y == 0:
+            return 0
+        s = humanfriendly.format_size(lengths.sum() * y, binary=False)
+        return reformat_human_friendly(s)
+    ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable_seq))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
+    # Set titles
+    ax.set_title("Read Distribution Graph for %s" % names)
+    ax.grid(color='black', linestyle=':', linewidth=0.5)
+    ax.set_ylabel("Bases per bin")
+    # Ensure labels are not mised.
+    fig.tight_layout()
+    savefig("%s.combined_hist.png" % names)
 
 
 def plot_single(name, sample_df):

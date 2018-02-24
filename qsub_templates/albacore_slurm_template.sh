@@ -6,11 +6,52 @@
 #SBATCH --parsable
 #SBATCH -o %STDOUT%
 #SBATCH --time=200
-#SBATCH -e %STDERR%
-#SBATCH --mem=%MEM%g
-#SBATCH -D %WORKING_DIRECTORY%
-# Insert your source files here around our 'command'. An example would be:
+
+# Other variables for analysis
+# ALBACORE_DIR
+# ALBACORE_VER
+# FASTQ_DIR
+# NUM_THREADS
+# KIT
+# FLOWCELL
+
+# Create tmp directories to untar and save the folders
+TMP_EXT=‘mktemp /tmp/fast5.XXXXXXX‘
+TMP_SAVE=`mktemp /tmp/albacore.XXXXXXX`
+#
+# Return error if tar file is corrupted
+tar_cmd=tar xf %tar% -C ${TMP_EXT})
+eval $tar_cmd
+ret_code = $?
+if [ ${ret_code} != 0 ]; then
+      printf "Error exit code [%d] when exiting tar file: ''${tar_cmd}'" ${ret_code}
+      exit ${ret_code}
+fi
+
+# Insert your source files here An example would be:
 export OMP_NUM_THREADS=1
-source activate albacore_%ALBACORE_VER%
-%COMMAND%
+
+# Run albacore through CONDA
+unset PYTHONPATH
+CONDA_ROOTDIR=~/anaconda2/
+
+source ${CONDA_ROOTDIR}/bin/activate albacore_${ALBACORE_VER}
+read_fast5_basecaller.py --input ${TMP_EXT}/${SUBFOLDER_NAME} \
+                         --worker_threads ${NUM_THREADS} \
+                         --save_path ${TMP_SAVE} \
+                         --flowcell ${FLOWCELL} \
+                         --kit ${KIT}
 source deactivate
+
+# Move albacore log file to log directory.
+mv ${TMP_SAVE}/pipeline.log ${ALBACORE_DIR}/${SUBFOLDER_NAME}.pipeline.log
+mv ${TMP_SAVE}/sequencing_summary.txt ${ALBACORE_DIR}/${SUBFOLDER_NAME}.sequencing_summary.txt
+
+# Move pass fastq file to fastq directory
+gzip ${TMP_SAVE}/pass/${SUBFOLDER_NAME}.fastq ${FASTQ_DIR}/pass/${SUBFOLDER_NAME}.fastq.gz
+
+# Move failed fastq file to failed directory
+gzip ${TMP_SAVE}/fail/${SUBFOLDER_NAME}.fastq ${FASTQ_DIR}/fail/${SUBFOLDER_NAME}.fastq.gz
+
+# Delete tmp directory
+rm -rf ${TMP_SAVE}
