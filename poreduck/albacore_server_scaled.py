@@ -311,7 +311,7 @@ def run_albacore(subfolder, dir_dict, configurations):
     # The following variables need to be set for sbatch.
     slurm_options = {"mem":"%d" % configurations['threads']*3,
                      "error":"albacore.{}.{}".format(subfolder.name, "%j"),
-                     "chdir": dir_dict["main_dir"]
+                     "chdir": dir_dict["main_dir"],
                      "job-name": "albacore"}
     # The following variables need to be exported
     export_options = {"NUM_THREADS": configurations["threads"],
@@ -373,7 +373,7 @@ def merge_dataframes(subfolder, merged_dir):
     # Now merge with the raw metadata file
     raw_df = pd.read_csv(subfolder.metadata_raw, header=True)
     raw_df.set_index(["channel", "read"], inplace=True)
-    pd.concat(raw_df, fastq_df, join='right').to_csv(merged_dir, subfolder.merged_dataframe))
+    pd.concat(raw_df, fastq_df, join='right').to_csv(merged_dir, subfolder.merged_dataframe)
     
 
 """
