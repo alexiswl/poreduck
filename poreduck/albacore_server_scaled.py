@@ -31,6 +31,8 @@ from Bio import SeqIO
 import gzip
 import statistics
 import argparse
+import tempfile
+import fileinput
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -50,7 +52,7 @@ CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
            "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit.
 
-FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
+FLOWCELLS = ["FLO-MIN107", "FLO-MIN106", "FLO-PRO001"]
 
 KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "SQK-LWB001",
         "SQK-RNA001", "SQK-RLI001", "SQK-RAD002", "SQK-RLB001", "SQK-RAB201", "SQK-LSK208", 
@@ -106,53 +108,53 @@ Main functions:
 """
 
 
-def main(args):
+def main():
     # Basic house cleaning, get arguments, make sure they're legit.
     args = get_args()
     dir_dict, configurations = check_directories(args)
     # Make sure there's no lockfile
-    if os.path.isfile(configurations['lockfile']):
+    if os.path.isfile(configurations['lock_file']):
         print("Lock file exists. Exiting")
         return
     # Create directories
     dir_dict = create_directories(dir_dict)
     set_logger(configurations['logger_path'])
-    create_basecalling_lock_file(configurations['lockfile'])
-
+    create_basecalling_lock_file(configurations['lock_file'])
+    status_csv = os.path.join(dir_dict["main"], "status.csv")
     # Get all the subfolders currently in the fast5 directory
     subfolders = get_subfolders(dir_dict=dir_dict)
 
     # Make sure STATUS_DF has all of the subfolders present
-    status_df = generate_dataframe(subfolders)
+    status_df = generate_dataframe(subfolders, status_csv)
 
     # Otherwise run through the pipeline
-    run_pipeline(subfolders, configurations["max_processes"], dir_dict["metadata.merged"],
+    run_pipeline(subfolders, configurations["max_processes"],
                  dir_dict, configurations)
 
     # Now wait for albacore to finish
     while is_still_basecalling(subfolders):
 
         # Otherwise run through the pipeline
-        run_pipeline(subfolders, configurations["max_processes"], dir_dict["metadata.merged"],
+        run_pipeline(subfolders, configurations["max_processes"],
                      dir_dict, configurations)
 
         # Generate dataframe throughout each iteration of the pipeline
-        status_df = generate_dataframe(subfolders, status_df)
+        status_df = generate_dataframe(subfolders, status_csv)
 
         # Have a 15 second break between iterations
         take_a_break()
 
     # Merge fastq files at the end of the run.
-    generate_dataframe(subfolders, status_df)
-    remove_basecalling_lock_file(configurations['lockfile'])
+    generate_dataframe(subfolders, status_csv)
+    remove_basecalling_lock_file(configurations['lock_file'])
 
 
-def run_pipeline(subfolders, processes, merged_dir, dir_dict, configurations):
+def run_pipeline(subfolders, processes, dir_dict, configurations):
     # Now run albacore
-    index = sum([subfolder
+    index = len([subfolder
                  for subfolder in subfolders
-                    if subfolder.albacore_commenced
-                    and not subfolder.albacore_complete])
+                   if subfolder.albacore_commenced
+                   and not subfolder.albacore_complete])
 
     for subfolder in subfolders:
         if index > processes:
@@ -168,7 +170,7 @@ def run_pipeline(subfolders, processes, merged_dir, dir_dict, configurations):
         and not subfolder.albacore_complete]
 
     # If albacore is complete. Merge the fastq output onto the metadata frame
-    [merge_dataframes(subfolder, merged_dir)
+    [merge_dataframes(subfolder, dir_dict["fastq"], dir_dict["metadata"], dir_dict["metadata.merged"])
      for subfolder in subfolders
         if subfolder.albacore_complete and
         not subfolder.metadata_merged]
@@ -184,14 +186,14 @@ General script initialisation functions
 
 def get_args():
     # Albacore server arguments:
-    albacore_parser = argparse.ArgumentParser(dscription="The albacore-server scaled command incorporates qsub to spread " +
+    albacore_parser = argparse.ArgumentParser(description="The albacore-server scaled command incorporates qsub to spread " +
                                                          "the server load and rapidly " + "generate data off the PromethION.")
     albacore_parser.add_argument("--fast5_dir", type=str, required=True,
                                  help="/path/to/reads/fast5, " +
                                       "should have a bunch of tar zipped files in it.")
-    albacore_parser.add_argument("--flowcell", type=str, choices=FLOWCELLS,
+    albacore_parser.add_argument("--flowcell", type=str, choices=FLOWCELLS, required=True,
                                  help="Pick a flowcell version")
-    albacore_parser.add_argument("--kit", type=str, choices=KITS,
+    albacore_parser.add_argument("--kit", type=str, choices=KITS, required=True,
                                  help="Pick a kit type")
     albacore_parser.add_argument("--output_dir", type=str, required=False, default=None,
                                  help="Will be called 'albacore'" +
@@ -199,26 +201,23 @@ def get_args():
     albacore_parser.add_argument("--num_threads", type=int, required=False, default=5,
                                  help="How many threads did you wish to use " +
                                       "per parallel output default is 5.")
-    albacore_parser.add_argument("--num_processes", type=int, required=False, default=10,
-                                 help="How many processes did you wish to process at once?")
     albacore_parser.add_argument("--fastq_dir", type=str, required=False, default=None,
                                  help="Where should the fastq data be placed." +
                                       "Will be called 'fastq'" +
                                       "and sit adjacent to reads folder if left blank.")
-    albacore_parser.add_argument("--qsub_directory", type=str, required=False, default=None,
+    albacore_parser.add_argument("--qsub_dir", type=str, required=False, default=None,
                                  help="Where would you like to place the qsub files?")
     albacore_parser.add_argument("--qsub_host", type=str, required=False, default=None,
                                  help="Where would you like the qsub jobs to be run?")
-    albacore_parser.add_argument("--max_processes", type=int, required=False, default=None,
+    albacore_parser.add_argument("--max_processes", type=int, required=False, default=10,
                                  help="Limit the number of jobs that can be processed at any given moment." +
                                       "This command will prevent extraction/albacore jobs from being submitted while" +
                                       "there exists 'max_processes' jobs running / in the queue.")
-    albacore_parser.add_argument("--log_directory", type=str, required=False, default=None,
+    albacore_parser.add_argument("--log_dir", type=str, required=False, default=None,
                                  help="Where do you wish to store the poreduck logs? " +
                                       "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
     albacore_parser.add_argument("--albacore_version", type=str, required=True,
-                                 help="Albacore 2 comes with the pass and fail folders." +
-                                      "Albacore 1 does not. Also used in %VER% command in templates." +
+                                 help="Albacore 2 comes with the pass and fail folders." + 
                                       "Expressed as <majore_version>.<minor_version>.<patch>")
     albacore_parser.add_argument("--qsub_albacore_template", type=str, required=True,
                                  help="The qsub albacore template for your qsub command. " +
@@ -233,21 +232,22 @@ def check_directories(args):
     configurations = {}
     # Get arguments used throughout the script
     configurations['threads'] = args.num_threads
-    configurations['processes'] = args.max_processes
+    configurations['max_processes'] = args.max_processes
     configurations['flowcell'] = args.flowcell
     configurations['kit'] = args.kit
-    configurations['template'] = args.qsub_albacore_template
+    if not os.path.isfile(args.qsub_albacore_template):
+            sys.exit("Error, template not found")
+    configurations['template'] = os.path.abspath(args.qsub_albacore_template)
     configurations["albacore.version"] = args.albacore_version
 
     dir_dict["fast5"] = os.path.abspath(args.fast5_dir)
-    if not os.path.isdir(args.reads_dir):
-        sys.exit(f"Error, {args.reads_dir} does not exist")
-    os.chdir(dir_dict["reads"])
+    if not os.path.isdir(args.fast5_dir):
+        sys.exit(f"Error, {args.fast5_dir} does not exist") 
 
     dir_dict["main"] = os.path.abspath(os.path.join(dir_dict["fast5"], os.pardir))
     dir_dict["metadata"] = os.path.join(dir_dict["main"], "metadata")
 
-    if args.qsub_dir is None:
+    if args.qsub_dir is None:   
         dir_dict["qsub"] = os.path.join(dir_dict["main"], "qsub")
     else:
         dir_dict["qsub"] = os.path.abspath(args.qsub_dir)
@@ -257,32 +257,35 @@ def check_directories(args):
     else:
         dir_dict["fastq"] = os.path.abspath(dir_dict["fastq"])
 
-
-    if dir_dict["log"] == "":
+    if args.log_dir is None:
         dir_dict["log"] = os.path.join(dir_dict["main"], "poreduck_logs")
     else:
         dir_dict["log"] = os.path.abspath(dir_dict["log"])
-
+    dir_dict["albacore"] = os.path.abspath(os.path.join(dir_dict["main"], "albacore"))
     configurations['logger_path'] = os.path.join(dir_dict["log"], '.'.join([str(datetime.now().date()),
                                                  str(datetime.now().time()).replace(":", "-"),
                                                  "albacore_pipeline.log"]))
-    configurations['lock_file'] = os.path.join(dir_dict['main_dir'], "BASECALLING")
+    configurations['lock_file'] = os.path.join(dir_dict['main'], "BASECALLING")
 
     return dir_dict, configurations
 
 
 def set_logger(logger_path):
     global logger
+    if not os.path.isdir(os.path.dirname(logger_path)):
+        os.mkdir(os.path.dirname(logger_path))
     logging.basicConfig(filename=logger_path, level=logging.INFO,
                         format='%(asctime)s::\t%(message)s', datefmt='%Y/%m/%d %I:%M:%S %p')
     logger = logging.getLogger()
 
 
 def create_directories(dir_dict):
-    for subdir in dir_dict:
+    for subdir in dir_dict.values():
         if not os.path.isdir(subdir):
             os.mkdir(subdir)
     dir_dict["metadata.merged"] = os.path.join(dir_dict['metadata'], "merged")
+    if not os.path.isdir(dir_dict["metadata.merged"]):
+        os.mkdir(dir_dict["metadata.merged"])
     return dir_dict
 
 """
@@ -308,29 +311,46 @@ def run_albacore(subfolder, dir_dict, configurations):
     subfolder.albacore_submitted = True
 
     # The sbatch is all primed.
-    # The following variables need to be set for sbatch.
-    slurm_options = {"mem":"%d" % configurations['threads']*3,
-                     "error":"albacore.{}.{}".format(subfolder.name, "%j"),
-                     "chdir": dir_dict["main_dir"],
-                     "job-name": "albacore"}
+    # The following variables need to be set for sbatch. 
+    slurm_options = {"mem":"%dG" % int(3*configurations['threads']),
+                     "output": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")),
+                     "error": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")), 
+                     "workdir": dir_dict["fast5"],
+                     "job-name": "albacore"} 
     # The following variables need to be exported
     export_options = {"NUM_THREADS": configurations["threads"],
                       "FLOWCELL": configurations["flowcell"],
                       "KIT": configurations["kit"],
                       "SUBFOLDER_NAME": subfolder.name,
-                      "ALBACORE_DIR": dir_dict["albacore_dir"],
+                      "FASTQ_DIR": dir_dict["fastq"],
+                      "ALBACORE_DIR": dir_dict["albacore"],
                       "ALBACORE_VER": configurations["albacore.version"]}
 
-    job_submission_command = ["sbatch", configurations['template']]
-    job_submission_command.extend(["--%s=%s" % (k,v) for k,v in slurm_options])
-    job_submission_command.append("--export=%s" % ','.join(["%s=%s" % (k,v) for k,v in export_options]))
+    # Create temporary file to submit from
+    sbatch_temp_file = tempfile.NamedTemporaryFile()
+    
+    # Copy template to tmp file
+    shutil.copy2(configurations['template'], sbatch_temp_file.name)
+    
+    # Edit temporary sbatch file using fileinput
+    with fileinput.FileInput(files=sbatch_temp_file.name, inplace=True) as input:
+        for line in input:
+            for key, value in export_options.items(): 
+                if line.strip() == '# %s' % key:
+                    line = '%s=%s' % (key, value)
+            for key, value in slurm_options.items():
+                if line.strip() == '#SBATCH --%s' % key:
+                    line = '#SBATCH --%s=%s' % (key, value)
+            print(line.strip())
+
+    job_submission_command = ["sbatch", sbatch_temp_file.name]
+    job_submission_command.extend(["--%s=%s" % (k,v) for k,v in slurm_options.items()]) 
 
     job_submission_proc = subprocess.run(job_submission_command,
-                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=dir_dict["qsub"])
 
-    stdout, stderr = job_submission_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
+    stdout, stderr = job_submission_proc.stdout.decode(), job_submission_proc.stderr.decode()
+    
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of th   e array.
     logger.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
@@ -343,37 +363,56 @@ def run_albacore(subfolder, dir_dict, configurations):
         sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
 
 
+def get_series_from_seq(record):
+    """Takes in a seq record and returns dataframe with index"""
+    # Series index
+    index = ["FastqID", "Read", "Channel", "SeqLength", "AvQual"]
+    # Get metadata
+    fastq_id = record.id.split()[0]
+    row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
+    # Get length
+    fastq_length = len(record.seq)
+    fastq_quality = statistics.mean(record.letter_annotations["phred_quality"])
+    return pd.Series([fastq_id, row_as_dict['read'], row_as_dict['ch'],
+                      fastq_length, fastq_quality], 
+                     index=index)                                     
+                               
+
 def get_fastq_dataframe(fastq_file):
-    fastq_df = pd.DataFrame(columns=["fastq_id", "read", "channel", "seq_length", "av_qual"])
-    with gzip.open(fastq_file, "rt") as handle:
-        for record in SeqIO.parse(handle, "fastq"):
-            # Get metadata
-            fastq_id = record.id.split()[0]
-            row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
-            # Get length
-            fastq_length = len(record.seq)
-            fastq_quality = statistics.mean(record.letter_annotations["phred_quality"])
-            fastq_df = fastq_df.append(pd.Series([fastq_id, row_as_dict["read"], row_as_dict["ch"],
-                                                  fastq_length, fastq_quality]),
-                                       ignore_index=True)
-    # Specify types for each line
-    numeric_cols = ["read", "channel", "seq_length", "av_qual"]
-    fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric)
-    fastq_df.set_index(["channel", "read"], inplace=True)
-    return fastq_df
+    """Use get_series_from_seq in list comprehension to generate dataframe then transpose"""
+    # Open fastq file and return list comprehension 
+    # PD concat merges series as columns, we then transpose.
+    try:
+        with gzip.open(fastq_file, "rt") as handle:
+            fastq_df = pd.concat([get_series_from_seq(record) 
+                                  for record in SeqIO.parse(handle, "fastq")], 
+                                 axis='columns').transpose()
+        # Specify types for each line
+        numeric_cols = ["Read", "Channel", "SeqLength", "AvQual"]
+        fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric, axis='columns')
+        return fastq_df
+    except ValueError:
+        print("Value error when generating dataframe for %s. Unknown cause of issue." % fastq_file)
+        return pd.DataFrame(columns=["FastqID", "Read", "Channel", "SeqLength", "AvQual"])
+    
 
-
-def merge_dataframes(subfolder, merged_dir):
+def merge_dataframes(subfolder, fastq_dir, metadata_dir, merged_dir):
     # Use the SeqIO library to extract the data info from the fastq file
-    pass_df = get_fastq_dataframe(subfolder.pass_fastq_file)
+    pass_df = get_fastq_dataframe(os.path.join(fastq_dir, "pass", subfolder.fastq_file))
     pass_df["Class"] = "pass"
-    fail_df = get_fastq_dataframe(subfolder.fail_fastq_file)
-    pass_df["Class"] = "fail"
-    fastq_df = pd.concat(fail_df, pass_df, axis='rows')
+   
+    fail_df = get_fastq_dataframe(os.path.join(fastq_dir, "fail", subfolder.fastq_file))
+    fail_df["Class"] = "fail"
+  
+    fastq_df = pd.concat([fail_df, pass_df], axis='rows')
+
     # Now merge with the raw metadata file
-    raw_df = pd.read_csv(subfolder.metadata_raw, header=True)
-    raw_df.set_index(["channel", "read"], inplace=True)
-    pd.concat(raw_df, fastq_df, join='right').to_csv(merged_dir, subfolder.merged_dataframe)
+    raw_df = pd.read_csv(os.path.join(metadata_dir, subfolder.raw_dataframe), header=0, sep="\t")
+    pd.merge(raw_df, fastq_df, how='right',
+             left_on=["Channel", "Read"], 
+             right_on=["Channel", "Read"]).to_csv(os.path.join(merged_dir, subfolder.merged_dataframe), 
+             sep="\t", header=True, index=False)
+    subfolder.metadata_merged = True
     
 
 """
@@ -401,16 +440,16 @@ def get_subfolders(subfolders=[], dir_dict={}):
                      for subfolder in subfolders]
 
     # Or those that have been basecalled in a previous script.
-    metadata_tar = [metadata.replace(".merged.tsv")
+    metadata_tar = [metadata.replace(".merged.tsv", "")
                     for metadata in os.listdir(dir_dict["metadata.merged"])]
 
     # Get a list of tarballs
-    new_subfolders = sorted([Subfolder(tarred_folder.replace(".fast5.tar.gz", ""))
-                             for tarred_folder in os.listdir(dir_dict["reads"])
+    new_subfolders = sorted([Subfolder(tarred_folder.replace(".fast5.tar.gz", ""), dir_dict["main"])
+                             for tarred_folder in os.listdir(dir_dict["fast5"])
                              if tarred_folder.endswith(".fast5.tar.gz")
                              and not tarred_folder in existing_tars
-                             and not tarred_folder.replace(".fast5.tar.gz")
-                             in metadata_tar])
+                             and not tarred_folder.replace(".fast5.tar.gz", "")
+                             in metadata_tar], key=lambda x: x.name)
     subfolders.extend(new_subfolders)
     return subfolders
 
@@ -422,16 +461,12 @@ def take_a_break():
     time.sleep(15)
 
 
-def generate_dataframe(subfolders, status_df=None):
-
-    for subfolder in subfolders:
-        if status_df is None or subfolder.name not in status_df.index.tolist():
-            # Append row
-            status_df = status_df.append(subfolder.to_series(), ignore_index=True)
-            # Reset index
-            status_df.set_index('name', drop=False, inplace=True)
-
-    status_df.to_csv(status_df, index=False)
+def generate_dataframe(subfolders, status_csv):
+    status_df = pd.concat([subfolder.to_series() for subfolder in subfolders],
+                          axis='columns').transpose() 
+    # Reset index
+    status_df.set_index('name', drop=False, inplace=True)
+    status_df.to_csv(status_csv, index=True)
     return status_df
 
 
@@ -529,3 +564,6 @@ def create_basecalling_lock_file(lockfile):
 def remove_basecalling_lock_file(lockfile):
     # Remove the basecalling lock file.
     os.remove(lockfile)
+
+if __name__=="__main__":
+    main()
