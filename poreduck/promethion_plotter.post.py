@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from promethion_starter import samplesheet_to_pd, config_to_pd
+from .promethion_starter import samplesheet_to_pd, config_to_pd
 import pandas as pd
 import os
 import argparse
@@ -8,6 +8,7 @@ import paramiko
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import humanfriendly
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
@@ -18,32 +19,17 @@ series_columns = ["Name", "Channel", "Read", "RNumber", # From file name
 
 
 class Sample:
-    def __init__(self, sample_name, sample_df):
+    def __init__(self, sample_name, sample_df, path):
         self.name = sample_name
         self.df = sample_df
         self.runs = []
-        self.concatenated_data = None
-
-
-class Slave:
-    """Use the slave node config to access the data from the master node."""
-    def __init__(self, slurm_id, ip):
-        self.slurm_id = slurm_id
-        self.ssh_ip = ip
-        self.ssh_client = None
-        self.reads_path = "/tmp/output/reads"
-
-    def connect(self):
-        self.ssh_client = paramiko.SSHClient()
-        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh_client.connect(self.ssh_ip, key_filename='/home/prom/.ssh/id_rsa.pub')
 
 
 class Run:
     def __init__(self, sample_name,
                  grnwch_mux_start_date, grnch_mux_start_time,
                  grnwch_seq_start_date, grnch_seq_start_time,
-                 slurm_id, flowcell_id, ip):
+                 slurm_id, flowcell_id, pca_path):
         self.sample_name = sample_name
         self.grnwch_mux_start_date = grnwch_mux_start_date
         self.grnch_mux_start_time = grnch_mux_start_time
@@ -52,10 +38,9 @@ class Run:
         self.slurm_id = slurm_id
         self.flowcell_id = flowcell_id
         self.concatenated_data = None
-        self.slave = Slave(self.slurm_id, ip)
-        self.path = os.path.join("/media/data", '_'.join([self.grnwch_seq_start_date,
-                                                          self.grnwch_seq_start_time,
-                                                          self.sample_name]))
+        self.path = os.path.join(pca_path, slurm_id, "reads", '_'.join([self.grnwch_seq_start_date,
+                                                                        self.grnwch_seq_start_time,
+                                                                        self.sample_name]))
 
 
 def get_args():
@@ -73,6 +58,8 @@ def get_args():
     parser.add_argument("--ip_config", type=str, required=True,
                         help="path/to/tab-delimited-config file. "
                              "One column of IP addresses ==> one column of slave nodes.")
+    parser.add_argument("--pca_dir", type=str, required=True,
+                        help="/PATH/TO/PCAXXXX")
     args = parser.parse_args()
     return args
 
@@ -84,31 +71,29 @@ def get_samples(samplesheet_df):
         samples.append(Sample(sample_name, samplesheet_df.query("SampleName==@sample_name")))
 
 
-def get_runs(sample_df, ip_config, pca_dir):
+def get_runs(sample_df, pca_dir):
     """Return a list of class run, each with a list of associated dataframes"""
     runs = []
     for index, row in sample_df.iterrows():
-        ip = ip_config.query("SlurmID==@row.SlurmID")["IP"].item()
         runs.append(Run(row.sample_name,
                         row.GrnwchMuxStartDate, row.GrnwchMuxStartTime,
                         row.GrnwchSeqStartDate, row.GrnwchSeqStartTime,
-                        row.SlurmID, row.FlowcellID, ip))
+                        row.SlurmID, row.FlowcellID, pca_dir))
     return runs
 
 
-def get_metadata(path, open_sftp):
+def get_metadata(run_path):
     """Return a list of pandas dataframes imported over paramiko"""
-    metadata_path = os.path.join(path, "metadata")
+    metadata_path = os.path.join(run_path, "metadata", "merged")
     # Get list of tsv files
     tsv_list = [tsv
-                for tsv in open_sftp.listdir(path=metadata_path)
+                for tsv in os.listdir(path=metadata_path)
                 if tsv.endswith(".tsv")]
     # Read in dataframe via read_csv()
     metadatas = []
     for tsv in tsv_list:
-        with open_sftp.file(os.path.join(metadata_path, tsv), 'r') as tsv_ftpfile:
-            metadata = pd.read_csv(tsv_ftpfile, header=True, index=False, sep="\t",
-                                   parse_dates=["StartTime", "EndTime"])
+        metadata = pd.read_csv(os.path.join(run_path, tsv), header=True, index=False, sep="\t",
+                               parse_dates=["StartTime", "EndTime"])
         # Convert the following columns to numeric
         metadata[["Channel", "Read", "Mux", "RNumber"]] = metadata[["Channel", "Read", "Mux", "RNumber"]].apply(pd.to_numeric)
         metadata["EstLength"] = metadata[["StartTime", "EndTime"]].apply(estimate_read_length)
@@ -135,7 +120,7 @@ def plot_samples(names, samples_df):
     samples_df.set_index("RunDurationTime", inplace=True)
     samples_df.sort_index(inplace=True)
     # Generate a cumulative yield
-    samples_df["CumYield"] = samples_df.groupby(["SampleName"])["EstLength"].apply(lambda x: x.cumsum())
+    samples_df["CumYield"] = samples_df.groupby(["SampleName"])["SeqLength"].apply(lambda x: x.cumsum())
     # Pivot dataframe using SampleName as pivot, CumYield as column. Save as yield_df
     yield_df = samples_df.pivot(index="SampleName",
                                 columns='CumYield',
@@ -166,12 +151,12 @@ def plot_histograms(names, samples_df):
     # Reset the index of the dataframe
     samples_df.reset_index(drop=True, inplace=True)
     # Clip data and plot histogram
-    lengths = samples_df['EstLength']
-    samples_df['EstLength'] = samples_df[lengths < lengths.quantile(0.995)]
-    # Pivot dataframe using SampleName as pivot, save the EstLengths
+    lengths = samples_df['SeqLength']
+    samples_df['SeqLength'] = samples_df[lengths < lengths.quantile(0.995)]
+    # Pivot dataframe using SampleName as pivot, save the SeqLengths
     hist_df = samples_df.pivot(index="SampleName",
-                               columns='EstLength',
-                               values='EstLengths').filter(regex=r'^EstLengths\.', axis=1)
+                               columns='SeqLength',
+                               values='SeqLengths').filter(regex=r'^SeqLengths\.', axis=1)
     hist_df.plot(type='hist', ax=ax, normed=1, facecolor='blue', alpha=0.75)
     def y_hist_to_human_readable_seq(y, position):
         # Convert distribution to base pairs
@@ -206,7 +191,6 @@ def plot_single(name, sample_df):
     # Define axis formatters
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     myFmt = mdates.DateFormatter('%H:%M')
-    # fig.autofmt_xdate()
     ax.xaxis.set_major_formatter(myFmt)
     # Set x and y labels
     ax.set_xlabel("Duration of run (HH:MM")
@@ -214,7 +198,7 @@ def plot_single(name, sample_df):
     ax.set_title("Yield for sample %s over time" % name)
     # Set x and y limits
     ax.set_ylim(ymin=0)
-    # Ensure labels are not mised
+    # Ensure labels are not missed
     fig.tight_layout()
     savefig("%s.combined_yield.png" % name)
 
@@ -224,9 +208,9 @@ def plot_single(name, sample_df):
     fig, ax = plt.subplots(1)
     num_bins = 50
     # Clip data and plot histogram
-    lengths = sample_df['EstLength']
+    lengths = sample_df['SeqLength']
     lengths = lengths[lengths < lengths.quantile(0.995)]
-    lengths.plot(type='hist', ax=ax, normed=1, facecolor='blue', alpha=0.75)
+    lengths.plot(type='hist', ax=ax, normed=1, bins=num_bins, facecolor='blue', alpha=0.75)
     # Set the axis formatters
     def y_hist_to_human_readable_seq(y, position):
         # Convert distribution to base pairs
@@ -240,7 +224,7 @@ def plot_single(name, sample_df):
     ax.set_title("Read Distribution Graph for %s" % name)
     ax.grid(color='black', linestyle=':', linewidth=0.5)
     ax.set_ylabel("Bases per bin")
-    # Ensure labels are not mised.
+    # Ensure labels are not missed.
     fig.tight_layout()
     savefig("%s.combined_hist.png" % name)
 
@@ -255,9 +239,9 @@ def estimate_read_length(dataframe):
     Takes in a dataframe of starttime and end time.
     Returns a series using the same index of the estimated length of a given read.
     """
-    speed = 0.450 #bases per millisecond
+    speed = 0.450  # bases per millisecond
     # Return a timedelta object converted into a float
-    return speed * (dataframe["EndTime"] - dataframe["TimeTime"]).milliseconds()
+    return speed * (dataframe["EndTime"] - dataframe["TimeTime"]).milliseconds
 
 
 def reformat_human_friendly(s):
@@ -309,8 +293,7 @@ def main():
         sample.concatenated_data["SampleName"] = sample.name
     # Plot for each individual sample:
     for sample in samples:
-        plot_single(sample.name, sample.concatenated_data.copy())
-        plot_runs(sample.name, sample.concatenated_data.copy())
+        plot_runs(sample.name, run.concatenated_data.copy())
         for run in sample.runs:
             plot_single(run.flowcellID, run.concatenated_data)
     # Plot collective
