@@ -73,8 +73,8 @@
       <file leaf-file-name="promethion_plotter.post.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.post.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="538">
-              <caret line="282" column="51" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="299" selection-end-column="83" />
+            <state relative-caret-position="454">
+              <caret line="278" column="30" lean-forward="true" selection-start-line="278" selection-start-column="30" selection-end-line="278" selection-end-column="30" />
               <folding>
                 <element signature="e#24#87#0" expanded="true" />
               </folding>
@@ -475,7 +475,14 @@
       <option name="project" value="LOCAL" />
       <updated>1519775605957</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Added pca_path to pca_dir">
+      <created>1519776485973</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1519776485973</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -537,7 +544,8 @@
     <MESSAGE value="Added in extra steps for the manipulate_rsync.py job." />
     <MESSAGE value="Overhaul of baseaclling script. Removed functionality for sge and torque. Fastq metadata is picked up in this script. Much more work now done in bash script. Only one job per set of fast5 files." />
     <MESSAGE value="Added secondary set of plotting scripts." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added secondary set of plotting scripts." />
+    <MESSAGE value="Added pca_path to pca_dir" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added pca_path to pca_dir" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1030,8 +1038,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.post.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="538">
-          <caret line="282" column="51" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="299" selection-end-column="83" />
+        <state relative-caret-position="454">
+          <caret line="278" column="30" lean-forward="true" selection-start-line="278" selection-start-column="30" selection-end-line="278" selection-end-column="30" />
           <folding>
             <element signature="e#24#87#0" expanded="true" />
           </folding>
