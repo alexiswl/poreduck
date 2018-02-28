@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="47b4cf6d-88b9-4fb0-9a87-4a8f710b93f5" name="Default" comment="">
-      <change beforePath="" afterPath="$PROJECT_DIR$/poreduck/promethion_plotter.post.py" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/poreduck/promethion_plotter.py" afterPath="$PROJECT_DIR$/poreduck/promethion_plotter.py" />
+      <change beforePath="$PROJECT_DIR$/poreduck/promethion_plotter.post.py" afterPath="$PROJECT_DIR$/poreduck/promethion_plotter.post.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -59,11 +58,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="promethion_plotter.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="promethion_plotter.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="205">
-              <caret line="305" column="48" lean-forward="false" selection-start-line="305" selection-start-column="36" selection-end-line="305" selection-end-column="48" />
+            <state relative-caret-position="193">
+              <caret line="108" column="22" lean-forward="false" selection-start-line="108" selection-start-column="18" selection-end-line="108" selection-end-column="22" />
               <folding>
                 <element signature="e#24#86#0" expanded="true" />
               </folding>
@@ -71,11 +70,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="promethion_plotter.post.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="promethion_plotter.post.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.post.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="6195">
-              <caret line="298" column="21" lean-forward="true" selection-start-line="298" selection-start-column="21" selection-end-line="298" selection-end-column="21" />
+            <state relative-caret-position="454">
+              <caret line="278" column="30" lean-forward="true" selection-start-line="278" selection-start-column="30" selection-end-line="278" selection-end-column="30" />
               <folding>
                 <element signature="e#24#87#0" expanded="true" />
               </folding>
@@ -130,9 +129,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>remove_tarred</find>
-      <find>Subfolder</find>
-      <find>time.sleep</find>
       <find>get_s</find>
       <find>save_path</find>
       <find>WORK_THREADS</find>
@@ -160,6 +156,9 @@
       <find>plot_single</find>
       <find>to</find>
       <find>estlength</find>
+      <find>sftp</find>
+      <find>path</find>
+      <find>Sample</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -174,14 +173,14 @@
         <option value="$PROJECT_DIR$/poreduck/manipulate_rsync.py" />
         <option value="$PROJECT_DIR$/qsub_templates/albacore_slurm_template.sh" />
         <option value="$PROJECT_DIR$/poreduck/albacore_server_scaled.py" />
-        <option value="$PROJECT_DIR$/poreduck/promethion_plotter.post.py" />
         <option value="$PROJECT_DIR$/poreduck/promethion_plotter.py" />
+        <option value="$PROJECT_DIR$/poreduck/promethion_plotter.post.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="174" />
-    <option name="y" value="5" />
+    <option name="x" value="682" />
+    <option name="y" value="113" />
     <option name="width" value="1162" />
     <option name="height" value="849" />
   </component>
@@ -469,11 +468,25 @@
       <option name="project" value="LOCAL" />
       <updated>1519448291507</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Added secondary set of plotting scripts.">
+      <created>1519775605957</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1519775605957</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Added pca_path to pca_dir">
+      <created>1519776485973</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1519776485973</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="174" y="5" width="1162" height="849" extended-state="0" />
+    <frame x="682" y="113" width="1162" height="849" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
@@ -530,7 +543,9 @@
     <MESSAGE value="Created manipulate_rsync.py function" />
     <MESSAGE value="Added in extra steps for the manipulate_rsync.py job." />
     <MESSAGE value="Overhaul of baseaclling script. Removed functionality for sge and torque. Fastq metadata is picked up in this script. Much more work now done in bash script. Only one job per set of fast5 files." />
-    <option name="LAST_COMMIT_MESSAGE" value="Overhaul of baseaclling script. Removed functionality for sge and torque. Fastq metadata is picked up in this script. Much more work now done in bash script. Only one job per set of fast5 files." />
+    <MESSAGE value="Added secondary set of plotting scripts." />
+    <MESSAGE value="Added pca_path to pca_dir" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added pca_path to pca_dir" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1011,22 +1026,22 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.post.py">
+    <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="6195">
-          <caret line="298" column="21" lean-forward="true" selection-start-line="298" selection-start-column="21" selection-end-line="298" selection-end-column="21" />
+        <state relative-caret-position="193">
+          <caret line="108" column="22" lean-forward="false" selection-start-line="108" selection-start-column="18" selection-end-line="108" selection-end-column="22" />
           <folding>
-            <element signature="e#24#87#0" expanded="true" />
+            <element signature="e#24#86#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.py">
+    <entry file="file://$PROJECT_DIR$/poreduck/promethion_plotter.post.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="205">
-          <caret line="305" column="48" lean-forward="false" selection-start-line="305" selection-start-column="36" selection-end-line="305" selection-end-column="48" />
+        <state relative-caret-position="454">
+          <caret line="278" column="30" lean-forward="true" selection-start-line="278" selection-start-column="30" selection-end-line="278" selection-end-column="30" />
           <folding>
-            <element signature="e#24#86#0" expanded="true" />
+            <element signature="e#24#87#0" expanded="true" />
           </folding>
         </state>
       </provider>
