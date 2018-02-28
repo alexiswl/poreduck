@@ -64,11 +64,11 @@ def get_args():
     return args
 
 
-def get_samples(samplesheet_df):
+def get_samples(samplesheet_df, pca_dir):
     # Get samples
     samples = []
     for sample_name in samplesheet_df["SampleName"].unique().tolist():
-        samples.append(Sample(sample_name, samplesheet_df.query("SampleName==@sample_name")))
+        samples.append(Sample(sample_name, samplesheet_df.query("SampleName==@sample_name"), pca_dir))
 
 
 def get_runs(sample_df, pca_dir):
@@ -280,7 +280,7 @@ def main():
     args = get_args()
     samplesheet = samplesheet_to_pd(args.samplesheet)
     ip_config = config_to_pd(args.ip_config)
-    samples = get_samples(samplesheet)
+    samples = get_samples(samplesheet, args.pca_dir)
     # Get runs for each sample
     for sample in samples:
         sample.runs = get_runs(sample.df, ip_config)
