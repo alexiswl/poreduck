@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from .promethion_starter import samplesheet_to_pd, config_to_pd
+from promethion_starter import samplesheet_to_pd, config_to_pd
 import pandas as pd
 import os
 import argparse
@@ -298,3 +298,6 @@ def main():
             plot_single(run.flowcellID, run.concatenated_data)
     # Plot collective
     plot_samples(merge_metadatas([sample.concatenated_data for sample in samples]))
+
+if __name__ == "__main__":
+    main()
