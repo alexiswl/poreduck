@@ -454,8 +454,9 @@ def get_subfolders(subfolders=[], dir_dict={}):
                              for tarred_folder in os.listdir(dir_dict["fast5"])
                              if tarred_folder.endswith(".fast5.tar.gz")
                              and not tarred_folder in existing_tars
-                             and not tarred_folder.replace(".fast5.tar.gz", "")
-                             in metadata_tar], key=lambda x: x.name)
+                             and not tarred_folder.replace(".fast5.tar.gz", "") in metadata_tar
+                             and not os.path.isfile(os.path.join(dir_dict["fast5"], tarred_folder+".corrupted"))], 
+                             key=lambda x: x.name)
     subfolders.extend(new_subfolders)
     return subfolders
 

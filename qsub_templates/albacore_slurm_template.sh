@@ -9,6 +9,7 @@
 #SBATCH --error
 #SBATCH --workdir
 #SBATCH --job-name
+#SBATCH --exclude=balder-wn06
 # Other variables for analysis
 # ALBACORE_DIR
 # ALBACORE_VER
@@ -29,7 +30,7 @@ ret_code=$?
 if [ ${ret_code} != 0 ]; then
       printf "Error exit code [%d] when extracting tar file: ''${tar_cmd}'" ${ret_code}
       printf "Moving subfolder to .corrupted"
-      mv ${SUBFOLDER_NAME}.fast5.tar.gz ${SUBFOLDER_NAME}.fast5.tar.gz.corrupted
+      touch ${SUBFOLDER_NAME}.fast5.tar.gz.corrupted
       exit ${ret_code}
 fi
 
