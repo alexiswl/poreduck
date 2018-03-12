@@ -378,15 +378,21 @@ def get_series_from_seq(record):
                      index=index)                                     
                                
 
-def get_fastq_dataframe(fastq_file):
+def get_fastq_dataframe(fastq_file, is_gzipped=True):
     """Use get_series_from_seq in list comprehension to generate dataframe then transpose"""
     # Open fastq file and return list comprehension 
     # PD concat merges series as columns, we then transpose.
     try:
-        with gzip.open(fastq_file, "rt") as handle:
-            fastq_df = pd.concat([get_series_from_seq(record) 
-                                  for record in SeqIO.parse(handle, "fastq")], 
-                                 axis='columns').transpose()
+        if not is_gzipped:
+            with open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     axis='columns').transpose()
+        else:
+            with gzip.open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     axis='columns').transpose()
         # Specify types for each line
         numeric_cols = ["Read", "Channel", "SeqLength", "AvQual"]
         fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric, axis='columns')
