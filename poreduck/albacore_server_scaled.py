@@ -205,10 +205,8 @@ def get_args():
                                  help="Where should the fastq data be placed." +
                                       "Will be called 'fastq'" +
                                       "and sit adjacent to reads folder if left blank.")
-    albacore_parser.add_argument("--qsub_dir", type=str, required=False, default=None,
-                                 help="Where would you like to place the qsub files?")
-    albacore_parser.add_argument("--qsub_host", type=str, required=False, default=None,
-                                 help="Where would you like the qsub jobs to be run?")
+    albacore_parser.add_argument("--hpc_dir", type=str, required=False, default=None,
+                                 help="Where would you like to place the hpc batch files?")
     albacore_parser.add_argument("--max_processes", type=int, required=False, default=10,
                                  help="Limit the number of jobs that can be processed at any given moment." +
                                       "This command will prevent extraction/albacore jobs from being submitted while" +
@@ -250,7 +248,7 @@ def check_directories(args):
     if args.qsub_dir is None:   
         dir_dict["qsub"] = os.path.join(dir_dict["main"], "qsub")
     else:
-        dir_dict["qsub"] = os.path.abspath(args.qsub_dir)
+        dir_dict["qsub"] = os.path.abspath(args.hpc_dir)
 
     if args.fastq_dir is None:
         dir_dict["fastq"] = os.path.join(dir_dict["main"], "fastq")
