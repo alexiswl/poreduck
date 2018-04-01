@@ -24,7 +24,7 @@ WORKDIR /data
 COPY ./docker-entrypoint.sh /
 
 # Change user
-#USER docker
+USER docker
 
 # Set the entrypoint to be 'poreduck'
 ENTRYPOINT ["/docker-entrypoint.sh"]
