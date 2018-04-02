@@ -24,6 +24,7 @@ WORKDIR /data
 COPY ./docker-entrypoint.sh /
 
 # Change user
+RUN useradd -ms /bin/bash docker
 USER docker
 
 # Set the entrypoint to be 'poreduck'
