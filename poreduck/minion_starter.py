@@ -352,8 +352,12 @@ class Run:
                 # In case we need to reference the time again.
                 continue
             else:
-                del subfolder.fast5_files
-     
+                try:
+                    del subfolder.fast5_files
+                except AttributeError:
+                    # Fast5 files already deleted
+                    pass
+                    
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
         if len(self.subfolders) == 0:
@@ -712,6 +716,7 @@ def main(args):
                     run.plot_hist()
                     run.plot_flowcell()
                     run.print_theoretical_stats()
+                    time.sleep(15)
         else:
             first_pass = False
         for sample in samples:
