@@ -257,7 +257,7 @@ class Subfolder:
         os.rename(self.path, self.new_folder_path)
 
         """Tar folder using pigz"""
-        with tarfile.open(name=self.tar_file+".tmp", mode="w:gz") as tar_h:
+        with tarfile.open(name=self.tar_path+".tmp", mode="w:gz") as tar_h:
             tar_h.add(name=self.new_folder_path,  # Set arc name as relative path
                       arcname=os.path.basename(os.path.normpath(self.new_folder_path)),
                       recursive=True)
@@ -285,7 +285,7 @@ class Subfolder:
     def get_tar_md5(self):
         md5_command = ["md5sum", self.tar_path]
         md5_proc = subprocess.run(md5_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if md5_proc.returncode == 0:
+        if not md5_proc.returncode == 0:
             print("Warning, md5_proc returned error code %s" % md5_proc.returncode)
         stdout = md5_proc.stdout.decode()
         self.md5sum = stdout.split(" ", 1)[0].strip()
@@ -345,8 +345,12 @@ class Run:
                 # In case we need to reference the time again.
                 continue
             else:
-                del subfolder.fast5_files
-     
+                try:
+                    del subfolder.fast5_files
+                except AttributeError:
+                    # Fast5 files already deleted
+                    pass
+                    
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
         if len(self.subfolders) == 0:
@@ -361,9 +365,9 @@ class Run:
                 except StopIteration:
                     break
             if fast5_file is not None and not fast5_file.corrupted:
-                start_time = fast5_file.exp_start_time
+                self.start_time = fast5_file.exp_start_time
                 minutes = fast5_file.exp_duration_set
-                return start_time + minutes
+                return self.start_time + minutes
             # If we are here, it means no folder is full. We expect run is complete
             return self.get_default_finishtime()
 
@@ -400,7 +404,7 @@ class Run:
         with open(self.checksum, 'w') as check_h:
             for subfolder in self.subfolders:
                 if subfolder.md5sum is not None:
-                    check_h.write("fast5/%s\t%s\n" % (subfolder.tar_file, subfolder.md5sum))
+                    check_h.write("%s  fast5/%s\n" % (subfolder.md5sum, subfolder.tar_file))
 
     def get_bulk_metadata(self):
         """
@@ -412,16 +416,16 @@ class Run:
                             axis=0, ignore_index=True)
         self.df['RunDurationTime'] = self.df["EndTime"].apply(lambda x: x - self.start_time)
         self.df['RunDurationFloat'] = self.df["RunDurationTime"].apply(lambda x: x.total_seconds())
-        self.df['EstLength'] = self.df[["StartTime", "EndTime"]].apply(self.estimate_read_length)
+        self.df['EstLength'] = self.df[["StartTime", "EndTime"]].apply(lambda x: self.estimate_read_length(x), axis=1)
 
-    def estimate_read_length(self, dataframe):
+    def estimate_read_length(self, row):
         """
         Takes in a dataframe of starttime and endtime
         Retuns a series using the same index of the estimated length of a given read
         """
         speed = 450  # Bases per second
         # Return a timedelta object converted into a float
-        return speed * (dataframe["EndTime"] - dataframe["StartTime"]).seconds
+        return speed * (row.EndTime - row.StartTime).seconds
 
     def plot_yield(self):
         """
@@ -437,7 +441,7 @@ class Run:
         self.df['EstLength'].cumsum().plot(ax=ax)
         # Define axis formatters
         ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-        ax.yaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
         # Set x and y labels
         ax.set_xlabel("Duration of run (HH:MM)")
         ax.set_ylabel("Yield")
@@ -450,7 +454,7 @@ class Run:
         fig.tight_layout()
         savefig(os.path.join(self.plots_dir, "%s.theoretical_yield.png" % self.name))
         # Reset index for next plots
-        self.df.reset_index()
+        self.df.reset_index(inplace=True)
 
     def plot_hist(self):
         plt.close('all')
@@ -459,22 +463,22 @@ class Run:
         # Trim histogram,
         trimmed = self.df.query("EstLength < %d" % self.df.EstLength.quantile(0.995))["EstLength"]
         bins = np.linspace(start=0, stop=trimmed.max(), num=num_bins)
-        bin_width = bins[1] - bins[0]
+        bin_width = bins[1] - bins[0] 
         # Plot histogram
-        trimmed.plot(kind="hist", ax=ax, normed=1, bins=bins, alpha=0.6, weights=trimmed)
+        trimmed.plot(kind="hist", ax=ax, density=1, bins=bins, alpha=0.6, weights=trimmed)
 
         # Local definition of formatter, requires input of bin_width and entire data frame
         def y_hist_to_human_readable(y, position):
             if y == 0:
                 return 0
-            s = humanfriendly.format_size(bin_width * trimmed["EstLength"].sum() * y, binary=False)
+            s = humanfriendly.format_size(bin_width * trimmed.sum() * y, binary=False)
             return reformat_human_friendly(s)
         # Now use this format to show the base pairs per bin
         ax.yaxis.set_major_formatter(FuncFormatter(y_hist_to_human_readable))
         ax.xaxis.set_major_formatter(FuncFormatter(x_hist_to_human_readable))
         # Set titles
         ax.set_title("Read Distribution Graph for %s" % self.name)
-        ax.grid(coloar='black', linestyle=':', linewidth=0.5)
+        ax.grid(color='black', linestyle=':', linewidth=0.5)
         ax.set_ylabel("Bases per bin")
         ax.set_xlabel("Read length")
         # Create legend
@@ -509,7 +513,7 @@ class Run:
         ax.set_title("Map of Yield by Channel", fontsize=25)
         # Ensure labels are not missed
         fig.tight_layout()
-        savefig(os.path.join(self.plots_dir, "%s.theoretical_yield_map_by_pore.png"))
+        savefig(os.path.join(self.plots_dir, "%s.theoretical_yield_map_by_pore.png" % self.name))
         del poremap_df
 
     def print_theoretical_stats(self):
@@ -522,14 +526,14 @@ class Run:
         total_bp = self.df.EstLength.sum()
         total_bp_h = reformat_human_friendly(humanfriendly.format_size(total_bp, binary=False))
         # Describe the seq length histogram:
-        total_bp_describe = self.df.describe(percentiles=percentiles).to_string()
+        total_bp_describe = self.df.EstLength.describe(percentiles=percentiles).to_string()
         total_bp_describe = '\n'.join([line.split()[0].ljust(8) + "\t" +
                                        "{:21.2f}".format(float(line.split()[1]))
                                        for line in total_bp_describe.split("\n")])
 
         # Calculate the NX of the read lengths where X is 0.1, 0.25, 0.5, 0.75 and 0.9
         nx = []
-        seq_length_sorted_as_series = self.df['SeqLength'].sort_values().reset_index(drop=True)
+        seq_length_sorted_as_series = self.df['EstLength'].sort_values().reset_index(drop=True)
         seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
         # Iterate through series, add value to nx_list if crosses a cumsum percentile
         for index, seq_value in seq_length_sorted_as_series.iteritems():
@@ -542,7 +546,7 @@ class Run:
         nx_h = [reformat_human_friendly(humanfriendly.format_size(nX_value, binary=False))
                 for nX_value in nx]
         # Print these stats to file
-        with open(os.path.join(self.plots_dir, "%s.stats.txt" % self.name)) as output_handle:
+        with open(os.path.join(self.plots_dir, "%s.stats.txt" % self.name), 'w') as output_handle:
             # Print total basepairs
             output_handle.write("# Stats for sample '%s' #\n" % self.name)
             output_handle.write("Total basepairs:\n")
@@ -555,6 +559,12 @@ class Run:
             output_handle.write("NX values:\n")
             output_handle.writelines(f"\tN{100*percentile:02.0f}:\t{nx_value:8,.0f}\t|\t{nx_h_value.rjust(9)}\n"
                                      for percentile, nx_value, nx_h_value in zip(percentiles, nx, nx_h))
+            duration = self.df["RunDurationFloat"].max()  # In seconds
+            hours, remainder = divmod(duration, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            run_duration_h = f"{hours} hours, {minutes} minutes, {seconds:2,.0f} seconds"
+            output_handle.write("Run Duration Time:\n")
+            output_handle.write(f"\t{duration:8,.1f} seconds\t|\t{run_duration_h}\n")
 
 
 class Sample:
@@ -608,7 +618,7 @@ def x_yield_to_human_readable(x, position):
     seconds = int(x % 60)
     if x == 0:
         return 0
-    s = "f{hours:02d}:{minutes:02d}"
+    s = f"{hours:02d}:{minutes:02d}"
     return s
 
 
@@ -648,9 +658,9 @@ def get_poremap_from_yield_df(run_df):
         channel_index = [(ix, iy)
                          for ix, row in enumerate(channels_by_order_array)
                          for iy, i in enumerate(row)
-                         if int(i) == int(yield_row.channel)][0]
+                         if int(i) == int(yield_row.Channel)][0]
         # Assign channel yield to position in MinKNOW
-        channels_by_yield_array[channel_index] = yield_row.seq_length
+        channels_by_yield_array[channel_index] = yield_row.EstLength
     return channels_by_yield_array
 
 
@@ -693,34 +703,31 @@ def samplesheet_to_pd(samplesheet):
     return pd.read_csv(samplesheet, header=0, sep="\t", dtype=str, comment='#')
 
 
-def config_to_pd(config):
-    return pd.read_csv(config, header=0, sep="\t", dtype=str, comment='#')
-
-
-def main():
-    args = get_args()
-    samplesheet = samplesheet_to_pd(args.samplesheet)
-    config_pd = config_to_pd(args.ip_config)
-    samples = [Sample(sample, samplesheet, config_pd)
+def main(args):
+    samplesheet = samplesheet_to_pd(args.samplesheet) 
+    samples = [Sample(sample, samplesheet, args.reads_path)
                for sample in samplesheet.SampleName.unique().tolist()]
     running = True
     first_pass = True
     while running:
         if not first_pass:
             running = is_still_running(samples)
+            for sample in samples:
+                for run in sample.runs:
+                    run.slim_tarred_subfolders()    
+                    run.get_bulk_metadata()
+                    run.plot_yield()
+                    run.plot_hist()
+                    run.plot_flowcell()
+                    run.print_theoretical_stats()
+                    time.sleep(15)
         else:
             first_pass = False
         for sample in samples:
-            for run in sample.runs:
-                run.unlink_tarred_subfolders()
+            for run in sample.runs: 
                 run.get_subfolders()
                 run.tar_subfolders()
                 run.write_md5()
-                run.get_bulk_metadata()
-                run.plot_yield()
-                run.plot_hist()
-                run.plot_flowcell()
-                run.write_bulk_metadata()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,23 @@
+FROM: continuumio/miniconda3:latest
+
+# Update conda
+RUN conda update --all --yes
+
+# Download poreduck
+RUN git clone -b yield_plot https://github.com/alexiswl/poreduck.git
+WORKDIR ./poreduck
+
+# Install required packages
+RUN conda install --file requirements.txt --yes
+
+# Re-update conda
+RUN conda update --all --yes
+
+# Install poreduck using pip
+pip install -e .
+
+# Change to /data directory
+WORKDIR /data
+
+# Set the entrypoint to be 'poreduck'
+ENTRYPOINT ["poreduck"]
