@@ -304,12 +304,13 @@ class Subfolder:
 
 
 class Run:
-    def __init__(self, path, slave, is_mux=False):
-        self.path = path 
+    def __init__(self, path, slave, start_date, start_time, is_mux=False):
+        self.path = path
+        self.start_date = start_date
+        self.start_time = start_time
         self.fast5_path = os.path.join(self.path, "fast5")
         self.is_mux = is_mux
         self.complete = False
-        self.start_time = None
         self.completion_time = None
         self.subfolders = []
         self.metadata_dir = os.path.join(self.path, "metadata")
@@ -361,7 +362,7 @@ class Run:
         # Get standard fast5 file (not that simple)
         if len(self.subfolders) == 0:
             print("No subfolders, assuming run has been moved previously")
-            return datetime.utcnow() - timedelta(days=1) 
+            return self.get_default_finishtime()
         for subfolder in self.subfolders:
             print(subfolder.number)
             fast5_files_iter = iter(subfolder.fast5_files)
@@ -374,12 +375,23 @@ class Run:
             if fast5_file is not None and not fast5_file.corrupted:
                 break
             # If we are here, it means no folder is full. We expect run is complete
-            return datetime.utcnow() - timedelta(days=1)
+            return self.get_default_finishtime()
 
         start_time = fast5_file.exp_start_time
         minutes = fast5_file.exp_duration_set
         return start_time + minutes
-        
+
+    def get_default_finishtime(self):
+        # Use the start_date and start_time to get the proposed finish times
+        print("Getting default run finish times")
+        start_string = self.start_date + self.start_time
+        start_date_ob = datetime.strptime(start_string, "%Y%m%d_%H%M")
+        if self.is_mux:
+            end_date_ob = start_date_ob + timedelta(minutes=8)
+        else:
+            end_date_ob = start_date_ob + timedelta(hours=64)
+        return end_date_ob
+
     def is_run_complete(self):
         # Get expected finish time from fast5 file
         if self.completion_time is None:
@@ -409,8 +421,8 @@ class Sample:
                      if slave.slurm_id == run.SlurmID][0]
             mux_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
             seq_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
-            self.runs.append(Run(mux_path, slave, is_mux=True))
-            self.runs.append(Run(seq_path, slave, is_mux=False))
+            self.runs.append(Run(mux_path, slave, run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, is_mux=True))
+            self.runs.append(Run(seq_path, slave, run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, is_mux=False))
     
     def is_run_complete(self):
         # All ports must be complete to return true.

@@ -46,19 +46,11 @@ Along with the expected finish time of the run.
 
 Issues:
 
-Pending:
-About 0.5% of tar folders are corrupted. Add 3 seconds prior to  tarring to allow disk io to catch up.
-Run rsync --checksum on the script to ensure the transfer write is smoother.  - has helped
-If a run is cancelled before 64 hours, the script will not recognise this.
-Use the slve to infer if MinKNOW is still running internally.
-
 Testing:
-time.sleep(3) to prevent
 
 Solved:
 
 To do:
-Add md5sum.
 
 """
 
@@ -300,13 +292,14 @@ class Subfolder:
 
 
 class Run:
-    def __init__(self, path, name, is_mux=False):
+    def __init__(self, path, name, start_date, start_time, is_mux=False):
         self.path = path
         self.name = name
         self.fast5_path = os.path.join(self.path, "fast5")
         self.is_mux = is_mux
         self.complete = False
-        self.start_time = None
+        self.start_time = start_time
+        self.start_date = start_date
         self.completion_time = None
         self.subfolders = []
         self.metadata_dir = os.path.join(self.path, "metadata")
@@ -357,8 +350,8 @@ class Run:
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
         if len(self.subfolders) == 0:
-            print("No subfolders, assuming run has been moved previously")
-            return datetime.utcnow() - timedelta(days=1) 
+            print("No subfolders, using folder names to get run finish time")
+            return self.get_default_finishtime()
         for subfolder in self.subfolders:
             fast5_files_iter = iter(subfolder.fast5_files)
             fast5_file = None
@@ -372,7 +365,18 @@ class Run:
                 minutes = fast5_file.exp_duration_set
                 return start_time + minutes
             # If we are here, it means no folder is full. We expect run is complete
-            return datetime.utcnow() - timedelta(days=1)
+            return self.get_default_finishtime()
+
+    def get_default_finishtime(self):
+        # Use the start_date and start_time to get the proposed finish times
+        print("Getting default run finish times")
+        start_string = self.start_date + self.start_time
+        start_date_ob = datetime.strptime(start_string, "%Y%m%d_%H%M")
+        if self.is_mux:
+            end_date_ob = start_date_ob + timedelta(minutes=8)
+        else:
+            end_date_ob = start_date_ob + timedelta(hours=48)
+        return end_date_ob
 
     def is_run_complete(self):
         # Get expected finish time from fast5 file
@@ -562,8 +566,8 @@ class Sample:
         for index, run in self.pd.iterrows():
             mux_path = os.path.join(reads_path, '_'.join([run.UTCMuxStartDate, run.UTCMuxStartTime, run.SampleName]))
             seq_path = os.path.join(reads_path, '_'.join([run.UTCSeqStartDate, run.UTCSeqStartTime, run.SampleName]))
-            self.runs.append(Run(mux_path, run.SampleName, is_mux=True))
-            self.runs.append(Run(seq_path, run.SampleName, is_mux=False))
+            self.runs.append(Run(mux_path, run.SampleName, run.UTCMuxStartDate, run.UTCMuxStartTime, is_mux=True))
+            self.runs.append(Run(seq_path, run.SampleName, run.UTCSeqStartDate, run.UTCSeqStartTime, is_mux=False))
     
     def is_run_complete(self):
         # All ports must be complete to return true.
@@ -668,7 +672,7 @@ def get_args():
     parser.add_argument("--samplesheet", type=str, required=True,
                         help="Path to tab delimited samplesheet. "
                              "Columns are SampleName, UTCMuxStartDate, UTCMuxStartTime, "
-                             "UTCSeqStartDate, UTCSeqStartTime SlurmID")
+                             "UTCSeqStartDate, UTCSeqStartTime")
     parser.add_argument("--reads_path", type=str, required=True,
                         help="path/to/reads. "
                              "Ubuntu: /var/lib/MinKNOW/data/reads"

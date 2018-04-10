@@ -18,71 +18,80 @@ Or checkout this repo: https://alexiswl.github.io/ASimpleNanoporeTutorial/index.
 ## Examples
 An examples of poreduck usage is shown below:
 
-### Transfer the data across to the server
-`poreduck transfer_to_server --reads_dir /var/lib/MinKNOW/data/reads/ --server_name super_nodes --user_name admin
---dest_dir /data/storage/MinION/my_MinION_run --sample_name lambda`
-where `/var/lib/MinKNOW/data/reads` contains a list of runs in `YYYYMMDD_HHMM_SAMPLE_NAME` format.
-This then exports each of the fast5 files into `/data/storage/MinION/my_MinION_run/fast5` in .tar.gz format.
-The sample_name adds lambda to the suffix of each 4000 bin.
+### TarMyFast5
+`poreduck tarMyFast5 --samplesheet samplesheet.tsv --reads_path /var/lib/MinKNOW/data/reads
 
 ### Basecall the fast5 files.  
-`poreduck albacore_on_server --reads_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
+`poreduck albacoreHPC --fast5_dir /data/storage/MinION/sample_name/fast5 --flowcell FLO-MIN106 --kit SQK-LSK108`
 where `/data/storage/MinION/sample_name/fast5` contains a list of .tar.gz files each of which holds 4000 fast5 files.
 
-#### Run some qc metrics and plots.
-`poreduck qc_plots --no_csv --fastq_dir ./fastq/ --gzipped --output_dir qc_plots/ --clip --sample_name "Lambda Run"`
-
-Let's go through some of the less intuitive parameters listed.
-
-The --no_csv is used if you do not have a list of metadata files from transferring the data from poreduck.  
-If you do, then you will have access to the mux number and duration times which add on a couple of extra plots.
-The gzipped parameter is used if the fastq files are gzipped. 
-Clip is used to prevent squishing of the histogram. Some reads are extra-long 
-(but most likely pseudo reads, these are omitted from the plot)
-
-
 ## MinKNOW version compatibility
-Last tested on MinKNOW version 1.7.14
+Last tested on MinKNOW version 1.18.02
 
-## transfer_fast5_to_server.py dependencies
-### Dependencies (Windows specific)
-1. Install Cygwin.
+## Installing Docker
 
-2.  Install sshpass (or don't and see 'how to make an id_rsa key' below):
-    *  Re-run the setup of Cygwin, selecting for 'make' and 'gcc' as these don't seem to be in the default installation. 
-    *  Read through the link below to install sshpass. https://stackoverflow.com/questions/37243087/how-to-install-sshpass-on-windows-through-cygwin/37250349
+### Docker Installation (Windows based tutorial specific)
+1. Install the docker toolbox from ![docker](https://docs.docker.com/toolbox/)
+    + Make sure you download 'docker toolbox', not 'docker for mac' or 'docker for windows'
+    + It will ask you if you would like to install Git Bash, say yes, you will need that too.
+    + It will ask you if you would like to install Kitematic, say yes, it will be handy.
+2. Once docker is installed, open up Kitematic, this will start the docker vm.
+3. Open the Git Bash app and confirm that docker has been installed and the VM is loaded by typing `docker --version`
 
-3.  Install pigz:
-    * Download the pigz source file.
-    * Type `make`.
-    * You may need to install the zlib library if you get an error in b. This is done through the Cygwin setup.exe program.
+### Docker Installation (Mac Users)
+Mac users can follow the Windows based tutorial but use the 'Docker Quick Start terminal' instead of 'Git Bash to run the docker commands'
 
-### Dependencies (Unix specific)
-1. pigz
-    * either `brew install pigz`
-    * or `conda install -c pigz`
+### Docker Installation (Ubuntu Users)
+1. Install docker
+`sudo apt-get install docker.io`
+2. Add the docker group which can run docker commands without needing sudo
+`sudo groupadd docker`
+`sudo gpasswd -a $USER docker`
+3. Log out and run `sudo newgrp docker` to activate changes
+4. Restart docker
+`sudo service docker restart`
 
-### Python Dependencies
-* python3.6 or higher is required. This script will break immediately if not satisfied!
-All of the python modules listed below can be installed through pip or conda.
-Non pre-installed python modules
-1. paramiko
-    * either `conda install -c anaconda paramiko`
-    * or `pip install paramiko`
- 
-### Downloading this repo.
-The following command will download this repo.
-`git clone https://github.com/alexiswl/poreduck.git`
+## Running tarMyFast5
+Download the poreduck docker image: `docker pull alexiswl/poreduck`
+5. As noted above, the tarMyFast5 command takes two arguments, '--samplesheet' and '--reads_path'
+    + The samplesheet is a *tab delimited* spreadsheet with the following columns in its header
+        1. SampleName (The name of your sample as expressed in the folder names in the reads folder from MinKNOW)
+        2. UTCMuxStartDate (The date of the mux run - this will be the first eight digits of the folder name)
+        3. UTCMuxStartTime (The time of the mux run - this will be the next four digits of the folder name)
+        4. UTCSeqStartDate (The date of the seq run - this will be the first eight digits of the folder name)
+        5. UTCSeqStartTime (The time of the seq run - this will be the next four digits of the folder name)
+    + The reads path is the path to the reads output by MinKNOW. By default, MinKNOW outputs to the following folders:
+        "Ubuntu: /var/lib/MinKNOW/data/reads"
+        "Mac: /Library/MinKNOW/data"
+        "Windows: /c/data/reads"
+    + Providing the files for the parameters will be dealt with separately.
+        1. First we're going to copy the samplesheet into the docker container.
+        2. Then we're going to mount the MinKNOW reads directory onto the container
+6. Before we copy the samplesheet, we need to create a container from the image.
+    + Run `docker container create alexiswl/poreduck`
+    + Docker will create a container name like 'milkshake_duck'
+    + Check the container name by running `docker ps -a`
+7. Now we can copy our samplesheet into the container
+    + `docker container cp /path/to/samplesheet.tsv milkshake_duck:/root/samplesheet.tsv
+8. Let's save this container as a new image with our samplesheet in it.
+    + `docker container commit milkshake_duck poreduck_mod`
+9. Run the image and mount the reads path
+    + `docker run --volumne /c/data:/data poreduck_mod --samplesheet /root/samplesheet.tsv --reads_path /data`
+
+## Syncing data to a server.
+The recommended way to do this is through an rsync command - run on a frequent basis.
+Here $local_read_dir is the path to the sequencing reads,
+and $remote_read_dir can be a mount to a server or
+username@server:/path/to/storage/
+`rsync -rzt --checksum --prune-empty-dirs --remove-source-files --stats \`
+`--include '*/' --include '*.fast5.tar.gz' --include '*.tsv' --exclude '*' \`
+`"$local_read_dir" "$remote_read_dir"`
+
+If you are unfamiliar with rsync commands I recommend running through the tutorial first.
+For Windows users, use git bash, Mac and Linux can use terminal
 
 ### Making an id-rsa key.
-The sshpass is used to automatically perform the scp and rsync commands that would generally prompt a
-user to enter their password each time one of these commands is run.
-It's not securely sound as one could use the ps -ef command and see all the commands running on the system
-with the password succeeding the sshpass -p parameter in plain text. Therefore I recommend using
-the -no-sshpass option when running the script and setting up an rsa key on your laptop before hand.
-This can be done easily for Mac, linux and Windows users.
-#### Step 1:
-Open up terminal/cygwin and type the following line:  
+Open up terminal/git-bash and type the following line:
 `ssh-keygen -t rsa`  
 You will be prompted to store the password in your local ~/.ssh directory
 under the name id_rsa. If you are using Cygwin on Windows, it is important that you 
