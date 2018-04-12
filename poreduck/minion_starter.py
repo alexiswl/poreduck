@@ -714,13 +714,16 @@ def main(args):
             running = is_still_running(samples)
             for sample in samples:
                 for run in sample.runs:
-                    run.slim_tarred_subfolders()    
+                    time.sleep(15)
+                    # This is going to break if no subfolders
+                    if len(run.subfolders) == 0:
+                        continue
+                    run.slim_tarred_subfolders()
                     run.get_bulk_metadata()
                     run.plot_yield()
                     run.plot_hist()
                     run.plot_flowcell()
                     run.print_theoretical_stats()
-                    time.sleep(15)
         else:
             first_pass = False
         for sample in samples:
