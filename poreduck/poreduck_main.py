@@ -16,10 +16,8 @@ def run_function(args):
     # Which function of the three did we choose?
     if args.command == "tarMyFast5":
         import poreduck.minion_starter as command_to_run
-    if args.command == "albacoreHpc":
+    if args.command == "albacoreHPC":
         import poreduck.albacore_server_scaled as command_to_run
-    if args.command == "compare_runs":
-        import poreduck.compare_runs as command_to_run
     # Now run it!
     command_to_run.main(args)
 

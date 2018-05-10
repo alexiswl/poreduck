@@ -25,6 +25,7 @@ from matplotlib.pylab import savefig
 import seaborn as sns
 import numpy as np
 from itertools import chain
+import re
 
 """
 Class types
@@ -574,13 +575,18 @@ class Sample:
         self.runs = []
         self.is_running = True
         for index, run in self.pd.iterrows():
-            mux_path = os.path.join(reads_path, '_'.join([run.UTCMuxStartDate, run.UTCMuxStartTime, run.SampleName]))
-            seq_path = os.path.join(reads_path, '_'.join([run.UTCSeqStartDate, run.UTCSeqStartTime, run.SampleName]))
+            if run.SampleName.startswith("%"):  # Sample name not specified in MinKNOW
+                mux_path = os.path.join(reads_path, '_'.join([run.UTCMuxStartDate, run.UTCMuxStartTime]))
+                seq_path = os.path.join(reads_path, '_'.join([run.UTCSeqStartDate, run.UTCSeqStartTime]))
+                run.SampleName = re.sub("^%", "", run.SampleName)
+            else:
+                mux_path = os.path.join(reads_path, '_'.join([run.UTCMuxStartDate, run.UTCMuxStartTime, run.SampleName]))
+                seq_path = os.path.join(reads_path, '_'.join([run.UTCSeqStartDate, run.UTCSeqStartTime, run.SampleName]))
             self.runs.append(Run(mux_path, run.SampleName, run.UTCMuxStartDate, run.UTCMuxStartTime, is_mux=True))
             self.runs.append(Run(seq_path, run.SampleName, run.UTCSeqStartDate, run.UTCSeqStartTime, is_mux=False))
     
     def is_run_complete(self):
-        # All ports must be complete to return true.
+        # All samples must be complete to return true.
         for run in self.runs:
             if not run.is_run_complete(): 
                 return False

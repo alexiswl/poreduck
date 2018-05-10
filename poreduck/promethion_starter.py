@@ -330,10 +330,10 @@ class Run:
         # Get all folders through opensftp
         opensftp = self.slave.ssh_client.open_sftp()
         folders = opensftp.listdir(path=self.fast5_path)
-        folders = [folder 
-                   for folder in folders
-                   if folder.isdigit()
-                  ]
+        folders = sorted([folder
+                          for folder in folders
+                              if folder.isdigit()],
+                         key=lambda x: int(x))
         for folder in folders:
             # Don't read in current folders
             if folder in [subfolder.number
@@ -345,18 +345,19 @@ class Run:
     def tar_subfolders(self):
         for folder in self.subfolders:
             if folder.is_tarred:
-                continue # Only the first folder will get to here.
+                continue  # Only the first folder will get to here.
             if not folder.is_full:
                 folder.check_if_full()
             if folder.is_full and not folder.is_tarred:
                 folder.tar_folder()
 
-    def unlink_tarred_subfolders(self):
-        # Remove tarred folder from run object
-        self.subfolders = [subfolder
-                           for subfolder in self.subfolders
-                           if not subfolder.is_tarred
-                           or subfolder == self.subfolders[0]]
+    def slim_tarred_subfolders(self):
+        # Remove fast5 objects folder from each subfolder
+        # That has been tarred.
+        for subfolder in self.subfolders:
+            if not subfolder.is_tarred:
+                continue
+            del subfolder.fast5_files
      
     def get_run_finish_time(self):
         # Get standard fast5 file (not that simple)
@@ -384,7 +385,7 @@ class Run:
     def get_default_finishtime(self):
         # Use the start_date and start_time to get the proposed finish times
         print("Getting default run finish times")
-        start_string = self.start_date + self.start_time
+        start_string = '_'.join([self.start_date, self.start_time])
         start_date_ob = datetime.strptime(start_string, "%Y%m%d_%H%M")
         if self.is_mux:
             end_date_ob = start_date_ob + timedelta(minutes=8)
@@ -419,10 +420,10 @@ class Sample:
             slave = [slave
                      for slave in self.slaves
                      if slave.slurm_id == run.SlurmID][0]
-            mux_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, run.SampleName]))
-            seq_path = os.path.join(slave.reads_path, '_'.join([run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, run.SampleName]))
-            self.runs.append(Run(mux_path, slave, run.GrnwchMuxStartDate, run.GrnwchMuxStartTime, is_mux=True))
-            self.runs.append(Run(seq_path, slave, run.GrnwchSeqStartDate, run.GrnwchSeqStartTime, is_mux=False))
+            mux_path = os.path.join(slave.reads_path, '_'.join([run.UTCMuxStartDate, run.UTCMuxStartTime, run.SampleName]))
+            seq_path = os.path.join(slave.reads_path, '_'.join([run.UTCSeqStartDate, run.UTCSeqStartTime, run.SampleName]))
+            self.runs.append(Run(mux_path, slave, run.UTCMuxStartDate, run.UTCMuxStartTime, is_mux=True))
+            self.runs.append(Run(seq_path, slave, run.UTCSeqStartDate, run.UTCSeqStartTime, is_mux=False))
     
     def is_run_complete(self):
         # All ports must be complete to return true.
@@ -465,8 +466,8 @@ def get_args():
     parser = argparse.ArgumentParser(description="Tar up the run folders of the PromethION")
     parser.add_argument("--samplesheet", type=str, required=True,
                         help="Path to tab delimited samplesheet. "
-                             "Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, "
-                             "GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID")
+                             "Columns are SampleName, UTCMuxStartDate, UTCMuxStartTime, "
+                             "UTCSeqStartDate, UTCSeqStartTime SlurmID")
     parser.add_argument("--ip_config", type=str, required=True,
                         help="path/to/tab-delimited-config file. "
                              "One column of IP addresses ==> one column of slave nodes.")
@@ -504,7 +505,7 @@ def main():
             first_pass = False
         for sample in samples:
             for run in sample.runs:
-                run.unlink_tarred_subfolders()
+                run.slim_tarred_subfolders()
                 run.get_subfolders()
                 run.tar_subfolders()
 
