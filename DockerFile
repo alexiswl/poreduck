@@ -5,7 +5,7 @@ RUN conda update -n base conda --yes
 RUN conda update --all --yes
 
 # Download poreduck
-RUN git clone -b yield_plot https://github.com/alexiswl/poreduck.git
+RUN git clone https://github.com/alexiswl/poreduck.git
 WORKDIR ./poreduck
 
 # Install required packages
