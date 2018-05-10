@@ -375,7 +375,7 @@ class Run:
     def get_default_finishtime(self):
         # Use the start_date and start_time to get the proposed finish times
         print("Getting default run finish times")
-        start_string = self.start_date + self.start_time
+        start_string = '_'.join([self.start_date, self.start_time])
         start_date_ob = datetime.strptime(start_string, "%Y%m%d_%H%M")
         if self.is_mux:
             end_date_ob = start_date_ob + timedelta(minutes=8)
@@ -413,7 +413,8 @@ class Run:
         We will delete this to save memory after each plot iteration
         A plot shouldn't take more than 2 minutes to be created.
         """
-        self.df = pd.concat([subfolder.pd for subfolder in self.subfolders],
+        self.df = pd.concat([subfolder.pd for subfolder in self.subfolders
+                             if subfolder.pd is not None],
                             axis=0, ignore_index=True)
         self.df['RunDurationTime'] = self.df["EndTime"].apply(lambda x: x - self.start_time)
         self.df['RunDurationFloat'] = self.df["RunDurationTime"].apply(lambda x: x.total_seconds())
@@ -722,7 +723,8 @@ def main(args):
                 for run in sample.runs:
                     time.sleep(15)
                     # This is going to break if no subfolders
-                    if len(run.subfolders) == 0:
+                    if len([subfolder.pd for subfolder in run.subfolders
+                            if subfolder.pd is not None]) == 0:
                         continue
                     run.slim_tarred_subfolders()
                     run.get_bulk_metadata()
