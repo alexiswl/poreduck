@@ -6,8 +6,8 @@ import poreduck.version
 if sys.version_info < (3,6):
     sys.exit('Sorry, Python < 3.6 is not supported')
 
-with open("requirements.txt", 'r') as file:
-    requirements = [line.strip() for line in file.readlines()]
+with open("requirements.txt", 'r') as file_h:
+    requirements = [line.strip() for line in file_h.readlines()]
 
 long_description = """
 
@@ -21,7 +21,7 @@ setup(
     packages=find_packages(),
     provides=['poreduck'],
     requires=['python (>=3.6)'],
-    install_requires=requirements,
+    dependency_links=requirements,
     url='github.com/alexiswl/poreduck',
     license='GPL',
     author='Alexis Lucattini',

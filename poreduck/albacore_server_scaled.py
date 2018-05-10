@@ -27,7 +27,12 @@ import fileinput  # Manipulating sge files
 from datetime import datetime  # Logging times of actions
 from pathlib import Path  # Creating lock files
 import shutil  # Deleting opened directories
-import gzip  # Gzipping fastq files.
+from Bio import SeqIO
+import gzip
+import statistics
+import argparse
+import tempfile
+import fileinput
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -36,120 +41,64 @@ try:
 except AssertionError:
     sys.exit("Error: Python version out of date. Require 3.6 or higher.")
 
-# Set global and semi-global variables
-TRANSFERRING = True
-BASECALLING_LOCK_FILE = None
-READS_DIR = ""
-CW_DIR = ""
-ALBACORE_DIR = ""
-WORKING_DIR = ""
-NUM_THREADS = 0
-MAX_PROCESSES = 0
-CHOSEN_FLOWCELL = ""
-CHOSEN_KIT = ""
-PARENT_DIRECTORY = ""
-QSUB_LOG_DIR = ""
-FASTQ_DIR = ""
-SUBFOLDERS = []
-STATUS_CSV = ""
-QSUB_HOST = None
-QSUB_TYPE = ""
-QSUB_EXTRACTION_TEMPLATE = ""
-QSUB_ALBACORE_TEMPLATE = ""
-STATUS_STANDARD_COLUMNS = ['name', 'extracted_submitted', 'extracted_jobid',
-                           'extracted_commenced', 'extracted_complete',
+STATUS_STANDARD_COLUMNS = ['name',
                            'albacore_submitted', 'albacore_jobid',
                            'albacore_commenced', 'albacore_complete',
-                           'albacore_tarred',
-                           'folder_removed', 'fastq_moved', 'fastq_gzipped']
+                           ]
 STATUS_DF = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
 
 CONFIGS = {"FC106_RAD001": "r94_250bps_linear.cfg",  # Rapid sequencing
            "FC106_LSK208_2d": "r94_250bps_2d.cfg",   # 2D unsure which one
            "FC106_LSK108": "r94_450bps_linear.cfg",  # For 1D ligation sequencing.
            "FC106_RAD002": "r94_450bps_linear.cfg"}  # Second Rapid sequencing kit.
-FLOWCELLS = ["FLO-MIN107", "FLO-MIN106"]
+
+FLOWCELLS = ["FLO-MIN107", "FLO-MIN106", "FLO-PRO001"]
+
 KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "SQK-LWB001",
         "SQK-RNA001", "SQK-RLI001", "SQK-RAD002", "SQK-RLB001", "SQK-RAB201", "SQK-LSK208", 
         "SQK-LSK108", "SQK-RAD003", "SQK-DCS108", "SQK-PCS108", "SQK-LSK308"]  # More kits to come
-QSUB_TYPES = ["SGE", "TORQUE"]
-LOGGER = None
-LOGGER_DIR = ""
-LOGGER_PATH = ""
-BARCODING = False
-ALBACORE_MAJOR_VERSION = 0
-ALBACORE_VERSION_STRING = ""
 
 
 class Subfolder:
-    def __init__(self, name):
+    """
+    Equivalent of the subfolder class from the starter.
+    This one finds the tar gzipped fast5 files in the fast5 folder
+    """
+    def __init__(self, name, main_dir):
         self.name = name
         # Get the relative name of the tar file
-        self.tar_filename = name + ".tar.gz"
+        self.tar_filename = name + ".fast5.tar.gz"
         # Set personal directories up
-        self.reads_dir = os.path.join(READS_DIR, name)
-        self.albacore_dir = os.path.join(ALBACORE_DIR, name)
-        # Albacore related files 1dsq_analysis
-        if CHOSEN_KIT == "SQK-LSK308":
-            self.workspace_dir = os.path.join(self.albacore_dir, "1dsq_analysis", "workspace")
-        else:
-            self.workspace_dir = os.path.join(self.albacore_dir, "workspace")
-        if ALBACORE_MAJOR_VERSION > 1:
-            self.workspace_pass_dir = os.path.join(self.workspace_dir, "pass")
-        else:
-            self.workspace_pass_dir = self.workspace_dir
-        self.albacore_summary_file = os.path.join(self.albacore_dir, "sequencing_summary.txt")
-        self.albacore_log_file = os.path.join(self.albacore_dir, "pipeline.log")
-        self.fastq_file = name + ".fastq"
-        self.albacore_zip_file = self.albacore_dir + ".albacore.tar.gz"
-        # Qsub related files / ids
-        self.extracted_submission_file = os.path.join(QSUB_LOG_DIR, name + ".extract.batch.sh")
-        self.extracted_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".extract.o.log")
-        self.extracted_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".extract.e.log")
-        self.extracted_jobid = -1
-        self.albacore_submission_file = os.path.join(QSUB_LOG_DIR, name + ".albacore.batch.sh")
-        self.albacore_qsub_output_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.o.log")
-        self.albacore_qsub_error_log = os.path.join(QSUB_LOG_DIR, name + ".albacore.e.log")
+        self.reads_dir = os.path.join(main_dir, "fast5", name)
+        self.albacore_summary_file = self.name + ".sequencing_summary.txt"
+        self.albacore_log_file = self.name + ".pipeline.log"
+        self.fastq_file = name + ".fastq.gz"
+        self.albacore_submission_file = self.name + ".albacore.batch.sh"
+        self.albacore_qsub_output_log = self.name + ".albacore.o.log"
+        self.albacore_qsub_error_log = self.name + ".albacore.e.log"
         self.albacore_jobid = -1
+        # Set dataframes up
+        self.raw_dataframe = name + ".tsv"
+        self.merged_dataframe = name + ".merged.tsv"
         # Status related attributes
-        self.extracted_submitted = False
-        self.extracted_commenced = False
-        self.extracted_complete = False
         self.albacore_submitted = False
         self.albacore_commenced = False
         self.albacore_complete = False
-        self.albacore_tarred = False
-        self.folder_removed = False
-        self.fastq_moved = False
-        self.fastq_gzipped = False
+        self.metadata_merged = False
 
     def to_series(self):
         return pd.Series(data=[self.name,
-                               str(self.extracted_submitted), self.extracted_jobid,
-                               str(self.extracted_commenced), str(self.extracted_complete),
                                str(self.albacore_submitted), self.albacore_jobid,
-                               str(self.albacore_commenced), str(self.albacore_complete),
-                               str(self.albacore_tarred),
-                               str(self.folder_removed), str(self.fastq_moved),
-                               str(self.fastq_gzipped)],
+                               str(self.albacore_commenced), str(self.albacore_complete)
+                               ],
                          index=STATUS_STANDARD_COLUMNS
                          )
 
     def check_albacore_job_status(self, check_failed=True):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
-            update_dataframe(get_current_subfolder(self.name))
         if has_completed(self.albacore_jobid, check_failed):
             self.albacore_complete = True
-            update_dataframe(get_current_subfolder(self.name))
-
-    def check_extraction_job_status(self, check_failed=True):
-        if has_commenced(self.extracted_jobid):
-            self.extracted_commenced = True
-            update_dataframe(get_current_subfolder(self.name))
-        if has_completed(self.extracted_jobid, check_failed):
-            self.extracted_complete = True
-            update_dataframe(get_current_subfolder(self.name))
 
 
 """
@@ -159,243 +108,183 @@ Main functions:
 """
 
 
-def main(args):
-    global TRANSFERRING
+def main():
     # Basic house cleaning, get arguments, make sure they're legit.
-    set_global_variables(args)
-    check_directories()
-    set_logger()
-    create_basecalling_lock_file()
+    args = get_args()
+    dir_dict, configurations = check_directories(args)
+    # Make sure there's no lockfile
+    if os.path.isfile(configurations['lock_file']):
+        print("Lock file exists. Exiting")
+        return
+    # Create directories
+    dir_dict = create_directories(dir_dict)
+    set_logger(configurations['logger_path'])
+    create_basecalling_lock_file(configurations['lock_file'])
+    status_csv = os.path.join(dir_dict["main"], "status.csv")
+    # Get all the subfolders currently in the fast5 directory
+    subfolders = get_subfolders(dir_dict=dir_dict)
 
-    # Pick up previous basecalling
-    pick_up_from_previous_run()
+    # Make sure STATUS_DF has all of the subfolders present
+    status_df = generate_dataframe(subfolders, status_csv)
 
-    # While the transferring lock script exists.
-    while TRANSFERRING:
-        # Check that we're still transferring
-        if not is_still_transferring():
-            TRANSFERRING = False
+    # Otherwise run through the pipeline
+    run_pipeline(subfolders, configurations["max_processes"],
+                 dir_dict, configurations)
 
-        # Get all the subfolders currently in the fast5 directory
-        get_subfolders()
-
-        # Make sure STATUS_DF has all of the subfolders present
-        generate_dataframe()
-
-        # Otherwise run through the pipeline
-        run_pipeline()
-
-        # Have a break
-        take_a_break()
-
-    # Transferring from laptop complete just wait for albacore to finish.
-    processing = True  # Set while command
-    while processing:
-        # Can we make this the last time around?
-        if not is_still_basecalling():
-            processing = False
+    # Now wait for albacore to finish
+    while is_still_basecalling(subfolders):
 
         # Otherwise run through the pipeline
-        run_pipeline()
+        run_pipeline(subfolders, configurations["max_processes"],
+                     dir_dict, configurations)
 
         # Generate dataframe throughout each iteration of the pipeline
-        generate_dataframe()
+        status_df = generate_dataframe(subfolders, status_csv)
 
         # Have a 15 second break between iterations
         take_a_break()
 
     # Merge fastq files at the end of the run.
-    generate_dataframe()    
-    remove_basecalling_lock_file()
+    generate_dataframe(subfolders, status_csv)
+    remove_basecalling_lock_file(configurations['lock_file'])
 
 
-def run_pipeline():
-    # Extract tarballs
-    [extract_tarred_read_set(subfolder) for subfolder in SUBFOLDERS
-     if not subfolder.extracted_submitted]
-
-    # Check for complete extraction jobs
-    [subfolder.check_extraction_job_status() for subfolder in SUBFOLDERS
-     if subfolder.extracted_submitted and
-     not subfolder.extracted_complete]
-
+def run_pipeline(subfolders, processes, dir_dict, configurations):
     # Now run albacore
-    [run_albacore(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.extracted_complete and
-     not subfolder.albacore_submitted]
+    index = len([subfolder
+                 for subfolder in subfolders
+                   if subfolder.albacore_commenced
+                   and not subfolder.albacore_complete])
+
+    for subfolder in subfolders:
+        if index > processes:
+            break
+        if not subfolder.albacore_submitted:
+            run_albacore(subfolder, dir_dict, configurations)
+            index += 1
 
     # Check for complete albacore jobs
-    [subfolder.check_albacore_job_status() for subfolder in SUBFOLDERS
-     if subfolder.albacore_submitted and
-     not subfolder.albacore_complete]
+    [subfolder.check_albacore_job_status()
+     for subfolder in subfolders
+        if subfolder.albacore_submitted
+        and not subfolder.albacore_complete]
 
-    # Once albacore is complete on a subfolder
-    # Remove folder from existence, leaving just the tarball again.
-    [remove_folder(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and
-     not subfolder.folder_removed]
-
-    # Move the fastq file to the FASTQ_DIR
-    [move_fastq_file(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and
-     not subfolder.fastq_moved]
-
-    # Gzip fastq file in the FASTQ_DIR
-    [gzip_fastq_file(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.fastq_moved and
-     not subfolder.fastq_gzipped]
-
-    # Tar albacore directory
-    [tar_albacore_folder(subfolder) for subfolder in SUBFOLDERS
-     if subfolder.albacore_complete and
-     not subfolder.albacore_tarred]
+    # If albacore is complete. Merge the fastq output onto the metadata frame
+    [merge_dataframes(subfolder, dir_dict["fastq"], dir_dict["metadata"], dir_dict["metadata.merged"])
+     for subfolder in subfolders
+        if subfolder.albacore_complete and
+        not subfolder.metadata_merged]
 
 
 """
 General script initialisation functions
-1. set_global_variables
 2. check_directories
 3. set_logger
 4. pick_up_from_previous_run
 """
 
 
-def set_global_variables(args):
-    # Global variables
-    global READS_DIR, ALBACORE_DIR, WORKING_DIR, NUM_THREADS, CHOSEN_KIT, FASTQ_DIR
-    global STATUS_CSV, QSUB_LOG_DIR, CW_DIR, QSUB_HOST, CHOSEN_FLOWCELL, MAX_PROCESSES
-    global LOGGER_DIR, BARCODING, QSUB_TYPE, QSUB_ALBACORE_TEMPLATE, QSUB_EXTRACTION_TEMPLATE
-    global ALBACORE_MAJOR_VERSION, ALBACORE_VERSION_STRING
-    READS_DIR = args.reads_dir
-    if args.output_dir is not None:
-        ALBACORE_DIR = args.output_dir
-    CHOSEN_KIT = args.kit
-    CHOSEN_FLOWCELL = args.flowcell
-    NUM_THREADS = args.num_threads
-    if args.fastq_dir is not None:
-        FASTQ_DIR = args.fastq_dir
-    if args.resume is not None:
-        STATUS_CSV = args.resume
-    if args.qsub_directory is not None:
-        QSUB_LOG_DIR = args.qsub_directory
-    CW_DIR = os.getcwd()
-    if args.qsub_host is not None:
-        QSUB_HOST = args.qsub_host
-    if args.max_processes is not None:
-        MAX_PROCESSES = args.max_processes
-    if args.log_directory is not None:
-        LOGGER_DIR = args.log_directory
-    BARCODING = args.barcoding
-    QSUB_EXTRACTION_TEMPLATE = os.path.abspath(args.qsub_extraction_template)
-    QSUB_ALBACORE_TEMPLATE = os.path.abspath(args.qsub_albacore_template)
-    QSUB_TYPE = args.qsub_type
-    ALBACORE_VERSION_STRING = args.albacore_version
-    ALBACORE_MAJOR_VERSION = int(ALBACORE_VERSION_STRING.split(".")[0])
+def get_args():
+    # Albacore server arguments:
+    albacore_parser = argparse.ArgumentParser(description="The albacore-server scaled command incorporates qsub to spread " +
+                                                         "the server load and rapidly " + "generate data off the PromethION.")
+    albacore_parser.add_argument("--fast5_dir", type=str, required=True,
+                                 help="/path/to/reads/fast5, " +
+                                      "should have a bunch of tar zipped files in it.")
+    albacore_parser.add_argument("--flowcell", type=str, choices=FLOWCELLS, required=True,
+                                 help="Pick a flowcell version")
+    albacore_parser.add_argument("--kit", type=str, choices=KITS, required=True,
+                                 help="Pick a kit type")
+    albacore_parser.add_argument("--output_dir", type=str, required=False, default=None,
+                                 help="Will be called 'albacore'" +
+                                      " and sit adjacent to the reads folder if left blank.")
+    albacore_parser.add_argument("--num_threads", type=int, required=False, default=5,
+                                 help="How many threads did you wish to use " +
+                                      "per parallel output default is 5.")
+    albacore_parser.add_argument("--fastq_dir", type=str, required=False, default=None,
+                                 help="Where should the fastq data be placed." +
+                                      "Will be called 'fastq'" +
+                                      "and sit adjacent to reads folder if left blank.")
+    albacore_parser.add_argument("--hpc_dir", type=str, required=False, default=None,
+                                 help="Where would you like to place the hpc batch files?")
+    albacore_parser.add_argument("--max_processes", type=int, required=False, default=10,
+                                 help="Limit the number of jobs that can be processed at any given moment." +
+                                      "This command will prevent extraction/albacore jobs from being submitted while" +
+                                      "there exists 'max_processes' jobs running / in the queue.")
+    albacore_parser.add_argument("--log_dir", type=str, required=False, default=None,
+                                 help="Where do you wish to store the poreduck logs? " +
+                                      "Will be called 'poreduck_logs' and sit adjacent to reads folder if left blank")
+    albacore_parser.add_argument("--albacore_version", type=str, required=True,
+                                 help="Albacore 2 comes with the pass and fail folders." + 
+                                      "Expressed as <majore_version>.<minor_version>.<patch>")
+    albacore_parser.add_argument("--qsub_albacore_template", type=str, required=True,
+                                 help="The qsub albacore template for your qsub command. " +
+                                      "Check the poreduck examples for more information.")
+    return albacore_parser.parse_args()
 
 
-def check_directories():
+def check_directories(args):
     # Make sure the directories exist, change to reads directory,
     # Create any other necessary directories for the script to run.
-    global READS_DIR, ALBACORE_DIR, PARENT_DIRECTORY, QSUB_LOG_DIR, FASTQ_DIR
-    global STATUS_CSV, LOGGER_DIR, LOGGER_PATH, QSUB_TYPE, BASECALLING_LOCK_FILE
-    if not os.path.isdir(READS_DIR):
-        sys.exit(f"Error, {READS_DIR} does not exist")
+    dir_dict = {}
+    configurations = {}
+    # Get arguments used throughout the script
+    configurations['threads'] = args.num_threads
+    configurations['max_processes'] = args.max_processes
+    configurations['flowcell'] = args.flowcell
+    configurations['kit'] = args.kit
+    if not os.path.isfile(args.qsub_albacore_template):
+            sys.exit("Error, template not found")
+    configurations['template'] = os.path.abspath(args.qsub_albacore_template)
+    configurations["albacore.version"] = args.albacore_version
 
-    READS_DIR = os.path.abspath(READS_DIR)
-    os.chdir(READS_DIR)
+    dir_dict["fast5"] = os.path.abspath(args.fast5_dir)
+    if not os.path.isdir(args.fast5_dir):
+        sys.exit(f"Error, {args.fast5_dir} does not exist") 
 
-    PARENT_DIRECTORY = os.path.abspath(os.path.join(READS_DIR, os.pardir)) + "/"
+    dir_dict["main"] = os.path.abspath(os.path.join(dir_dict["fast5"], os.pardir))
+    dir_dict["metadata"] = os.path.join(dir_dict["main"], "metadata")
 
-    if ALBACORE_DIR == "":
-        ALBACORE_DIR = os.path.join(PARENT_DIRECTORY, "albacore")
+    if args.qsub_dir is None:   
+        dir_dict["qsub"] = os.path.join(dir_dict["main"], "qsub")
     else:
-        ALBACORE_DIR = os.path.abspath(ALBACORE_DIR)
+        dir_dict["qsub"] = os.path.abspath(args.hpc_dir)
 
-    if not os.path.isdir(ALBACORE_DIR):
-        os.mkdir(ALBACORE_DIR)
-
-    QSUB_LOG_DIR = os.path.join(PARENT_DIRECTORY, "qsub_log")
-    if not os.path.isdir(QSUB_LOG_DIR):
-        os.mkdir(QSUB_LOG_DIR)
-
-    if FASTQ_DIR == "":
-        FASTQ_DIR = os.path.join(PARENT_DIRECTORY, "fastq")
+    if args.fastq_dir is None:
+        dir_dict["fastq"] = os.path.join(dir_dict["main"], "fastq")
     else:
-        FASTQ_DIR = os.path.abspath(FASTQ_DIR)
+        dir_dict["fastq"] = os.path.abspath(dir_dict["fastq"])
 
-    if not os.path.isdir(FASTQ_DIR):
-        os.mkdir(FASTQ_DIR)
-    if LOGGER_DIR == "":
-        LOGGER_DIR = os.path.join(PARENT_DIRECTORY, "poreduck_logs")
+    if args.log_dir is None:
+        dir_dict["log"] = os.path.join(dir_dict["main"], "poreduck_logs")
     else:
-        LOGGER_DIR = os.path.abspath(LOGGER_DIR)
-    if not os.path.isdir(LOGGER_DIR):
-        os.mkdir(LOGGER_DIR)
-    LOGGER_PATH = os.path.join(LOGGER_DIR, '.'.join([str(datetime.now().date()),
-                                                     str(datetime.now().time()).replace(":", "-"),
-                                                     "albacore_pipeline.log"]))
+        dir_dict["log"] = os.path.abspath(dir_dict["log"])
+    dir_dict["albacore"] = os.path.abspath(os.path.join(dir_dict["main"], "albacore"))
+    configurations['logger_path'] = os.path.join(dir_dict["log"], '.'.join([str(datetime.now().date()),
+                                                 str(datetime.now().time()).replace(":", "-"),
+                                                 "albacore_pipeline.log"]))
+    configurations['lock_file'] = os.path.join(dir_dict['main'], "BASECALLING")
 
-    if not STATUS_CSV == "":
-        if not os.path.isfile(os.path.join(CW_DIR, STATUS_CSV)):
-            sys.exit("Resume csv specified but does not exist")
-    else:
-        STATUS_CSV = os.path.join(PARENT_DIRECTORY, "status.csv")
-        if os.path.isfile(STATUS_CSV):
-            print(f"Warning, STATUS_CSV not defined but still exists. Removing file {STATUS_CSV}")
-            os.remove(STATUS_CSV)
-    BASECALLING_LOCK_FILE = os.path.join(PARENT_DIRECTORY, "BASECALLING")
+    return dir_dict, configurations
 
 
-def set_logger():
-    global LOGGER
-    logging.basicConfig(filename=LOGGER_PATH, level=logging.INFO,
+def set_logger(logger_path):
+    global logger
+    if not os.path.isdir(os.path.dirname(logger_path)):
+        os.mkdir(os.path.dirname(logger_path))
+    logging.basicConfig(filename=logger_path, level=logging.INFO,
                         format='%(asctime)s::\t%(message)s', datefmt='%Y/%m/%d %I:%M:%S %p')
-    LOGGER = logging.getLogger() 
+    logger = logging.getLogger()
 
 
-def pick_up_from_previous_run():
-    global SUBFOLDERS
-    if os.path.isfile(STATUS_CSV):
-        previous_dataframe = pd.read_csv(STATUS_CSV)
-        LOGGER.info(f"Found {STATUS_CSV}. Putting run back on track.")
-
-        # Set subfolders and all the statuses
-        for index, row in previous_dataframe.iterrows():
-            subfolder = row['name']
-            SUBFOLDERS.append(Subfolder(subfolder)) 
-            SUBFOLDERS[-1].extracted_submitted = row['extracted_submitted']
-            SUBFOLDERS[-1].extracted_commenced = row['extracted_commenced']
-            SUBFOLDERS[-1].extracted_jobid = row['extracted_jobid']
-            SUBFOLDERS[-1].extracted_complete = row['extracted_complete']
-            SUBFOLDERS[-1].albacore_submitted = row['albacore_submitted']
-            SUBFOLDERS[-1].albacore_commenced = row['albacore_commenced']
-            SUBFOLDERS[-1].albacore_jobid = row['albacore_jobid']
-            SUBFOLDERS[-1].albacore_complete = row['albacore_complete']
-            SUBFOLDERS[-1].folder_removed = row['folder_removed']
-            SUBFOLDERS[-1].fastq_moved = row['fastq_moved']
-            
-            # Check to see if the jobs may have finished after the run crashed
-            SUBFOLDERS[-1].check_extraction_job_status(check_failed=False) 
-            SUBFOLDERS[-1].check_albacore_job_status(check_failed=False)
-              
-            # Now make sure none of the jobs have failed and reset if so
-            if has_failed(SUBFOLDERS[-1].albacore_jobid):
-                LOGGER.info(f"It appears {SUBFOLDERS[-1].name} has failed albacore processing. " +
-                            "Reverting albacore submitted, commenced to false. " +
-                            f"Removing job id. {SUBFOLDERS[-1].albacore_jobid}")
-                SUBFOLDERS[-1].albacore_submitted = False
-                SUBFOLDERS[-1].albacore_commenced = False
-                SUBFOLDERS[-1].albacore_jobid = -1
-                SUBFOLDERS[-1].albacore_complete = False
-            if has_failed(SUBFOLDERS[-1].extracted_jobid):
-                LOGGER.info(f"It appears {SUBFOLDERS[-1].name} has failed to extract. " +
-                            "Reverting albacore submitted, commenced to false. " +
-                            f"Removing job id. {SUBFOLDERS[-1].extracted_jobid}")
-                SUBFOLDERS[-1].extracted_submitted = False
-                SUBFOLDERS[-1].extracted_commenced = False
-                SUBFOLDERS[-1].extracted_jobid = -1
-                SUBFOLDERS[-1].extracted_complete = False
-
+def create_directories(dir_dict):
+    for subdir in dir_dict.values():
+        if not os.path.isdir(subdir):
+            os.mkdir(subdir)
+    dir_dict["metadata.merged"] = os.path.join(dir_dict['metadata'], "merged")
+    if not os.path.isdir(dir_dict["metadata.merged"]):
+        os.mkdir(dir_dict["metadata.merged"])
+    return dir_dict
 
 """
 Pipeline functions:
@@ -408,315 +297,127 @@ Pipeline functions:
 """
 
 
-def extract_tarred_read_set(subfolder):
-    # Extract the tarred reads, we currently do not delete after extraction...
-    # maybe a good idea?
-    # Has the dataset already been set for extraction?
-    if subfolder.extracted_submitted:
-        return
-    elif num_current_jobs() >= MAX_PROCESSES and not MAX_PROCESSES == 0:
-        return
-    else:
-        subfolder.extracted_submitted = True
-
-    tar_command = f"pigz -dc {os.path.join(READS_DIR, subfolder.tar_filename)} | tar -xf -"
-
-    qsub_replacement_dict = {"STDOUT": subfolder.extracted_qsub_output_log,
-                             "STDERR": subfolder.extracted_qsub_error_log,
-                             "HOSTNAME": QSUB_HOST, 
-                             "COMMAND": tar_command,
-                             "WORKING_DIRECTORY": READS_DIR
-                             }
-
-    # Copy the standard qsub file from the main folder to the qsub folder
-    shutil.copy(QSUB_EXTRACTION_TEMPLATE, subfolder.extracted_submission_file)
-
-    # Now manipulate the submission file based on the replacement dict
-    with fileinput.FileInput(subfolder.extracted_submission_file, inplace=True) as file:
-        # Now edit this file based on our inputs.
-        for line in file:
-            for key, replacement in qsub_replacement_dict.items():
-                # If the replacement is none we need to remove this line.
-                if replacement is None:
-                    if key in line:
-                        line = ""
-                    # Or continue if the key is not in this line.
-                    else:
-                        continue
-                # Substitute in the replacement for this key in this line.
-                else:
-                    line = line.replace(f"%{key}%", str(replacement))
-            # Print the substituted line which is captured by the fileinput.
-            print(line.rstrip())
-
-    # Submit job
-    if QSUB_TYPE == "SLURM":
-        job_submission_command = f"sbatch {subfolder.extracted_submission_file}"
-    elif QSUB_TYPE == "SGE" or QSUB_TYPE == "TORQUE":
-        job_submission_command = f"qsub {subfolder.extracted_submission_file}"
-    job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
-                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = job_submission_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
-    # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
-    # So job equal to third element of the array.
-    LOGGER.info(f"Output of pigz sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    # Get job ID:
-    if QSUB_TYPE == "SLURM":
-        job_id = stdout.rstrip().split(";")[0]
-    else:
-        job_id = stdout.rstrip().split(".")[0]
-    if job_id.isdigit():
-        subfolder.extracted_jobid = int(job_id)
-    else:
-        LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
-        sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
-    update_dataframe(subfolder)
-
-
-def run_albacore(subfolder):
+def run_albacore(subfolder, dir_dict, configurations):
     """ Generate read_fast5_basecaller command
         And qsub command and pipe former into latter
         This function also sets the jobid of a given folder.
     """
     if subfolder.albacore_submitted:
         return   # Basecalling has already queued for this directory
-    elif num_current_jobs() >= MAX_PROCESSES and not MAX_PROCESSES == 0:
-        return
-    else:
-        # Commence basecalling on this directory
-        subfolder.albacore_submitted = True
 
-    # Need to ramp up memory requirements if using the 1D^2 protocol
-    if CHOSEN_KIT == "SQK-LSK308":
-        memory_allocation = 4 + 4*NUM_THREADS
-        basecaller_command_options = ["full_1dsq_basecaller.py"]
-    else:
-        memory_allocation = 4 + 2*NUM_THREADS
-        basecaller_command_options = ["read_fast5_basecaller.py"]
-    # The read_fast5_basecaller is the algorithm that does the actual base calling,
-    # what would be run if we just had Ubuntu.
-    basecaller_command_options.append(f"--input {subfolder.reads_dir}")
-    basecaller_command_options.append(f"--worker_threads {NUM_THREADS}")
-    basecaller_command_options.append(f"--save_path {subfolder.albacore_dir}")
-    basecaller_command_options.append(f"--flowcell {CHOSEN_FLOWCELL}")
-    basecaller_command_options.append(f"--kit {CHOSEN_KIT}")
-    if BARCODING:
-        basecaller_command_options.append("--barcoding")
-    basecaller_command = ' '.join(basecaller_command_options)
+    # Commence basecalling on this directory
+    subfolder.albacore_submitted = True
 
-    # These are both parsed into qsub which then determines what to do with it all.
-    qsub_replacement_dict = {"STDOUT": subfolder.albacore_qsub_output_log,
-                             "STDERR": subfolder.albacore_qsub_error_log,
-                             "HOSTNAME": QSUB_HOST,
-                             "MEM": memory_allocation, 
-                             "COMMAND": basecaller_command,
-                             "WORKING_DIRECTORY": ALBACORE_DIR,
-                             "ALBACORE_VER": ALBACORE_VERSION_STRING}
+    # The sbatch is all primed.
+    # The following variables need to be set for sbatch. 
+    slurm_options = {"mem":"%dG" % int(3*configurations['threads']),
+                     "output": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")),
+                     "error": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")), 
+                     "workdir": dir_dict["fast5"],
+                     "job-name": "albacore"} 
+    # The following variables need to be exported
+    export_options = {"NUM_THREADS": configurations["threads"],
+                      "FLOWCELL": configurations["flowcell"],
+                      "KIT": configurations["kit"],
+                      "SUBFOLDER_NAME": subfolder.name,
+                      "FASTQ_DIR": dir_dict["fastq"],
+                      "ALBACORE_DIR": dir_dict["albacore"],
+                      "ALBACORE_VER": configurations["albacore.version"]}
 
-    # Copy the standard qsub file from the main folder to the qsub folder
-    shutil.copy(QSUB_ALBACORE_TEMPLATE, subfolder.albacore_submission_file)
+    # Create temporary file to submit from
+    sbatch_temp_file = tempfile.NamedTemporaryFile()
+    
+    # Copy template to tmp file
+    shutil.copy2(configurations['template'], sbatch_temp_file.name)
+    
+    # Edit temporary sbatch file using fileinput
+    with fileinput.FileInput(files=sbatch_temp_file.name, inplace=True) as input:
+        for line in input:
+            for key, value in export_options.items(): 
+                if line.strip() == '# %s' % key:
+                    line = '%s=%s' % (key, value)
+            for key, value in slurm_options.items():
+                if line.strip() == '#SBATCH --%s' % key:
+                    line = '#SBATCH --%s=%s' % (key, value)
+            print(line.strip())
 
-    # Manipulate submission file based on replacement dict.
-    with fileinput.FileInput(subfolder.albacore_submission_file, inplace=True) as file:
-        # Now edit this file based on our inputs.
-        for line in file:
-            for key, replacement in qsub_replacement_dict.items():
-                # If the replacement is none we need to remove this line.
-                if replacement is None:
-                    if key in line:
-                        line = ""
-                    # Or continue if the variable is not in this line.
-                    else:
-                        continue
-                # Substitute in the replacement for this key in this line.
-                else:
-                    line = line.replace(f"%{key}%", str(replacement))
-            # Print the substituted line which is captured by the fileinput.
-            print(line.rstrip())
+    job_submission_command = ["sbatch", sbatch_temp_file.name]
+    job_submission_command.extend(["--%s=%s" % (k,v) for k,v in slurm_options.items()]) 
 
-    # Submit job
-    if QSUB_TYPE == "SGE" or QSUB_TYPE == "TORQUE":
-        job_submission_command = f"qsub {subfolder.albacore_submission_file}"
-    elif QSUB_TYPE == "SLURM":
-        job_submission_command = f"sbatch {subfolder.albacore_submission_file}"
+    job_submission_proc = subprocess.run(job_submission_command,
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=dir_dict["qsub"])
 
-    job_submission_proc = subprocess.Popen(job_submission_command, shell=True,
-                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    stdout, stderr = job_submission_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
+    stdout, stderr = job_submission_proc.stdout.decode(), job_submission_proc.stderr.decode()
+    
     # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
     # So job equal to third element of th   e array.
-    LOGGER.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
+    logger.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
     # Get job ID:
-    if QSUB_TYPE == "SLURM":
-        job_id = stdout.rstrip().split(";")[0]
-    else:
-        job_id = stdout.rstrip().split(".")[0]
+    job_id = stdout.rstrip().split(";")[0]
     if job_id.isdigit():
         subfolder.albacore_jobid = int(job_id)
     else:
-        LOGGER.error(f"Error: Could not assign job id from {stdout.rstrip()}")
+        logger.error(f"Error: Could not assign job id from {stdout.rstrip()}")
         sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
-    update_dataframe(subfolder)
 
 
-def remove_folder(subfolder):
-    """ Remove subfolder, leave us just with the '.tar.gz' file"""
+def get_series_from_seq(record):
+    """Takes in a seq record and returns dataframe with index"""
+    # Series index
+    index = ["FastqID", "Read", "Channel", "SeqLength", "AvQual"]
+    # Get metadata
+    fastq_id = record.id.split()[0]
+    row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
+    # Get length
+    fastq_length = len(record.seq)
+    fastq_quality = statistics.mean(record.letter_annotations["phred_quality"])
+    return pd.Series([fastq_id, row_as_dict['read'], row_as_dict['ch'],
+                      fastq_length, fastq_quality], 
+                     index=index)                                     
+                               
 
-    # Make sure that albacore has finished processing directory
-    if not subfolder.albacore_complete:
-        return
-
-    # Check the folder hasn't already been removed.
-    if subfolder.folder_removed:
-        return
-    else:  # Set this to true so that we don't try do it again!
-        subfolder.folder_removed = True
-
-    # Ensure that the tarred read set still exists
-    if not os.path.isfile(os.path.join(READS_DIR, subfolder.tar_filename)):
-        LOGGER.info("Um... the archive doesn't exist, I'm not going to delete the folder")
-        return
-
-    # Remove opened fast5 folder
-    LOGGER.info(f"Deleting {os.path.join(READS_DIR, subfolder.name)}")
-    shutil.rmtree(os.path.join(READS_DIR, subfolder.name))
-
-
-def move_fastq_file(subfolder):
-    """ Get the fastq file from the albacore workspace and merge into generic fastq file
-        As the fastq_file contains some weird run id info we can find using os.listdir
-        to first find the fastq file in the workspace directory.
-        Then we can move to the fastq folder and change name to subfolder.name + '.fastq'
-        We will combine all fastq files at the end.
-    """
-    # Check if this job hasn't already been completed
-    if subfolder.fastq_moved:
-        return  # Job has already been
-
-    # Dict where index is barcode or just "unbarcoded" and value is a list of paths
-    # Generally just one item in the list of paths
-    fastq_files_dict = {}
-
-    if BARCODING:
-        barcodes = [barcode for barcode in os.listdir(subfolder.workspace_pass_dir)
-                    if os.path.isdir(os.path.join(subfolder.workspace_pass_dir, barcode))
-                    and barcode.startswith("barcode")
-                    or os.path.isdir(os.path.join(subfolder.workspace_pass_dir, barcode))
-                    and barcode == "unclassified"]
-        for barcode in barcodes:
-            # Get fastq files in the workspace directory
-            fastq_files_list = [os.path.join(subfolder.workspace_pass_dir, barcode, fastq)
-                                for fastq in os.listdir(os.path.join(subfolder.workspace_pass_dir, barcode))
-                                if fastq.endswith(".fastq")]
-            fastq_files_dict[barcode] = fastq_files_list
-    else:
-        fastq_files_list = [os.path.join(subfolder.workspace_pass_dir, fastq)
-                            for fastq in os.listdir(os.path.join(subfolder.workspace_pass_dir))
-                            if fastq.endswith(".fastq")]
-        if CHOSEN_KIT == "SQK-LSK308":
-            fastq_files_dict["1d"] = fastq_files_list
+def get_fastq_dataframe(fastq_file, is_gzipped=True):
+    """Use get_series_from_seq in list comprehension to generate dataframe then transpose"""
+    # Open fastq file and return list comprehension 
+    # PD concat merges series as columns, we then transpose.
+    try:
+        if not is_gzipped:
+            with open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     axis='columns').transpose()
         else:
-            fastq_files_dict["unbarcoded"] = fastq_files_list
+            with gzip.open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     axis='columns').transpose()
+        # Specify types for each line
+        numeric_cols = ["Read", "Channel", "SeqLength", "AvQual"]
+        fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric, axis='columns')
+        return fastq_df
+    except ValueError:
+        print("Value error when generating dataframe for %s. Unknown cause of issue." % fastq_file)
+        return pd.DataFrame(columns=["FastqID", "Read", "Channel", "SeqLength", "AvQual"])
+    
 
-    if CHOSEN_KIT == "SQK-LSK308":
-        # Get the 1dsq fastq file as well
-        fastq_folder_1dsq = os.path.join(subfolder.albacore_dir, "1dsq_analysis", "1dsq_analysis", "workspace")
-        if ALBACORE_MAJOR_VERSION > 1:
-            fastq_folder_1dsq = os.path.join(fastq_folder_1dsq, "pass")
-        fastq_files_list = [os.path.join(fastq_folder_1dsq, fastq)
-                            for fastq in os.listdir(os.path.join(fastq_folder_1dsq))
-                            if fastq.endswith(".fastq")]
-        fastq_files_dict["1dsq"] = fastq_files_list
+def merge_dataframes(subfolder, fastq_dir, metadata_dir, merged_dir):
+    # Use the SeqIO library to extract the data info from the fastq file
+    pass_df = get_fastq_dataframe(os.path.join(fastq_dir, "pass", subfolder.fastq_file))
+    pass_df["Class"] = "pass"
+   
+    fail_df = get_fastq_dataframe(os.path.join(fastq_dir, "fail", subfolder.fastq_file))
+    fail_df["Class"] = "fail"
+  
+    fastq_df = pd.concat([fail_df, pass_df], axis='rows')
 
-    for barcode, fastq_files in fastq_files_dict.items():
-        if len(fastq_files) > 1:
-            LOGGER.info("It seems like we have more than 1 file here", fastq_files)
-
-        barcode_dir = os.path.join(FASTQ_DIR, barcode)
-        if not os.path.isdir(barcode_dir) and BARCODING:
-            os.mkdir(barcode_dir)
-
-        for index, fastq_file in enumerate(fastq_files):
-            if BARCODING or CHOSEN_KIT == "SQK-LSK308":
-                new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
-                                                                                  barcode,
-                                                                                  str(index),
-                                                                                  "fastq"]))
-                # Create move command and run through subprocess.
-                shutil.move(fastq_file, os.path.join(barcode_dir, new_fastq_file))
-            else:
-                new_fastq_file = subfolder.fastq_file.replace(".fastq", '.'.join(["",
-                                                                                  str(index),
-                                                                                  "fastq"]))
-                LOGGER.info(f"Moving fastq file: {fastq_file} to {new_fastq_file}")
-                shutil.move(fastq_file, os.path.join(FASTQ_DIR, new_fastq_file))
-
-    # Set as complete so we don't try to do it again.
-    subfolder.fastq_moved = True
-    update_dataframe(subfolder)
-
-
-def gzip_fastq_file(subfolder):
-    # Get fastq files
-    if BARCODING:
-        barcode_dirs = [os.path.join(FASTQ_DIR, barcode_dir)
-                        for barcode_dir in os.listdir(FASTQ_DIR)
-                        if os.path.isdir(os.path.join(FASTQ_DIR, barcode_dir))
-                        and barcode_dir.startswith("barcode")]
-        fastq_files = [os.path.join(barcode_dir, fastq_file)
-                       for barcode_dir in barcode_dirs
-                       for fastq_file in os.listdir(barcode_dir)
-                       if os.path.isfile(os.path.join(barcode_dir, fastq_file))
-                       and ".".join(fastq_file.split(".")[:-2]) == subfolder.name
-                       and fastq_file.endswith(".fastq")
-                       ]
-    else:
-        fastq_files = [os.path.join(FASTQ_DIR, fastq_file)
-                       for fastq_file in os.listdir(FASTQ_DIR)
-                       if os.path.isfile(os.path.join(FASTQ_DIR, fastq_file))
-                       and ".".join(fastq_file.split(".")[:-2]) == subfolder.name
-                       and fastq_file.endswith(".fastq")
-                       ]
-
-    # Now gzip fastq file then remove original.
-    for fastq_file in fastq_files:
-        # Gzip fastq file with gzip python module
-        fastq_gzipped = fastq_file + ".gz"
-        with open(fastq_file, 'rb') as f_in:
-            with gzip.open(fastq_gzipped, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-        # Remove fastq file
-        os.remove(fastq_file)
-    subfolder.fastq_gzipped = True
-    update_dataframe(subfolder)
-
-
-def tar_albacore_folder(subfolder):
-    """
-    Tar up the albacore folder into .tar.gz files.
-    It's really just a bunch of metadata anyway
-    """
-    os.chdir(ALBACORE_DIR)
-    tar_command = f"tar -cf - {subfolder.name} --remove-files | " + \
-                  f"pigz -p 16 > {subfolder.albacore_zip_file}"
-
-    # Run tar_command through subprocess.
-    tar_proc = subprocess.Popen(tar_command, shell=True,
-                                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    stdout, stderr = tar_proc.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
-    if not stdout == "" or not stderr == "":
-        LOGGER.info(f"Output of tar albacore folder command is:\n\"{stdout.rstrip()}\"\n\"{stderr.rstrip()}\"")
-    subfolder.albacore_tarred = True
-    update_dataframe(subfolder)
-    os.chdir(READS_DIR)
-
+    # Now merge with the raw metadata file
+    raw_df = pd.read_csv(os.path.join(metadata_dir, subfolder.raw_dataframe), header=0, sep="\t")
+    pd.merge(raw_df, fastq_df, how='right',
+             left_on=["Channel", "Read"], 
+             right_on=["Channel", "Read"]).to_csv(os.path.join(merged_dir, subfolder.merged_dataframe), 
+             sep="\t", header=True, index=False)
+    subfolder.metadata_merged = True
+    
 
 """
 Miscellaneous pipeline non-core functions
@@ -733,38 +434,29 @@ Miscellaneous pipeline non-core functions
 """
 
 
-def get_subfolders():
+def get_subfolders(subfolders=[], dir_dict={}):
     """ New subfolders will emerge to the directory as tarballs.
         Get a list of new tarballs then append them to the SUBFOLDERS
         list
     """
-    global SUBFOLDERS
+    # Don't reset existing Subfolder classes
+    existing_tars = [subfolder.tar_filename
+                     for subfolder in subfolders]
+
+    # Or those that have been basecalled in a previous script.
+    metadata_tar = [metadata.replace(".merged.tsv", "")
+                    for metadata in os.listdir(dir_dict["metadata.merged"])]
+
     # Get a list of tarballs
-    subfolders = sorted([tarred_folder.replace(".tar.gz", "") for tarred_folder
-                         in os.listdir(READS_DIR) if tarred_folder.endswith(".tar.gz")])
-    for subfolder in subfolders:
-        is_initialised = False
-        for initialised_subfolder in SUBFOLDERS:
-            if subfolder == initialised_subfolder.name:
-                is_initialised = True
-                break
-        if not is_initialised:
-            SUBFOLDERS.append(Subfolder(subfolder))
-
-
-def is_still_transferring():
-    """ Is data still coming from the laptop.
-        Get list of files in the destination directory
-        and if any of them are called TRANSFERRING then the answer is yes!
-    """
-    transferring_file = [t_file for t_file in os.listdir(PARENT_DIRECTORY)
-                         # Lock name is called TRANSFERRING.
-                         if t_file == "TRANSFERRING"]
-    # Can the lock file file be found?
-    if len(transferring_file) == 0:
-        return False
-    else:
-        return True
+    new_subfolders = sorted([Subfolder(tarred_folder.replace(".fast5.tar.gz", ""), dir_dict["main"])
+                             for tarred_folder in os.listdir(dir_dict["fast5"])
+                             if tarred_folder.endswith(".fast5.tar.gz")
+                             and not tarred_folder in existing_tars
+                             and not tarred_folder.replace(".fast5.tar.gz", "") in metadata_tar
+                             and not os.path.isfile(os.path.join(dir_dict["fast5"], tarred_folder+".corrupted"))], 
+                             key=lambda x: x.name)
+    subfolders.extend(new_subfolders)
+    return subfolders
 
 
 def take_a_break():
@@ -774,49 +466,22 @@ def take_a_break():
     time.sleep(15)
 
 
-def generate_dataframe():
-    global STATUS_DF
-
-    for subfolder in SUBFOLDERS:
-        if subfolder.name not in STATUS_DF.index.tolist():
-            # Append row
-            STATUS_DF = STATUS_DF.append(subfolder.to_series(), ignore_index=True)
-            # Reset index
-            STATUS_DF.set_index('name', drop=False, inplace=True)
-
-    STATUS_DF.to_csv(STATUS_CSV, index=False)
+def generate_dataframe(subfolders, status_csv):
+    status_df = pd.concat([subfolder.to_series() for subfolder in subfolders],
+                          axis='columns').transpose() 
+    # Reset index
+    status_df.set_index('name', drop=False, inplace=True)
+    status_df.to_csv(status_csv, index=True)
+    return status_df
 
 
-def update_dataframe(subfolder):
-    global STATUS_DF
-    """
-    Edits the STATUS_DF row of a given subfolder
-    """
-    STATUS_DF.loc[STATUS_DF.index == subfolder.name, ] = subfolder.to_series().tolist()
-
-
-def is_still_basecalling():
+def is_still_basecalling(subfolders):
     """Any subfolders left to be basecalled?"""
-    if len([subfolder for subfolder in SUBFOLDERS
-            if not subfolder.albacore_complete]) == 0:
+    if len([subfolder for subfolder in subfolders
+            if not subfolder.metadata_merged]) == 0:
         return False  # basecalling finished
     else:  # Basecalling still going
         return True
-
-
-def get_current_subfolder(subfolder_name):
-    return [subfolder for subfolder in SUBFOLDERS
-            if subfolder.name == subfolder_name][0]
-
-
-def num_current_jobs():
-    """Returns the number of subfolders that have either an extraction job submitted and not complete
-    or an albacore job submitted and not complete"""
-    return len([subfolder for subfolder in SUBFOLDERS
-                if subfolder.extracted_submitted
-                and not subfolder.extracted_complete
-                or subfolder.albacore_submitted
-                and not subfolder.albacore_complete])
 
 """
 qsub specific functions
@@ -831,25 +496,18 @@ def has_commenced(job_id):
     Use the qacct command to see if there exists a start time
     No start_time is represented as -/-
     """
-    if QSUB_TYPE == "SGE":
-        qacct_command = f"qacct -j {job_id} | grep start_time | grep -v '\-\/\-'"
-    elif QSUB_TYPE == "TORQUE":
-        qacct_command = f"tracejob {job_id} | grep QUEUED | wc -l"
-    elif QSUB_TYPE == "SLURM":
-        qacct_command = f"sacct -j {job_id} | tail -n 1 | grep RUNNING | wc -l"
+    qacct_command = f"sacct -j {job_id} | tail -n 1 | grep RUNNING | wc -l"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
     qacct_stdout, qacct_stderr = qacct_proc.communicate()
     qacct_stdout = qacct_stdout.decode()
     qacct_stderr = qacct_stderr.decode()
-    if QSUB_TYPE == "SGE" and qacct_stdout == "" \
-            or QSUB_TYPE == "TORQUE" and int(qacct_stdout) > 1\
-            or QSUB_TYPE == "SLURM" and int(qacct_stdout) > 1:
+    if int(qacct_stdout) > 1:
         # Start-time is non-existent
         return False
     if not qacct_stderr == "":
-        LOGGER.info(f"qacct stderr of {qacct_stderr}") 
+        logger.info(f"qacct stderr of {qacct_stderr}")
     return True
 
 
@@ -858,12 +516,7 @@ def has_completed(job_id, check_failed):
     Use the qacct command to see if the job has finished.
     No end_time is represented as -/-
     """
-    if QSUB_TYPE == "SGE":
-        qacct_command = f"qacct -j {job_id} | grep end_time | grep -v '\-\/\-'"
-    elif QSUB_TYPE == "TORQUE":
-        qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status "
-    elif QSUB_TYPE == "SLURM":
-        qacct_command = f"sacct -j {job_id} | grep 'COMPLETED\|FAILED'"
+    qacct_command = f"sacct -j {job_id} | grep 'COMPLETED\|FAILED'"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -874,10 +527,10 @@ def has_completed(job_id, check_failed):
         # end_time is non-existent
         return False
     if not qacct_stderr == "":
-        LOGGER.info(f"qacct stderr of {qacct_stderr}")
+        logger.info(f"qacct stderr of {qacct_stderr}")
     
     if check_failed and has_failed(job_id):
-        LOGGER.info(f"It appears that the job {job_id} has failed")
+        logger.info(f"It appears that the job {job_id} has failed")
         sys.exit(f"Failing because {job_id} failed.")
 
     return True
@@ -889,13 +542,8 @@ def has_failed(job_id):
     We pass the exit_status parameter into awk and sum it.
     If it's any greater than zero then the command has failed
     """
-    if QSUB_TYPE == "SGE":
-        qacct_command = f"qacct -j {job_id} | grep exit_status | awk '{{sum+=$2}} END {{print sum}}'"
-    elif QSUB_TYPE == "TORQUE":
-        qacct_command = f"tracejob {job_id} 2> /dev/null | grep Exit_status | grep - v preparing |" + \
-                        f" cut - d' ' - f7 | cut - d'=' -f2"
-    elif QSUB_TYPE == "SLURM":
-        qacct_command = f"sacct {job_id} | tail -n1 | grep FAILED | wc -l"
+
+    qacct_command = f"sacct {job_id} | tail -n1 | grep FAILED | wc -l"
     qacct_proc = subprocess.Popen(qacct_command, shell=True,
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -905,19 +553,22 @@ def has_failed(job_id):
     if qacct_stdout.strip() == "":
         return True  
     if int(qacct_stdout) > 0:
-        LOGGER.info(qacct_stdout)
+        logger.info(qacct_stdout)
         # Job has failed
         return True
     if not qacct_stderr == "":
-        LOGGER.info(f"qacct stderr of {qacct_stderr}")
+        logger.info(f"qacct stderr of {qacct_stderr}")
     return False
 
 
-def create_basecalling_lock_file():
+def create_basecalling_lock_file(lockfile):
     # Create a file called BASECALLING in the working directory
-    Path(BASECALLING_LOCK_FILE).touch()
+    Path(lockfile).touch()
 
 
-def remove_basecalling_lock_file():
+def remove_basecalling_lock_file(lockfile):
     # Remove the basecalling lock file.
-    os.remove(BASECALLING_LOCK_FILE)
+    os.remove(lockfile)
+
+if __name__=="__main__":
+    main()
