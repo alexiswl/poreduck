@@ -17,11 +17,11 @@ RUN conda update --all --yes
 # Install poreduck using pip
 RUN pip install -e .
 
-# Change to /data directory
-WORKDIR /data
-
 # Copy the entry point for the user
 COPY ./docker-entrypoint.sh /
+
+# Change to /data directory
+WORKDIR /data
 
 # Change user
 RUN useradd -ms /bin/bash docker
