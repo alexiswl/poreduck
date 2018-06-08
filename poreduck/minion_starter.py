@@ -377,6 +377,8 @@ class Run:
         print("Getting default run finish times")
         start_string = '_'.join([self.start_date, self.start_time])
         start_date_ob = datetime.strptime(start_string, "%Y%m%d_%H%M")
+        if self.start_time is None:
+            self.start_time = start_date_ob
         if self.is_mux:
             end_date_ob = start_date_ob + timedelta(minutes=8)
         else:
