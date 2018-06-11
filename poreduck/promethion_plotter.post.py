@@ -39,18 +39,15 @@ class Run:
     def __init__(self, sample_name,
                  grnwch_mux_start_date, grnwch_mux_start_time,
                  grnwch_seq_start_date, grnwch_seq_start_time,
-                 slurm_id, flowcell_id, pca_path):
+                 flowcell_id, run_path):
         self.sample_name = sample_name
         self.grnwch_mux_start_date = grnwch_mux_start_date
         self.grnwch_mux_start_time = grnwch_mux_start_time
         self.grnwch_seq_start_date = grnwch_seq_start_date
         self.grnwch_seq_start_time = grnwch_seq_start_time
-        self.slurm_id = slurm_id
         self.flowcell_id = flowcell_id
         self.concatenated_data = None
-        self.path = os.path.join(pca_path, slurm_id, "reads", '_'.join([self.grnwch_seq_start_date,
-                                                                        self.grnwch_seq_start_time,
-                                                                        self.sample_name]))
+        self.path = run_path
         self.metadata_path = os.path.join(self.path, "metadata", "merged")
         print(self.path)
 
@@ -66,17 +63,12 @@ def get_args():
     parser.add_argument("--samplesheet", type=str, required=True,
                         help="Path to tab delimited samplesheet. "
                              "Columns are SampleName, GrnwchMuxStartDate, GrnwchMuxStartTime, "
-                             "GrnwchSeqStartDate, GrnwchSeqStartTime SlurmID FlowcellID")
-    parser.add_argument("--ip_config", type=str, required=True,
-                        help="path/to/tab-delimited-config file. "
-                             "One column of IP addresses ==> one column of slave nodes.")
-    parser.add_argument("--pca_dir", type=str, required=True,
-                        help="/PATH/TO/PCAXXXX")
+                             "GrnwchSeqStartDate, GrnwchSeqStartTime, FlowcellID, Path")
     args = parser.parse_args()
     return args
 
 
-def get_samples(samplesheet_df, pca_dir):
+def get_samples(samplesheet_df):
     # Get samples
     samples = []
     for sample_name in samplesheet_df["SampleName"].unique().tolist(): 
@@ -84,7 +76,7 @@ def get_samples(samplesheet_df, pca_dir):
     return samples 
 
 
-def get_flowcells(sample_df, pca_dir):
+def get_flowcells(sample_df):
     # Get flowcells from a given sample.
     flowcells = []
     for flowcell_id in sample_df["FlowcellID"].unique().tolist():
@@ -93,14 +85,14 @@ def get_flowcells(sample_df, pca_dir):
     return flowcells
 
 
-def get_runs(flowcell_df, pca_dir):
+def get_runs(flowcell_df):
     """Return a list of class run, each with a list of associated dataframes"""
     runs = []
     for index, row in flowcell_df.iterrows():
         runs.append(Run(row.SampleName,
                         row.GrnwchMuxStartDate, row.GrnwchMuxStartTime,
                         row.GrnwchSeqStartDate, row.GrnwchSeqStartTime,
-                        row.SlurmID, row.FlowcellID, pca_dir))
+                        row.FlowcellID, row.Path))
     return runs
 
 
@@ -209,7 +201,9 @@ def plot_histograms(names, samples_df):
     savefig("%s.combined_hist.png" % names)
 
 
-def plot_flowcell(name, sample_df):
+
+
+def plot_flowcell(name, sample_df, flowcell_type):
     """Plot an estimated yield plot and a histogram plot for the sample""" 
     # Histogram
     plt.close('all')
@@ -240,35 +234,7 @@ def plot_flowcell(name, sample_df):
     savefig("%s.combined_hist.png" % name)
 
     # Plot flowcell
-    
-    # Split into chunks of 64 (rows of 4)
-    c_w = 10
-    c_l = 25
-    c_num = 12
-    
-    # Create the values that make up the numbers of the far-right column of the grid
-    channels_by_order_array = np.array([[c_no*c_w*c_l + c_w*l_no + w_no + 1
-                                         for c_no in np.arange(c_num)
-                                         for w_no in np.arange(c_w)]
-                                         for l_no in np.arange(c_l)])
-    
-    # Initialise the array with zeros
-    channels_by_yield_array = np.zeros(channels_by_order_array.shape)
 
-    # Sum the values for each channel
-    channels_by_yield_df = pd.DataFrame(sample_df.reset_index().groupby("Channel")['SeqLength'].sum())
-    
-    # Reset the index and have channel as a column instead of the index.
-    channels_by_yield_df.reset_index(level=0, inplace=True)
-    
-    # Iterate through each row of the yield by channel dataframe.
-    for yield_row in channels_by_yield_df.itertuples():
-        channel_index = [(ix, iy)
-                         for ix, row in enumerate(channels_by_order_array)
-                         for iy, i in enumerate(row)
-                         if int(i) == int(yield_row.Channel)][0]
-        # Assign channel yield to position in MinKNOW
-        channels_by_yield_array[channel_index] = yield_row.SeqLength
 
     # Close any previous plots
     plt.close('all')
