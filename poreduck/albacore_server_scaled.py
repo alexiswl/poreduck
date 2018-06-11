@@ -33,6 +33,7 @@ import statistics
 import argparse
 import tempfile
 import fileinput
+import re
 
 # Before we begin, are we using python 3.6 or greater?
 try:
@@ -56,7 +57,7 @@ FLOWCELLS = ["FLO-MIN107", "FLO-MIN106", "FLO-PRO001"]
 
 KITS = ["SQK-LWP001", "SQK-NSK007", "VSK-VBK001", "SQK-RAS201", "SQK-RBK001", "SQK-LWB001",
         "SQK-RNA001", "SQK-RLI001", "SQK-RAD002", "SQK-RLB001", "SQK-RAB201", "SQK-LSK208", 
-        "SQK-LSK108", "SQK-RAD003", "SQK-DCS108", "SQK-PCS108", "SQK-LSK308"]  # More kits to come
+        "SQK-LSK108", "SQK-RAD003", "SQK-DCS108", "SQK-PCS108", "SQK-LSK308", "SQK-LSK109"]  # More kits to come
 
 
 class Subfolder:
@@ -64,12 +65,11 @@ class Subfolder:
     Equivalent of the subfolder class from the starter.
     This one finds the tar gzipped fast5 files in the fast5 folder
     """
-    def __init__(self, name, main_dir):
+    def __init__(self, name, main_dir, configs):
         self.name = name
         # Get the relative name of the tar file
         self.tar_filename = name + ".fast5.tar.gz"
         # Set personal directories up
-        self.reads_dir = os.path.join(main_dir, "fast5", name)
         self.albacore_summary_file = self.name + ".sequencing_summary.txt"
         self.albacore_log_file = self.name + ".pipeline.log"
         self.fastq_file = name + ".fastq.gz"
@@ -85,6 +85,7 @@ class Subfolder:
         self.albacore_commenced = False
         self.albacore_complete = False
         self.metadata_merged = False
+        self.configs = configs
 
     def to_series(self):
         return pd.Series(data=[self.name,
@@ -94,11 +95,169 @@ class Subfolder:
                          index=STATUS_STANDARD_COLUMNS
                          )
 
+    def basecall_subfolder(self):
+        """
+        Generate read_fast5_basecaller command
+        And qsub command and pipe former into latter
+        This function also sets the jobid of a given folder.
+        """
+        if self.albacore_submitted:
+            return  # Basecalling has already queued for this directory
+
+        # Commence basecalling on this directory
+        self.albacore_submitted = True
+
+        # The sbatch is all primed.
+        # The following variables need to be set for sbatch.
+        slurm_options = {"mem": "%dG" % int(3 * self.configs.threads),
+                         "output": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")),
+                         "error": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")),
+                         "workdir": dir_dict["fast5"],
+                         "job-name": "albacore"}
+        # The following variables need to be exported
+        export_options = {"NUM_THREADS": configurations["threads"],
+                          "FLOWCELL": configurations["flowcell"],
+                          "KIT": configurations["kit"],
+                          "SUBFOLDER_NAME": subfolder.name,
+                          "FASTQ_DIR": dir_dict["fastq"],
+                          "ALBACORE_DIR": dir_dict["albacore"],
+                          "ALBACORE_VER": configurations["albacore.version"]}
+
+        # Create temporary file to submit from
+        sbatch_temp_file = tempfile.NamedTemporaryFile()
+
+        # Copy template to tmp file
+        shutil.copy2(configurations['template'], sbatch_temp_file.name)
+
+        # Edit temporary sbatch file using fileinput
+        with fileinput.FileInput(files=sbatch_temp_file.name, inplace=True) as input:
+            for line in input:
+                for key, value in export_options.items():
+                    if line.strip() == '# %s' % key:
+                        line = '%s=%s' % (key, value)
+                for key, value in slurm_options.items():
+                    if line.strip() == '#SBATCH --%s' % key:
+                        line = '#SBATCH --%s=%s' % (key, value)
+                print(line.strip())
+
+        job_submission_command = ["sbatch", sbatch_temp_file.name]
+        job_submission_command.extend(["--%s=%s" % (k, v) for k, v in slurm_options.items()])
+
+        job_submission_proc = subprocess.run(job_submission_command,
+                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=dir_dict["qsub"])
+
+        stdout, stderr = job_submission_proc.stdout.decode(), job_submission_proc.stderr.decode()
+
+        # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
+        # So job equal to third element of th   e array.
+        logger.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
+        # Get job ID:
+        job_id = stdout.rstrip().split(";")[0]
+        if job_id.isdigit():
+            subfolder.albacore_jobid = int(job_id)
+        else:
+            logger.error(f"Error: Could not assign job id from {stdout.rstrip()}")
+            sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
+
     def check_albacore_job_status(self, check_failed=True):
         if has_commenced(self.albacore_jobid):
             self.albacore_commenced = True
         if has_completed(self.albacore_jobid, check_failed):
             self.albacore_complete = True
+
+
+class Run:
+    """
+    Equivalent of the Run in minion_starter.
+    Simple list of path, list of subfolder class.
+    Each holds its own separate dataframe.
+    Dataframe has extras, kit, flowcell and albacore version and path to template id.
+    """
+    def __init__(self, path, series):
+        # Series is the given row for the dataframe.
+        self.path = path
+        self.series = series  # What's in this config.
+        self.lockfile = os.path.join(path, "BASECALLING")
+        self.subfolders = []
+        # Initilaise directories
+        self.fast5_dir = os.path.join(path, "fast5")
+        self.fastq_dir = os.path.join(path, "fastq")
+        self.metadata_dir = os.path.join(path, "metadata")
+        self.merged_dir = os.path.join(self.metadata_dir, "merged")
+        self.log_dir = os.path.join(path, "log")
+
+        # We may be picking up from a previous run.
+        self.status_csv = os.path.join(path, "status.csv")
+        self.status_df = self.get_previous_status_file()
+        if self.status_df is None:
+            self.status_df = pd.DataFrame(columns=STATUS_STANDARD_COLUMNS)
+
+        # Check lock file doesn't exist.
+        if self.check_lockfile():
+            # Already basecalling from previous instance
+            return
+        else:
+            self.make_lockfile()
+
+        # Create directories
+        self.create_dirs()
+
+        # Initialise subfolders
+        self.subfolders = self.get_subfolders()
+
+        # Get previous metadata if it exists
+        self.metadata_df = self.initialise_dataframe()
+
+    def create_dirs(self):
+        # Create the fastq and log directories
+        for dir in [self.fastq_dir, self.log_dir]:
+            if not os.path.isdir(dir):
+                os.mkdir(dir)
+
+    def check_lockfile(self):
+        # Check if the lockfile is present
+        if os.path.isfile(self.lockfile):
+            return True
+        else:
+            return False
+
+    def make_lockfile(self):
+        # Create the lockfile
+        Path(self.lockfile).touch()
+
+    def get_previous_status_file(self):
+        # Import previous status.csv file
+        if not os.path.isfile(self.status_csv):
+            return None
+        else:
+            return pd.read_csv(self.status_csv, header=True, sep="\t")
+
+    def get_subfolders(self):
+        # Get list of subfolders to basecall
+        return [Subfolder(re.sub(".fast5.tar.gz$", "", subfolder), self.path, self.series)
+                for subfolder in os.path.listdir(self.fast5_dir)
+                if subfolder.endswith(".fast5.tar.gz")
+                and not os.path.isfile(os.path.join(self.merged_dir,
+                                                    re.sub(".fast5.tar.gz", "", subfolder)))]
+
+    def initialise_dataframe(self):
+        # Check tsv files exist in the merged directory
+        if len([merged_tsv for merged_tsv in os.listdir(self.merged_dir)
+                if merged_tsv.endswith(".tsv")]) == 0:
+            return None
+        defined_subfolders = [defined_subfolder.name for defined_subfolder in self.subfolders]
+        # Otherwise a dataframe of previously basecalled subfolders
+        return pd.concat([pd.read_csv(os.path.join(self.merged_dir,
+                                      re.sub(".fast5.tar.gz", "merged.tsv", subfolder)),
+                                      header=True, sep="\t")
+                          for subfolder in os.listdir(self.fast5_dir)
+                          # Check not in list.. somehow!!
+                          if re.sub(".fast5.tar.gz", "", subfolder) not in defined_subfolders
+                          # And expected data file exists
+                          and os.path.isfile(os.path.join(self.merged_dir, re.sub(".fast5.tar.gz", "merged.tsv")))
+                         ])
+
+
 
 
 """
@@ -111,6 +270,10 @@ Main functions:
 def main():
     # Basic house cleaning, get arguments, make sure they're legit.
     args = get_args()
+
+    # Get run list
+
+
     dir_dict, configurations = check_directories(args)
     # Make sure there's no lockfile
     if os.path.isfile(configurations['lock_file']):
@@ -297,68 +460,8 @@ Pipeline functions:
 """
 
 
-def run_albacore(subfolder, dir_dict, configurations):
-    """ Generate read_fast5_basecaller command
-        And qsub command and pipe former into latter
-        This function also sets the jobid of a given folder.
-    """
-    if subfolder.albacore_submitted:
-        return   # Basecalling has already queued for this directory
+def self.run_albacore():
 
-    # Commence basecalling on this directory
-    subfolder.albacore_submitted = True
-
-    # The sbatch is all primed.
-    # The following variables need to be set for sbatch. 
-    slurm_options = {"mem":"%dG" % int(3*configurations['threads']),
-                     "output": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")),
-                     "error": os.path.join(dir_dict["qsub"], "albacore.{}.{}".format(subfolder.name, "%j.txt")), 
-                     "workdir": dir_dict["fast5"],
-                     "job-name": "albacore"} 
-    # The following variables need to be exported
-    export_options = {"NUM_THREADS": configurations["threads"],
-                      "FLOWCELL": configurations["flowcell"],
-                      "KIT": configurations["kit"],
-                      "SUBFOLDER_NAME": subfolder.name,
-                      "FASTQ_DIR": dir_dict["fastq"],
-                      "ALBACORE_DIR": dir_dict["albacore"],
-                      "ALBACORE_VER": configurations["albacore.version"]}
-
-    # Create temporary file to submit from
-    sbatch_temp_file = tempfile.NamedTemporaryFile()
-    
-    # Copy template to tmp file
-    shutil.copy2(configurations['template'], sbatch_temp_file.name)
-    
-    # Edit temporary sbatch file using fileinput
-    with fileinput.FileInput(files=sbatch_temp_file.name, inplace=True) as input:
-        for line in input:
-            for key, value in export_options.items(): 
-                if line.strip() == '# %s' % key:
-                    line = '%s=%s' % (key, value)
-            for key, value in slurm_options.items():
-                if line.strip() == '#SBATCH --%s' % key:
-                    line = '#SBATCH --%s=%s' % (key, value)
-            print(line.strip())
-
-    job_submission_command = ["sbatch", sbatch_temp_file.name]
-    job_submission_command.extend(["--%s=%s" % (k,v) for k,v in slurm_options.items()]) 
-
-    job_submission_proc = subprocess.run(job_submission_command,
-                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=dir_dict["qsub"])
-
-    stdout, stderr = job_submission_proc.stdout.decode(), job_submission_proc.stderr.decode()
-    
-    # Stdout equal to 'Your job 122079 ("STDIN") has been submitted\n'
-    # So job equal to third element of th   e array.
-    logger.info(f"Output of albacore sge submission \nStdout:\"{stdout.rstrip()}\"\nStderr:\"{stderr.rstrip()}\"")
-    # Get job ID:
-    job_id = stdout.rstrip().split(";")[0]
-    if job_id.isdigit():
-        subfolder.albacore_jobid = int(job_id)
-    else:
-        logger.error(f"Error: Could not assign job id from {stdout.rstrip()}")
-        sys.exit(f"Error: Could not assign job id from {stdout.rstrip()}")
 
 
 def get_series_from_seq(record):
