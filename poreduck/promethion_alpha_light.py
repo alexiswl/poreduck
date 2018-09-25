@@ -9,6 +9,7 @@ from datetime import datetime
 import subprocess
 
 logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 """
 Usage: Given a folder of fast5 data create a new folder matching the zero filled filename of that folder.
@@ -52,11 +53,13 @@ def get_output_path(folder_path, output_name):
     return output_path
 
 
-def tar_up_folder(folder_path, output_name, dry_run=False):
+def tar_up_folder(folder_path, output_path, dry_run=False):
     # Tar up the folder provided
     # Get the output path
-    output_path = get_output_path(folder_path, output_name)
     logging.info("Output path is %s" % output_path)
+
+    # Normalise the output path, it's come straight from args
+    folder_path = os.path.normpath(folder_path)
 
     # Get number of files in the path
     fast5_files = [fast5_file
@@ -70,20 +73,23 @@ def tar_up_folder(folder_path, output_name, dry_run=False):
     if not dry_run:
         # Get time
         start_time = datetime.now()
-        logging.info("Starting tarring %s into %s" % (folder_path, output_name))
+        logging.info("Starting tarring %s into %s" % (folder_path, output_path))
+        logging.info("%d files to tar" % len(fast5_files))
         # Open up the output_path file
         archive = tarfile.open(output_path, "w|gz")
         # Add each of the fast5 files to the archive
         for fast5_file in fast5_files:
-            archive.add(os.path.join(folder_path, fast5_file), arcname=fast5_file)
+            input_file = os.path.join(folder_path, fast5_file)
+            output_file = os.path.join(os.path.basename(folder_path), fast5_file)
+            archive.add(input_file, arcname=output_file)
         archive.close()
         end_time = datetime.now()
         diff_time = end_time - start_time
-        logging.info("Finished tarring %s in %s" % (folder_path, output_name))
+        logging.info("Finished tarring %s in %s" % (folder_path, output_path))
         logging.info("Added %d files to the tar archive" % len(fast5_files))
         logging.info("Process completed in %s" % round(diff_time.total_seconds(), 2))
     else:
-        logging.info("Would have tarred %s into %s" % (folder_path, output_name))
+        logging.info("Would have tarred %s into %s" % (folder_path, output_path))
 
 
 def get_md5sum(output_path):
@@ -111,9 +117,11 @@ def main():
     # Tar up folder
     tar_up_folder(args.folder_path, output_path, args.dry_run)
     # Get md5
-    md5sum = get_md5sum(output_path)
+    if not args.dry_run:
+        md5sum = get_md5sum(output_path)
     # Write md5
-    write_md5sum(md5sum, args.md5)
+    if not args.dry_run:
+        write_md5sum(md5sum, args.md5)
 
 
 if __name__ == "__main__":
