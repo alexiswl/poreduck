@@ -13,7 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 """
 Usage: Given a folder of fast5 data create a new folder matching the zero filled filename of that folder.
-Also use the nomenclature 0000_<FlowcellID>_RNUMBER.tar.gz 
+Also use the nomenclature 0000_<FlowcellID>_RNUMBER.fast5.tar.gz 
 """
 
 
@@ -48,7 +48,7 @@ def get_output_name(args):
 def get_output_path(folder_path, output_name):
     # Get the .tar.gz. output to the folder
     folder_dirpath = os.path.dirname(os.path.normpath(folder_path))
-    output_path = os.path.join(folder_dirpath, output_name + ".tar.gz")
+    output_path = os.path.join(folder_dirpath, output_name + ".fast5.tar.gz")
     logging.info("Tar will be written to %s" % output_path)
     return output_path
 
