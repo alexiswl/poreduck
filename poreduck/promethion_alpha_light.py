@@ -7,6 +7,7 @@ import os
 import sys
 from datetime import datetime
 import subprocess
+import shutil
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -81,7 +82,10 @@ def tar_up_folder(folder_path, output_path, dry_run=False):
         for fast5_file in fast5_files:
             input_file = os.path.join(folder_path, fast5_file)
             output_file = os.path.join(os.path.basename(folder_path), fast5_file)
+            # Add file to archive
             archive.add(input_file, arcname=output_file)
+            # Remove file from filesystem
+            os.remove(input_file)
         archive.close()
         end_time = datetime.now()
         diff_time = end_time - start_time
