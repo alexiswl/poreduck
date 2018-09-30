@@ -12,6 +12,8 @@ import humanfriendly
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
 
+import seaborn as sns
+
 """
 Sequencing summary file columns
 filename	read_id	run_id	channel	start_time	duration	num_events	template_start	num_events_template
@@ -129,7 +131,67 @@ def plot_yield(dataset, name, plots_dir):
 
 
 def plot_flowcell(dataset, name, plots_dir):
+    # Close any previous plots
+    plt.close('all')
+    fig, ax = plt.subplots()
 
+    fig.set_size_inches(15, 7)
+    # Use the formatter we used for the yield plots.
+    formatter_y = FuncFormatter(y_yield_to_human_readable)
+
+    # Create the values that make up the numbers on the far-right column of the grid.
+    c_w = 10
+    c_l = 25
+    c_num = 12
+
+    # Create the array
+    channels_by_order_array = np.array([[c_no * c_w * c_l + c_w * l_no + w_no + 1
+                                         for c_no in np.arange(c_num)
+                                         for w_no in np.arange(c_w)]
+                                         for l_no in np.arange(c_l)])
+
+    # Use the minknow_column_order function which reference the far-right column for a given row
+
+    # to fill in the rest of the values for each row.
+    channels_by_yield_array = np.zeros(channels_by_order_array.shape)
+
+    # Sum the values for each channel.
+    channels_by_yield_df = pd.DataFrame(dataset.groupby("channel")['channel_yield'].max())
+
+    # Reset the index and have channel as a column instead of the index.
+    channels_by_yield_df.reset_index(level=0, inplace=True)
+
+    # Iterate through each row of the yield by channel dataframe.
+    for yield_row in channels_by_yield_df.itertuples():
+        channel_index = [(ix, iy)
+                         for ix, row in enumerate(channels_by_order_array)
+                         for iy, i in enumerate(row)
+                         if int(i) == int(yield_row.channel)][0]
+
+        # Assign channel yield to position in MinKNOW
+        channels_by_yield_array[channel_index] = yield_row.seq_length
+
+    channels_by_yield_array = {}
+
+    sns.heatmap(channels_by_yield_array,
+                # Remove labels from side, they're not useful in this context.
+                xticklabels=False,
+                yticklabels=False,
+                ax=ax,
+                # Prevent extreme values from over-scaling the sidebar.
+                robust=True,
+                # Use the greens scale but in reverse, similar to MinKNOW.
+                cmap="Greens_r",
+                # Format keyword args for the side bar.
+                cbar_kws={"format": formatter_y,
+                          "label": "Bases per channel"})
+    # Create three lines down the middle as shown in PromethION MinKNOW.
+    [ax.axvline([x], color='white', lw=5) for x in [30, 60, 90]]
+    # Nice big title!
+    ax.set_title("Map of Yield by Channel", fontsize=25)
+    # Ensure labels are not missed.
+    fig.tight_layout()
+    savefig(os.path.join(plots_dir, "%s.flowcellmap.png" % name))
 
 
 # Plot histogram
