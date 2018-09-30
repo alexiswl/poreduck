@@ -57,6 +57,9 @@ def read_datasets(sequencing_summary_files):
     # Get yield column
     dataset['yield'] = get_yield(dataset)
 
+    # Get the cumulative channel yield
+    dataset['yield_channel'] = get_channel_yield(dataset)
+
     # Get pass column
     dataset['pass'] = get_pass(dataset)
 
@@ -74,10 +77,13 @@ def merge_dataset(dataset):
     # Merge a list of datasets into a single pandas dataframe
     return pd.concat(dataset, ignore_index=True)
 
-
 def sort_dataset(dataset):
     # Sort the dataset by start_time (in seconds)
     return dataset.sort_values(['start_time'])
+
+def get_channel_yield(dataset):
+    # Get the yield per channel
+    return dataset.groupby(['channel'])['sequence_length_template'].cumsum().reset_index()
 
 
 def get_yield(dataset):
@@ -85,7 +91,6 @@ def get_yield(dataset):
     return dataset.sequence_length_template.cumsum()
 
 
-# plt.gcf().autofmt_xdate()
 def get_pass(dataset):
     # Determine if sequence passed quality
     return dataset['mean_qscore_template'].apply(lambda x: True if x > 9 else False)
@@ -121,6 +126,10 @@ def plot_yield(dataset, name, plots_dir):
     # Format nicely
     fig.tight_layout()
     savefig(os.path.join(plots_dir, "yield.png"))
+
+
+def plot_flowcell(dataset, name, plots_dir):
+
 
 
 # Plot histogram
@@ -225,6 +234,8 @@ def main():
     # Plot yields and histograms
     plot_yield(dataset, args.name, args.plots_dir)
     plot_hist(dataset, args.name, args.plots_dir)
+    plot_flowcell(dataset, args.name, args.plots_dir)
+
 
 if __name__ == "__main__":
     main()
