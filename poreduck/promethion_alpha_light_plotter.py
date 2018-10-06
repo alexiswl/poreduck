@@ -53,6 +53,9 @@ def read_datasets(sequencing_summary_files):
     # Merge the list of datasets
     dataset = merge_dataset(dataset)
 
+    # Reset the dtypes for the time columns
+    dataset = set_time_dtypes(dataset)
+
     # Sort the dataset by the template_start time
     dataset = sort_dataset(dataset)
 
@@ -77,11 +80,23 @@ def read_datasets(sequencing_summary_files):
 
 def merge_dataset(dataset):
     # Merge a list of datasets into a single pandas dataframe
-    return pd.concat(dataset, ignore_index=True)
+    return pd.concat(dataset, sort=True, ignore_index=True)
+
+def set_time_dtypes(dataset):
+
+    # Return the time datasets as appropriate
+    dataset.rename(columns={"start_time": "start_time_float",
+                            "template_start": "template_time_float"}, inplace=True)
+
+    # Add start_time_float template_time_float
+    dataset['start_time_timedelta'] = pd.to_timedelta(dataset['start_time_float'], unit='s')
+    dataset['template_start_time_timedelta'] = pd.to_timedelta(dataset['template_time_float'], unit='s')
+
+    return dataset
 
 def sort_dataset(dataset):
     # Sort the dataset by start_time (in seconds)
-    return dataset.sort_values(['start_time'])
+    return dataset.sort_values(['start_time_timedelta'])
 
 def get_channel_yield(dataset):
     # Get the yield per channel
