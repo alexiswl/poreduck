@@ -88,7 +88,7 @@ def get_sequencing_summary_output_path(sequencing_summary_path, output_name):
     return output_path
 
 
-def move_sequencing_summary_file(summary_path, output_path, overwrite=False, dry_run=False, inplace=False):
+def move_sequencing_summary_file(summary_path, output_path, overwrite=False, inplace=False, dry_run=False):
     # Move to the sequencing_summary file to new output path
     if not dry_run:
         if os.path.isfile(output_path) and not overwrite:
@@ -207,9 +207,8 @@ def main():
     output_sequencing_summary_path = get_sequencing_summary_output_path(args.fastq_path, output_name)
 
     # Create folders for fastq and sequencing summary files if necessary
-    fastq_dir = os.path.join(os.path.dirname(os.path.normpath(output_fastq_path)), "fastq")
-    sequencing_summary_dir = os.path.join(os.path.dirname(os.path.normpath(output_sequencing_summary_path)),
-                                          "sequencing_summary")
+    fastq_dir = os.path.join(os.path.dirname(os.path.normpath(output_fastq_path)))
+    sequencing_summary_dir = os.path.join(os.path.dirname(os.path.normpath(output_sequencing_summary_path))) 
 
     # Create fastq directory
     if not os.path.isdir(fastq_dir):
@@ -221,13 +220,13 @@ def main():
 
     # Tar up folder
     tar_up_folder(args.fast5_path, output_fast5_path,
-                  args.overwrite, args.inplace, args.dry_run)
+                  overwrite=args.overwrite, inplace=args.inplace, dry_run=args.dry_run)
     # Move fastq folder
     zip_and_move_fastq_file(args.fastq_path, output_fastq_path,
-                            args.overwrite, args.inplace, args.dry_run)
+                            overwrite=args.overwrite, inplace=args.inplace, dry_run=args.dry_run)
     # Move sequencing summary file
     move_sequencing_summary_file(args.sequencing_summary_path, output_sequencing_summary_path,
-                                 args.overwrite, args.inplace, args.dry_run)
+                                 overwrite=args.overwrite, inplace=args.inplace, dry_run=args.dry_run)
 
     # Get md5 for fastq and fast5
     if not args.dry_run:
