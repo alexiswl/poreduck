@@ -17,9 +17,9 @@ logger.setLevel(logging.DEBUG)
 """
 Usage: Given a folder of fast5 data create a new folder matching the zero filled filename of that folder.
 Also use the nomenclature 
-Fast5: reads/0000_<FlowcellID>_RNUMBER.fast5.tar.gz
-Fastq: fastq/0000_<FlowcellID>_RNUMBER.fastq.gz
-Sequencing_summary: sequencing_summary/0000_<FlowcellID>_RNUMBER.sequencing_summary.txt
+Fast5: from reads/0/ to reads/00000_<FlowcellID>_RNUMBER.fast5.tar.gz
+Fastq: from fastq_0.fastq to fastq/00000_<FlowcellID>_RNUMBER.fastq.gz
+Sequencing_summary: sequencing_summary_0.txt to sequencing_summary/00000_<FlowcellID>_RNUMBER.sequencing_summary.txt
 """
 
 
@@ -54,7 +54,7 @@ def get_args():
 def get_output_name(args):
     # Return the appropriate name for the tar folder
     folder_basename = os.path.basename(os.path.normpath(args.fast5_path))
-    output_name = [folder_basename.zfill(4)]
+    output_name = [folder_basename.zfill(5)]
     if args.flowcellID:
         output_name.append(args.flowcellID)
     if args.rnumber:
