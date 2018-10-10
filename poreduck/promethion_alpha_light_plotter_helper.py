@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use('agg')
-
+from scipy import stats
 import matplotlib.pyplot as plt
 import humanfriendly
 from matplotlib.ticker import FuncFormatter
 from matplotlib.pylab import savefig
+from datetime import timedelta
 
 import seaborn as sns
 
@@ -22,17 +23,17 @@ def plot_yield(dataset, name, plots_dir):
     plt.close('all')
     fig, ax = plt.subplots(1)
     # Plot setting start_time_float as axis index
-    dataset.set_index("start_time_float")["yield"].plot(ax=ax)
+    dataset.set_index("start_time_float_by_sample")["yield"].plot(ax=ax)
     # Set x and y ticks
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
     # Set x and y labels
-    ax.set_title("Read Distribution Graph for %s" % name)
+    ax.set_title("Yield over time for for %s" % name)
     ax.set_xlabel("Time in (HH:MM)")
     ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, "%s_yield.png" % name))
+    savefig(os.path.join(plots_dir, "%s.yield.png" % name))
 
 
 def plot_flowcell(dataset, name, plots_dir):
@@ -118,7 +119,7 @@ def plot_hist(dataset, name, plots_dir):
     bin_width = bins[1] - bins[0]
 
     # Plot weighted histogram
-    trimmed.plot(kind="hist", ax=ax, normed=1, bins=bins, alpha=0.6, weights=trimmed)
+    trimmed.plot(kind="hist", ax=ax, density=1, bins=bins, alpha=0.6, weights=trimmed)
 
     # Set the axis formatters
     def y_hist_to_human_readable_seq(y, position):
@@ -195,7 +196,15 @@ def plot_events_ratio(dataset, name, plots_dir):
     max_ratio = dataset['events_ratio'].quantile(max_quantile)
     trimmed = dataset.query("events_ratio < %s" % max_ratio)
  
-    g = sns.lmplot(x='start_time_float', y='events_ratio', hue='pass', col='pass', markers=None, data=trimmed)
+    g = sns.lmplot(x='start_time_float_by_sample', y='events_ratio', 
+                   hue='pass', data=trimmed,
+                   scatter_kws={"alpha": 0.1}, 
+                   legend_out=True)
+
+    # Reset legend and rename
+    leg_title = "Read Quality"
+    g.ax.legend.set_title(leg_title)
+    g.ax.legend.set_alpha(1)
 
     # Set x and y labels
     g.set_axis_labels("Time in (HH:MM)", "Events ratio")
@@ -205,8 +214,8 @@ def plot_events_ratio(dataset, name, plots_dir):
 
     # Set x and y ticks:
     for ax in g.axes[0]:
-        ax.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-        ax.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
 
     # Format nicely
     g.fig.tight_layout()
@@ -221,21 +230,19 @@ def plot_quality_per_speed(dataset, name, plots_dir):
     g = sns.jointplot(x='pore_speed', y='mean_qscore_template',
                       data=dataset, kind='hex')
 
+    # Add pearson stat
+    g.annotate(stats.personr)
+
     # Set axis labels
-    g.set_axis_labels(["Pore Speed", "Mean q-score Template"])
+    g.set_axis_labels("Pore Speed (b/s)", "Mean q-score Template")
 
     # Set title
     g.fig.suptitle("Pore Speed against q-score template")
 
-    # Set x and y ticks
-    for ax_x, ax_y in g.axes[0]:
-        ax_x.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-        ax_y.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-
     # Format nicely.
     g.fig.tight_layout()
 
-    savefig(os.path.join(plots_dir, "%s_speed_vs_qscore.png" % name))
+    savefig(os.path.join(plots_dir, "%s.speed_vs_qscore.png" % name))
     plt.close('all')
 
 
@@ -243,11 +250,15 @@ def plot_pore_speed(dataset, name, plots_dir):
     # Plot setting start_time_float as axis index
 
     # Seaborn nomenclature for lmplots are a little different
-    sns.set_style('dark')
+    sns.set_style('darkgrid')
 
     g = sns.lmplot(x='start_time_float_by_sample',
                    y='pore_speed', hue='pass', data=dataset,
-                   scatter_kws={'markers': False})
+                   scatter_kws={'alpha': 0.1},
+                   legend_out=True)
+
+    # Reset alpha on legend
+    g.ax.legend.set_alpha(1)
 
     # Set axis labels
     g.set_axis_labels("Time (HH:MM)", "Pore Speed")
@@ -255,13 +266,12 @@ def plot_pore_speed(dataset, name, plots_dir):
     # Set axis formats
     for ax in g.axes[0]:
         ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-        #ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
 
     # Set title
     g.fig.suptitle("Pore speed over time")
 
     # Save figure
-    savefig(os.path.join(plots_dir, "%s_pore_speed.png" % name))
+    savefig(os.path.join(plots_dir, "%s.pore_speed.png" % name))
     plt.close('all')
 
 
@@ -271,13 +281,21 @@ def convert_sample_time_columns(dataset):
     dataset['start_time_timedelta_by_sample'] = dataset['start_time_utc'].apply(lambda x: x - min_start_time)
 
     # Convert to float because matplotlib doesn't seem to do timedelta on the x axis well.
-    dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x.total_seconds())
+    # Need to divide by another timedelta object in order to get float
+    dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x / timedelta(seconds=1))
+
+    # Sort values to start_time_float_by_sample (to assist yield plotting)
+    dataset.sort_values(['start_time_float_by_sample'], inplace=True)
+
+    # Return
     return dataset
 
 
 def plot_data(dataset, name, plots_dir):
     # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
     dataset = convert_sample_time_columns(dataset)
+
+    dataset.to_csv("dataset_test.csv", index=False, header=True)
 
     # Plot things
     # Matplotlib base plots
