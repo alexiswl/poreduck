@@ -219,7 +219,7 @@ def plot_quality_per_speed(dataset, name, plots_dir):
 def plot_pore_speed(dataset, name, plots_dir):
     fig, ax = plt.subplots(1)
     # Plot setting start_time_float as axis index
-    dataset.set_index("start_time_float")["pore_speed"].plot(ax=ax)
+    dataset.set_index("start_time_float_by_sample")["pore_speed"].plot(ax=ax)
     # Set x and y ticks
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
@@ -233,6 +233,10 @@ def plot_pore_speed(dataset, name, plots_dir):
 
 
 def plot_data(dataset, name, plots_dir):
+    # Add in the start_time_float_by_sample
+    dataset['start_time_timedelta_by_sample'] = pd.to_timedelta(dataset['start_time'] - min(dataset['start_time']),
+                                                                unit='s')
+    dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x.total_seconds())
     plot_yield(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
     plot_flowcell(dataset, name, plots_dir)

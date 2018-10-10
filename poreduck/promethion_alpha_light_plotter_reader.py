@@ -1,28 +1,92 @@
 import os
 import pandas as pd
+import gzip
+from Bio import SeqIO
 
-
-def get_summary_files(summary_dir):
+def get_summary_files(summary_dirs):
     summary_files = [os.path.join(summary_dir, summary_file)
+                     for summary_dir in summary_dirs
                      for summary_file in os.listdir(summary_dir)
                      if summary_file.endswith(".txt")
-                     and summary_file.startswith("sequencing")]
+                     and "sequencing_summary" in summary_file]
+
     return summary_files
 
 
-def read_datasets(sequencing_summary_files):
+def get_fastq_files(fastq_dirs):
+    fastq_files = [os.path.join(fastq_dir, fastq)
+                   for fastq_dir in fastq_dirs
+                   for fastq in os.listdir(fastq_dir)
+                   if fastq.endswith(".txt")
+                   and "sequencing_summary" in fastq]
+
+    return fastq_files
+
+
+def get_series_from_seq(record):
+    """Takes in a seq record and returns dataframe with index"""
+    # Series index
+    index = ["read_id", "run_id", "sample_id", "read", "channel", "start_time"]
+    # Get metadata
+    fastq_id = record.id.split()[0].lstrip("@")
+    row_as_dict = dict(x.split("=") for x in record.description.split()[1:])
+
+    return pd.Series([fastq_id, row_as_dict['runid'],
+                      row_as_dict['sampleid'], row_as_dict['read'],
+                      row_as_dict['ch'], row_as_dict['start_time']],
+                     index=index)
+
+
+def get_fastq_dataframe(fastq_file, is_gzipped=True):
+    """Use get_series_from_seq in list comprehension to generate dataframe then transpose"""
+    # Open fastq file and return list comprehension
+    # PD concat merges series as columns, we then transpose.
+    try:
+        if not is_gzipped:
+            with open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     sort=True,
+                                     axis='columns').transpose()
+        else:
+            with gzip.open(fastq_file, "rt") as handle:
+                fastq_df = pd.concat([get_series_from_seq(record)
+                                      for record in SeqIO.parse(handle, "fastq")],
+                                     sort=True,
+                                     axis='columns').transpose()
+        # Specify types for each line
+        numeric_cols = ["Read", "Channel"]
+        fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric, axis='columns')
+        # Convert StartTime to date
+        fastq_df['StartTime'] = pd.to_datetime(fastq_df['StartTime'])
+        return fastq_df
+    except ValueError:
+        print("Value error when generating dataframe for %s. Unknown cause of issue." % fastq_file)
+        return pd.DataFrame(columns=["read_id", "run_id", "sample_id", "read", "channel", "start_time"])
+
+
+def read_fastq_datasets(fastq_files):
+    # Read in each of the fastq files and retrieve header info
+    dataset = pd.concat([get_fastq_dataframe(fastq_file, is_gzipped=True)
+                         for fastq_file in fastq_files],
+                        sort=True, ignore_index=True)
+    # Return dataset
+    return dataset
+
+
+def read_summary_datasets(sequencing_summary_files):
     # Read in each of the csv files.
     dataset = [pd.read_csv(sequencing_summary_file, sep="\t", header=0)
-                for sequencing_summary_file in sequencing_summary_files]
+               for sequencing_summary_file in sequencing_summary_files]
 
     # Merge the list of datasets
-    dataset = merge_dataset(dataset)
+    dataset = merge_summary_dataset(dataset)
 
     # Reset the dtypes for the time columns
-    dataset = set_time_dtypes(dataset)
+    dataset = set_summary_time_dtypes(dataset)
 
     # Sort the dataset by the template_start time
-    dataset = sort_dataset(dataset)
+    dataset = sort_summary_dataset(dataset)
 
     # Get yield column
     dataset['yield'] = get_yield(dataset)
@@ -43,13 +107,18 @@ def read_datasets(sequencing_summary_files):
     return dataset
 
 
-def merge_dataset(dataset):
+def merge_summary_dataset(dataset):
+    """
+    :rtype: pd.DataFrame
+    """
     # Merge a list of datasets into a single pandas dataframe
     return pd.concat(dataset, sort=True, ignore_index=True)
 
 
-def set_time_dtypes(dataset):
-
+def set_summary_time_dtypes(dataset):
+    """
+    :rtype: pd.DataFrame
+    """
     # Return the time datasets as appropriate
     dataset.rename(columns={"start_time": "start_time_float",
                             "template_start": "template_time_float"}, inplace=True)
@@ -61,7 +130,10 @@ def set_time_dtypes(dataset):
     return dataset
 
 
-def sort_dataset(dataset):
+def sort_summary_dataset(dataset):
+    """
+    :rtype: pd.DataFrame
+    """
     # Sort the dataset by start_time (in seconds)
     return dataset.sort_values(['start_time_timedelta'])
 
@@ -72,7 +144,7 @@ def get_channel_yield(dataset):
 
 
 def get_yield(dataset):
-    # Get the yield datset
+    # Get the yield dataset
     return dataset.sequence_length_template.cumsum()
 
 
@@ -83,7 +155,7 @@ def get_pass(dataset):
 
 def get_duration_ratio(dataset):
     # Return the length in bases over time in seconds.
-    return dataset.apply(lambda x: x.sequence_length_template/x.template_duration, axis='columns')
+    return dataset.apply(lambda x: x.sequence_length_template / x.template_duration, axis='columns')
 
 
 def get_events_ratio(dataset):
