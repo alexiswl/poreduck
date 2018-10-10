@@ -64,7 +64,7 @@ def plot_flowcell(dataset, name, plots_dir):
     channels_by_yield_df = pd.DataFrame(dataset.groupby("channel")['channel_yield'].max())
 
     # Reset the index and have channel as a column instead of the index.
-    channels_by_yield_df.reset_index(level=0, inplace=True)
+    channels_by_yield_df.reset_index(level='channel', inplace=True) 
 
     # Iterate through each row of the yield by channel dataframe.
     for yield_row in channels_by_yield_df.itertuples():
@@ -74,9 +74,9 @@ def plot_flowcell(dataset, name, plots_dir):
                          if int(i) == int(yield_row.channel)][0]
 
         # Assign channel yield to position in MinKNOW
-        channels_by_yield_array[channel_index] = yield_row.seq_length
+        channels_by_yield_array[channel_index] = yield_row.channel_yield
 
-    channels_by_yield_array = {}
+    #channels_by_yield_array = {}
 
     sns.heatmap(channels_by_yield_array,
                 # Remove labels from side, they're not useful in this context.
@@ -185,16 +185,25 @@ def x_hist_to_human_readable(x, position):
 
 
 def plot_events_ratio(dataset, name, plots_dir):
+    # Open up the plot set
+    plt.close('all')
     fig, ax = plt.subplots(1)
+
     # Plot setting start_time_float as axis index
-    dataset.set_index("start_time_float")["events_ratio"].plot(ax=ax)
+    max_quantile = 0.99
+
+    # Trim the events ratio 
+    max_ratio = dataset['events_ratio'].quantile(max_quantile)
+    trimmed = dataset.query("events_ratio < %s" % max_ratio)
+ 
+    ax = sns.lmplot(x='start_time_float', y='events_ratio', hue='pass', col='pass', markers=None, data=trimmed)
     # Set x and y ticks
-    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+    #ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    #ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
     # Set x and y labels
-    ax.set_title("Events Ratio Graph for %s" % name)
-    ax.set_xlabel("Time in (HH:MM)")
-    ax.set_ylabel("Cumulative Yield")
+    fig.suptitle("Events Ratio Graph for %s" % name)
+    #ax.set_xlabel("Time in (HH:MM)")
+    #ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
     savefig(os.path.join(plots_dir, name + "_events_ratio.png"))
@@ -202,38 +211,51 @@ def plot_events_ratio(dataset, name, plots_dir):
 
 def plot_quality_per_speed(dataset, name, plots_dir):
     # Plot the average quality against the events ratio
+    plt.close('all')
     fig, ax = plt.subplots(1)
+    fig.suptitle("Map of the Quality over DNA speed")
 
     x = dataset['pore_speed']
     y = dataset['mean_qscore_template']
 
-    sns.jointplot(x, y, kind="hex", ax=ax)
+    ax = sns.jointplot(x, y, kind="hex")
+    # Set labels through seaborn method
+    ax.set_axis_labels("Pore Speed (ms)", "Avg. QScore")
 
-    ax.set_title("Map of the Quality over DNA speed")
     fig.tight_layout()
 
     savefig(os.path.join(plots_dir, name + "_speed_vs_qscore.png"))
 
 
 def plot_pore_speed(dataset, name, plots_dir):
-    fig, ax = plt.subplots(1)
+    fig, ax_r = plt.subplots(1)
+    fig.suptitle("Pore speed over time")
     # Plot setting start_time_float as axis index
-    dataset.set_index("start_time_float")["pore_speed"].plot(ax=ax)
+    x = dataset['start_time_float']
+    y = dataset['pore_speed']
+    passed = dataset['pass']
+
+    ax = sns.lmplot(x='start_time_float', y='pore_speed', hue='pass', col='pass', data=dataset, markers=None)
+
     # Set x and y ticks
-    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-    # Set x and y labels
-    ax.set_title("Pore speed over time for %s" % name)
-    ax.set_xlabel("Time in (HH:MM)")
-    ax.set_ylabel("Cumulative Yield")
+    ax_r.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax_r.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+
+    # print(channels_by_yield_df)Set x and y labels
+    #ax.set_title("Pore speed over time for %s" % name)
+    for ax_item in ax.axes.flatten():
+        ax_item.set_xlabel("Time in (HH:MM)")
+        ax_item.set_ylabel("Pore speed")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, "events_ratio.png"))
+    savefig(os.path.join(plots_dir, '_'.join([name, "pore_speed_over_time.png"])))
 
 
 def plot_data(dataset, name, plots_dir):
     plot_yield(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
     plot_flowcell(dataset, name, plots_dir)
-    plot_quality_per_speed(dataset, name, plots_dir)
     plot_pore_speed(dataset, name, plots_dir)
+    plot_quality_per_speed(dataset, name, plots_dir)
+    plot_events_ratio(dataset, name, plots_dir)
+
