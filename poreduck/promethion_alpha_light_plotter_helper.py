@@ -201,16 +201,17 @@ def plot_events_ratio(dataset, name, plots_dir):
 
 
 def plot_quality_per_speed(dataset, name, plots_dir):
-    # Plot the average quality against the events ratio
-    fig, ax = plt.subplots(1)
 
-    x = dataset['pore_speed']
-    y = dataset['mean_qscore_template']
+    # Seaborn nomenclature for joint plots are a little different
+    sns.set_style("dark")
+    g = sns.jointplot(x='pore_speed', y='mean_qscore_template',
+                      data=dataset, kind='hex')
 
-    sns.jointplot(x, y, kind="hex", ax=ax)
+    g.set_axis_labels(xlabel="Pore Speed", ylabel="Mean q-score Template")
 
-    ax.set_title("Map of the Quality over DNA speed")
-    fig.tight_layout()
+    g.fig.suptitle("Pore Speed against q-score template")
+
+    g.fig.tight_layout()
 
     savefig(os.path.join(plots_dir, name + "_speed_vs_qscore.png"))
 
@@ -228,7 +229,7 @@ def plot_pore_speed(dataset, name, plots_dir):
     ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, "events_ratio.png"))
+    savefig(os.path.join(plots_dir, name + "_events_ratio.png"))
 
 
 def plot_data(dataset, name, plots_dir):
