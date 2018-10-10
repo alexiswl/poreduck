@@ -232,11 +232,18 @@ def plot_pore_speed(dataset, name, plots_dir):
     savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
 
 
-def plot_data(dataset, name, plots_dir):
-    # Add in the start_time_float_by_sample
+def convert_sample_time_columns(dataset):
     dataset['start_time_timedelta_by_sample'] = pd.to_timedelta(dataset['start_time'] - min(dataset['start_time']),
                                                                 unit='s')
     dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x.total_seconds())
+    return dataset
+
+
+def plot_data(dataset, name, plots_dir):
+    # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
+    dataset = convert_sample_time_columns(dataset)
+
+    # Plot the rest of the yields
     plot_yield(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
     plot_flowcell(dataset, name, plots_dir)
