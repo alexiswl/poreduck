@@ -266,9 +266,11 @@ def plot_pore_speed(dataset, name, plots_dir):
 
 
 def convert_sample_time_columns(dataset):
-    dataset['start_time_timedelta_by_sample'] = pd.to_timedelta(dataset['start_time_timedelta'] -
-                                                                min(dataset['start_time_timedelta']),
-                                                                unit='s')
+    # Use the utc in the fastq file to work around restarts
+    min_start_time = dataset['start_time_utc'].min()
+    dataset['start_time_timedelta_by_sample'] = dataset['start_time_utc'].apply(lambda x: x - min_start_time)
+
+    # Convert to float because matplotlib doesn't seem to do timedelta on the x axis well.
     dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x.total_seconds())
     return dataset
 
@@ -277,8 +279,7 @@ def plot_data(dataset, name, plots_dir):
     # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
     dataset = convert_sample_time_columns(dataset)
 
-    # Plot the rest of the yields
-
+    # Plot things
     # Matplotlib base plots
     plot_yield(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
