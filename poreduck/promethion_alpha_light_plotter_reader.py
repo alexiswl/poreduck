@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import gzip
 from Bio import SeqIO
 
@@ -92,7 +93,8 @@ def read_summary_datasets(sequencing_summary_files):
     dataset['yield'] = get_yield(dataset)
 
     # Get the cumulative channel yield
-    dataset['yield_channel'] = get_channel_yield(dataset)
+    #print(dataset)
+    dataset['channel_yield'] = get_channel_yield(dataset)
 
     # Get pass column
     dataset['pass'] = get_pass(dataset)
@@ -139,13 +141,13 @@ def sort_summary_dataset(dataset):
 
 
 def get_channel_yield(dataset):
-    # Get the yield per channel
-    return dataset.groupby(['channel'])['sequence_length_template'].cumsum().reset_index()
+    # Get the yield per channel 
+    return dataset.groupby(['channel'])['sequence_length_template'].cumsum()
 
 
 def get_yield(dataset):
-    # Get the yield dataset
-    return dataset.sequence_length_template.cumsum()
+    # Get the yield datset
+    return dataset['sequence_length_template'].cumsum()
 
 
 def get_pass(dataset):
@@ -155,9 +157,9 @@ def get_pass(dataset):
 
 def get_duration_ratio(dataset):
     # Return the length in bases over time in seconds.
-    return dataset.apply(lambda x: x.sequence_length_template / x.template_duration, axis='columns')
+    return dataset.apply(lambda x: np.nan if x.template_duration == 0 else x.sequence_length_template/x.template_duration, axis='columns')
 
 
 def get_events_ratio(dataset):
     # Return the events-per-base ratio
-    return dataset.apply(lambda x: x.num_events / x.sequence_length_template, axis='columns')
+    return dataset.apply(lambda x: np.nan if x.sequence_length_template == 0 else x.num_events / x.sequence_length_template, axis='columns')
