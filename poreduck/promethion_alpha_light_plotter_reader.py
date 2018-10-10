@@ -93,7 +93,6 @@ def read_summary_datasets(sequencing_summary_files):
     dataset['yield'] = get_yield(dataset)
 
     # Get the cumulative channel yield
-    #print(dataset)
     dataset['channel_yield'] = get_channel_yield(dataset)
 
     # Get pass column

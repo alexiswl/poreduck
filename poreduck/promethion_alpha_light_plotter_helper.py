@@ -196,20 +196,21 @@ def plot_events_ratio(dataset, name, plots_dir):
     trimmed = dataset.query("events_ratio < %s" % max_ratio)
  
     g = sns.lmplot(x='start_time_float', y='events_ratio', hue='pass', col='pass', markers=None, data=trimmed)
-    
+
     # Set x and y labels
-    g.set_axis_labels(["Time in (HH:MM)", "Events ratio"])
+    g.set_axis_labels("Time in (HH:MM)", "Events ratio")
 
     # Set title
     g.fig.suptitle("Events Ratio Graph for %s" % name)
 
     # Set x and y ticks:
-    for ax_x, ax_y in g.axes[0]:
-        ax_x.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-        ax_y.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    for ax in g.axes[0]:
+        ax.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
 
     # Format nicely
-    fig.tight_layout()
+    g.fig.tight_layout()
+
     savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
 
 
@@ -243,27 +244,30 @@ def plot_pore_speed(dataset, name, plots_dir):
 
     # Seaborn nomenclature for lmplots are a little different
     sns.set_style('dark')
-    sns.set_style('ticks', {'xtick.major.formatter': FuncFormatter(x_yield_to_human_readable),
-                            'ytick.major.formatter': FuncFormatter(y_yield_to_human_readable)})
 
-    g = sns.lmplot(x='start_time_float_by_sample', y='pore_speed', hue='pass', markers=None, data=dataset)
+    g = sns.lmplot(x='start_time_float_by_sample',
+                   y='pore_speed', hue='pass', data=dataset,
+                   scatter_kws={'markers': False})
 
     # Set axis labels
-    g.set_axis_labels(["Time (HH:MM)", "Pore Speed"])
+    g.set_axis_labels("Time (HH:MM)", "Pore Speed")
+
+    # Set axis formats
+    for ax in g.axes[0]:
+        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        #ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
 
     # Set title
     g.fig.suptitle("Pore speed over time")
 
-    # Format nicely
-    g.fig.tight_layout()
-
     # Save figure
-    savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
+    savefig(os.path.join(plots_dir, "%s_pore_speed.png" % name))
     plt.close('all')
 
 
 def convert_sample_time_columns(dataset):
-    dataset['start_time_timedelta_by_sample'] = pd.to_timedelta(dataset['start_time'] - min(dataset['start_time']),
+    dataset['start_time_timedelta_by_sample'] = pd.to_timedelta(dataset['start_time_timedelta'] -
+                                                                min(dataset['start_time_timedelta']),
                                                                 unit='s')
     dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x.total_seconds())
     return dataset

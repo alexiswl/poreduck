@@ -48,9 +48,14 @@ def run_process(config_data):
 
 
 def main():
+
+    # Get args
     args = get_args()
+
+    # Read in pandas dataframe
     dataframe = pd.DataFrame(read_config(args.config))
 
+    # Iterate through each row of the configuration file.
     for row in dataframe.itertuples():
         run_process(row)
 
