@@ -32,7 +32,7 @@ def plot_yield(dataset, name, plots_dir):
     ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, "yield.png"))
+    savefig(os.path.join(plots_dir, "%s_yield.png" % name))
 
 
 def plot_flowcell(dataset, name, plots_dir):
@@ -139,7 +139,7 @@ def plot_hist(dataset, name, plots_dir):
 
     # Ensure labels are not missed.
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, "hist.png"))
+    savefig(os.path.join(plots_dir, "%s.hist.png" % name))
 
 
 def reformat_human_friendly(s):
@@ -197,7 +197,7 @@ def plot_events_ratio(dataset, name, plots_dir):
     ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, name + "_events_ratio.png"))
+    savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
 
 
 def plot_quality_per_speed(dataset, name, plots_dir):
@@ -213,7 +213,7 @@ def plot_quality_per_speed(dataset, name, plots_dir):
 
     g.fig.tight_layout()
 
-    savefig(os.path.join(plots_dir, name + "_speed_vs_qscore.png"))
+    savefig(os.path.join(plots_dir, "%s_speed_vs_qscore.png" % name))
 
 
 def plot_pore_speed(dataset, name, plots_dir):
@@ -229,7 +229,7 @@ def plot_pore_speed(dataset, name, plots_dir):
     ax.set_ylabel("Cumulative Yield")
     # Format nicely
     fig.tight_layout()
-    savefig(os.path.join(plots_dir, name + "_events_ratio.png"))
+    savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
 
 
 def plot_data(dataset, name, plots_dir):
