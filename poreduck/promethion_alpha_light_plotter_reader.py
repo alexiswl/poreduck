@@ -18,8 +18,8 @@ def get_fastq_files(fastq_dirs):
     fastq_files = [os.path.join(fastq_dir, fastq)
                    for fastq_dir in fastq_dirs
                    for fastq in os.listdir(fastq_dir)
-                   if fastq.endswith(".txt")
-                   and "sequencing_summary" in fastq]
+                   if fastq.endswith(".fastq.gz")
+                  ]
 
     return fastq_files
 
@@ -56,10 +56,10 @@ def get_fastq_dataframe(fastq_file, is_gzipped=True):
                                      sort=True,
                                      axis='columns').transpose()
         # Specify types for each line
-        numeric_cols = ["Read", "Channel"]
+        numeric_cols = ["read", "channel"]
         fastq_df[numeric_cols] = fastq_df[numeric_cols].apply(pd.to_numeric, axis='columns')
         # Convert StartTime to date
-        fastq_df['StartTime'] = pd.to_datetime(fastq_df['StartTime'])
+        fastq_df['start_time'] = pd.to_datetime(fastq_df['start_time']) 
         return fastq_df
     except ValueError:
         print("Value error when generating dataframe for %s. Unknown cause of issue." % fastq_file)
