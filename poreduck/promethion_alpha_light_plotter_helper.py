@@ -185,9 +185,8 @@ def x_hist_to_human_readable(x, position):
 
 
 def plot_events_ratio(dataset, name, plots_dir):
-    # Open up the plot set
-    plt.close('all')
-    fig, ax = plt.subplots(1)
+
+    # Seaborn nomenclature for reg/lm plots are a little different 
 
     # Plot setting start_time_float as axis index
     max_quantile = 0.99
@@ -196,14 +195,19 @@ def plot_events_ratio(dataset, name, plots_dir):
     max_ratio = dataset['events_ratio'].quantile(max_quantile)
     trimmed = dataset.query("events_ratio < %s" % max_ratio)
  
-    ax = sns.lmplot(x='start_time_float', y='events_ratio', hue='pass', col='pass', markers=None, data=trimmed)
-    # Set x and y ticks
-    #ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-    #ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+    g = sns.lmplot(x='start_time_float', y='events_ratio', hue='pass', col='pass', markers=None, data=trimmed)
+    
     # Set x and y labels
-    fig.suptitle("Events Ratio Graph for %s" % name)
-    #ax.set_xlabel("Time in (HH:MM)")
-    #ax.set_ylabel("Cumulative Yield")
+    g.set_axis_labels(["Time in (HH:MM)", "Events ratio"])
+
+    # Set title
+    g.fig.suptitle("Events Ratio Graph for %s" % name)
+
+    # Set x and y ticks:
+    for ax_x, ax_y in g.axes[0]:
+        ax_x.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax_y.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+
     # Format nicely
     fig.tight_layout()
     savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
@@ -216,32 +220,46 @@ def plot_quality_per_speed(dataset, name, plots_dir):
     g = sns.jointplot(x='pore_speed', y='mean_qscore_template',
                       data=dataset, kind='hex')
 
-    g.set_axis_labels(xlabel="Pore Speed", ylabel="Mean q-score Template")
+    # Set axis labels
+    g.set_axis_labels(["Pore Speed", "Mean q-score Template"])
 
+    # Set title
     g.fig.suptitle("Pore Speed against q-score template")
 
+    # Set x and y ticks
+    for ax_x, ax_y in g.axes[0]:
+        ax_x.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax_y.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+
+    # Format nicely.
     g.fig.tight_layout()
 
     savefig(os.path.join(plots_dir, "%s_speed_vs_qscore.png" % name))
+    plt.close('all')
 
 
 def plot_pore_speed(dataset, name, plots_dir):
-    fig, ax_r = plt.subplots(1)
-    fig.suptitle("Pore speed over time")
     # Plot setting start_time_float as axis index
-    dataset.set_index("start_time_float_by_sample")["pore_speed"].plot(ax=ax)
-    # Set x and y ticks
-    ax_r.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
-    ax_r.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
 
-    # print(channels_by_yield_df)Set x and y labels
-    #ax.set_title("Pore speed over time for %s" % name)
-    for ax_item in ax.axes.flatten():
-        ax_item.set_xlabel("Time in (HH:MM)")
-        ax_item.set_ylabel("Pore speed")
+    # Seaborn nomenclature for lmplots are a little different
+    sns.set_style('dark')
+    sns.set_style('ticks', {'xtick.major.formatter': FuncFormatter(x_yield_to_human_readable),
+                            'ytick.major.formatter': FuncFormatter(y_yield_to_human_readable)})
+
+    g = sns.lmplot(x='start_time_float_by_sample', y='pore_speed', hue='pass', markers=None, data=dataset)
+
+    # Set axis labels
+    g.set_axis_labels(["Time (HH:MM)", "Pore Speed"])
+
+    # Set title
+    g.fig.suptitle("Pore speed over time")
+
     # Format nicely
-    fig.tight_layout()
+    g.fig.tight_layout()
+
+    # Save figure
     savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
+    plt.close('all')
 
 
 def convert_sample_time_columns(dataset):
@@ -256,11 +274,14 @@ def plot_data(dataset, name, plots_dir):
     dataset = convert_sample_time_columns(dataset)
 
     # Plot the rest of the yields
+
+    # Matplotlib base plots
     plot_yield(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
+
+    # Seaborn plots
     plot_flowcell(dataset, name, plots_dir)
     plot_pore_speed(dataset, name, plots_dir)
-    plot_quality_per_speed(dataset, name, plots_dir)
-    plot_pore_speed(dataset, name, plots_dir)
+    plot_quality_per_speed(dataset, name, plots_dir) 
     plot_events_ratio(dataset, name, plots_dir)
 
