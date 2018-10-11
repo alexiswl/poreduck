@@ -20,28 +20,61 @@ def plot_yield(dataset, name, plots_dir):
     # Plot total yield for the sample
     # Yield plot
     # Set up plotting structure
-    plt.close('all')
     fig, ax = plt.subplots(1)
+
     # Plot setting start_time_float as axis index
     dataset.set_index("start_time_float_by_sample")["yield"].plot(ax=ax)
+
     # Set x and y ticks
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+
     # Set x and y labels
-    ax.set_title("Yield over time for for %s" % name)
+    ax.set_title("Yield over time for %s" % name)
     ax.set_xlabel("Time in (HH:MM)")
     ax.set_ylabel("Cumulative Yield")
+
     # Format nicely
     fig.tight_layout()
+
+    # Save and close figure
     savefig(os.path.join(plots_dir, "%s.yield.png" % name))
+    plt.close('all')
+
+
+# Plot reads
+def plot_reads(dataset, name, plots_dir):
+    """Plot an estimated yield plot and a histogram plot for each sample but by each flowcell"""
+    # Plot total number of reads for the sample
+    # Set up plotting structure
+    fig, ax = plt.subplots(1)
+
+    # Plot setting start_time_float as axis index
+    dataset.set_index("start_time_float_by_sample")["read_count"].plot(ax=ax)
+
+    # Set x and y ticks
+    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+
+    # Set x and y labels
+    ax.set_title("Read count over time for %s" % name)
+    ax.set_xlabel("Time in (HH:MM)")
+    ax.set_ylabel("Cumulative read count")
+
+    # Format nicely
+    fig.tight_layout()
+
+    # Save and close figure
+    savefig(os.path.join(plots_dir, "%s.reads.png" % name))
+    plt.close('all')
+ 
 
 
 def plot_flowcell(dataset, name, plots_dir):
-    # Close any previous plots
-    plt.close('all')
+    # Set up plots 
     fig, ax = plt.subplots()
-
     fig.set_size_inches(15, 7)
+
     # Use the formatter we used for the yield plots.
     formatter_y = FuncFormatter(y_yield_to_human_readable)
 
@@ -77,8 +110,7 @@ def plot_flowcell(dataset, name, plots_dir):
         # Assign channel yield to position in MinKNOW
         channels_by_yield_array[channel_index] = yield_row.channel_yield
 
-    #channels_by_yield_array = {}
-
+    # Plot heatmap
     sns.heatmap(channels_by_yield_array,
                 # Remove labels from side, they're not useful in this context.
                 xticklabels=False,
@@ -91,13 +123,19 @@ def plot_flowcell(dataset, name, plots_dir):
                 # Format keyword args for the side bar.
                 cbar_kws={"format": formatter_y,
                           "label": "Bases per channel"})
+    
     # Create three lines down the middle as shown in PromethION MinKNOW.
     [ax.axvline([x], color='white', lw=5) for x in [30, 60, 90]]
+    
     # Nice big title!
-    ax.set_title("Map of Yield by Channel", fontsize=25)
+    ax.set_title("Map of Yield by Channel for %s" % name, fontsize=25)
+    
     # Ensure labels are not missed.
     fig.tight_layout()
+
+    # Save and close figure
     savefig(os.path.join(plots_dir, "%s.flowcellmap.png" % name))
+    plt.close('all')
 
 
 # Plot histogram
@@ -107,7 +145,6 @@ def plot_hist(dataset, name, plots_dir):
     max_quantile = 0.999
 
     # Open up plotting frame
-    plt.close('all')
     fig, ax = plt.subplots(1)
 
     # Get linspacing of histogram
@@ -140,7 +177,10 @@ def plot_hist(dataset, name, plots_dir):
 
     # Ensure labels are not missed.
     fig.tight_layout()
+
+    # Save and close figure
     savefig(os.path.join(plots_dir, "%s.hist.png" % name))
+    plt.close('all')
 
 
 def reformat_human_friendly(s):
@@ -195,32 +235,41 @@ def plot_events_ratio(dataset, name, plots_dir):
     # Trim the events ratio 
     max_ratio = dataset['events_ratio'].quantile(max_quantile)
     trimmed = dataset.query("events_ratio < %s" % max_ratio)
- 
-    g = sns.lmplot(x='start_time_float_by_sample', y='events_ratio', 
-                   hue='pass', data=trimmed,
-                   scatter_kws={"alpha": 0.1}, 
-                   legend_out=True)
+    
+    # Set the background style for the plot
+    sns.set_style('darkgrid')
 
-    # Reset legend and rename
+    # Generate the plot 
+    g = sns.regplot(x='start_time_float_by_sample', y='events_ratio', data=trimmed,
+                    hue='qualitative_pass', hue_order=['Passed', 'Failed'],
+                    x_estimator=np.mean,
+                    legend=False)
+
+    # Create legend and rename
     leg_title = "Read Quality"
-    g.ax.legend.set_title(leg_title)
-    g.ax.legend.set_alpha(1)
+    leg = g.ax.legend(title=leg_title, framealpha=0.5)
+    for lh in leg.legendHandles:
+        lh.set_alpha(1)
 
     # Set x and y labels
-    g.set_axis_labels("Time in (HH:MM)", "Events ratio")
+    g.set_axis_labels("Time in (HH:MM)", "Events ratio (events per base)")
 
     # Set title
     g.fig.suptitle("Events Ratio Graph for %s" % name)
 
     # Set x and y ticks:
     for ax in g.axes[0]:
-        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
-        ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable)) 
 
     # Format nicely
     g.fig.tight_layout()
 
-    savefig(os.path.join(plots_dir, "%s_events_ratio.png" % name))
+    # Reduce the plot size to make way for the suptitle
+    g.fig.subplots_adjust(top=0.95)
+
+    # Save and close figure
+    savefig(os.path.join(plots_dir, "%s.events_ratio.png" % name))
+    plt.close("all")
 
 
 def plot_quality_per_speed(dataset, name, plots_dir):
@@ -231,17 +280,21 @@ def plot_quality_per_speed(dataset, name, plots_dir):
                       data=dataset, kind='hex')
 
     # Add pearson stat
-    g.annotate(stats.personr)
+    g.annotate(stats.pearsonr)
 
     # Set axis labels
     g.set_axis_labels("Pore Speed (b/s)", "Mean q-score Template")
 
     # Set title
-    g.fig.suptitle("Pore Speed against q-score template")
+    g.fig.suptitle("Pore Speed against q-score template for %s" % name)
 
     # Format nicely.
     g.fig.tight_layout()
 
+    # Reduce plot to make room for suptitle
+    g.fig.subplots_adjust(top=0.95)
+    
+    # Save and close the figure
     savefig(os.path.join(plots_dir, "%s.speed_vs_qscore.png" % name))
     plt.close('all')
 
@@ -249,16 +302,19 @@ def plot_quality_per_speed(dataset, name, plots_dir):
 def plot_pore_speed(dataset, name, plots_dir):
     # Plot setting start_time_float as axis index
 
-    # Seaborn nomenclature for lmplots are a little different
+    # Seaborn nomenclature for lmplots/regplots are a little different
     sns.set_style('darkgrid')
 
-    g = sns.lmplot(x='start_time_float_by_sample',
-                   y='pore_speed', hue='pass', data=dataset,
-                   scatter_kws={'alpha': 0.1},
-                   legend_out=True)
+    g = sns.regplot(x='start_time_float_by_sample', y='pore_speed', data=dataset,
+                    hue='qualitative_pass', hue_order=["Passed", "Failed"],
+                    x_estimator=np.mean,  
+                    legend=False)
 
-    # Reset alpha on legend
-    g.ax.legend.set_alpha(1)
+    # Create legend with new alpha
+    leg_title="Read Quality"
+    leg = g.ax.legend(title=leg_title, framealpha=0.5)    
+    for lh in leg.legendHandles:
+        lh.set_alpha(1)
 
     # Set axis labels
     g.set_axis_labels("Time (HH:MM)", "Pore Speed")
@@ -269,6 +325,9 @@ def plot_pore_speed(dataset, name, plots_dir):
 
     # Set title
     g.fig.suptitle("Pore speed over time")
+
+    # Reduce plot to make room for suptitle
+    g.fig.subplots_adjust(top=0.95)
 
     # Save figure
     savefig(os.path.join(plots_dir, "%s.pore_speed.png" % name))
@@ -287,19 +346,47 @@ def convert_sample_time_columns(dataset):
     # Sort values to start_time_float_by_sample (to assist yield plotting)
     dataset.sort_values(['start_time_float_by_sample'], inplace=True)
 
+    # Reset index values to match
+    dataset.reset_index(drop=True, inplace=True)
+
     # Return
     return dataset
+
+
+def get_channel_yield(dataset):
+    # Get the yield per channel
+    return dataset.groupby(['channel'])['sequence_length_template'].cumsum()
+
+
+def get_yield(dataset):
+    # Get the yield dataset
+    return dataset['sequence_length_template'].cumsum()
+
+
+def get_read_count(dataset):
+    # Get the read count dataset
+    return dataset.reset_index()['index']
 
 
 def plot_data(dataset, name, plots_dir):
     # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
     dataset = convert_sample_time_columns(dataset)
 
-    dataset.to_csv("dataset_test.csv", index=False, header=True)
+    # Get read_count column
+    dataset['read_count'] = get_read_count(dataset)
+
+    # Get yield column
+    dataset['yield'] = get_yield(dataset)
+
+    # Get the cumulative channel yield
+    dataset['channel_yield'] = get_channel_yield(dataset)
+
+    #dataset.to_csv("dataset_test.csv", index=False, header=True)
 
     # Plot things
     # Matplotlib base plots
     plot_yield(dataset, name, plots_dir)
+    plot_reads(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
 
     # Seaborn plots

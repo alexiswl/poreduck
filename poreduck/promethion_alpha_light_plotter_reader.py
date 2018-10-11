@@ -86,17 +86,14 @@ def read_summary_datasets(sequencing_summary_files):
     # Reset the dtypes for the time columns
     dataset = set_summary_time_dtypes(dataset)
 
-    # Sort the dataset by the template_start time
-    dataset = sort_summary_dataset(dataset)
-
-    # Get yield column
-    dataset['yield'] = get_yield(dataset)
-
     # Get the cumulative channel yield
     dataset['channel_yield'] = get_channel_yield(dataset)
 
     # Get pass column
     dataset['pass'] = get_pass(dataset)
+
+    # Get qualitative pass
+    dataset['qualitative_pass'] = get_qualitative_pass(dataset)
 
     # Get duration ratio
     dataset['pore_speed'] = get_duration_ratio(dataset)
@@ -152,6 +149,11 @@ def get_yield(dataset):
 def get_pass(dataset):
     # Determine if sequence passed quality
     return dataset['mean_qscore_template'].apply(lambda x: True if x > 9 else False)
+
+
+def get_qualitative_pass(dataset):
+    # Describe the pass (Passed / Failed)
+    return dataset['pass'].apply(lambda x: 'Passed' if x == True else "Failed")
 
 
 def get_duration_ratio(dataset):
