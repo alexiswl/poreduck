@@ -494,6 +494,66 @@ def get_read_count(dataset):
     return dataset.reset_index()['index']
 
 
+def print_stats(dataset, name, plots_dir):
+    percentiles = [0.1, 0.25, 0.5, 0.75, 0.9]
+    # Get total yield
+    total_bp = dataset['sequence_length_template'].sum()
+    total_bp_h = reformat_human_friendly(humanfriendly.format_size(total_bp, binary=False))
+    # Describe length
+    length_describe = dataset['sequence_length_template'].describe(percentiles=percentiles).to_string()
+    # Describe quality
+    qual_describe = dataset['mean_qscore_template'].describe(percentiles=percentiles).to_string()
+
+    # Reformat each of the methods such that they're rounded to two decimal places
+    length_describe = '\n'.join([qual_line.split()[0].ljust(8) + "\t" +
+                                 "{:21.2f}".format(float(qual_line.split()[1]))
+                                 for qual_line in length_describe.split("\n")])
+    qual_describe = '\n'.join([qual_line.split()[0].ljust(8) + "\t" +
+                               "{:21.2f}".format(float(qual_line.split()[1]))
+                               for qual_line in qual_describe.split("\n")])
+
+    # Calculate the N50:
+    nx = []
+    seq_length_sorted_as_series = dataset['sequence_length_template'].sort_values().reset_index(drop=True)
+    seq_length_cumsum_as_series = seq_length_sorted_as_series.cumsum()
+    for index, seq_value in seq_length_sorted_as_series.iteritems():
+        if (seq_length_cumsum_as_series[index] <= total_bp * percentiles[len(nx)] <=
+                seq_length_cumsum_as_series[index + 1]):
+            nx.append(seq_value)
+        if len(nx) == len(percentiles):
+            # Found all the percentiles, no need to continue.
+            break
+    nx_h = [reformat_human_friendly(humanfriendly.format_size(n_x_value, binary=False))
+            for n_x_value in nx]
+
+    # Get run duration, from first read to last read.
+    duration = dataset["start_time_float_by_sample"].max()  # In seconds
+    hours, remainder = divmod(duration, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    run_duration_h = f"{hours} hours, {minutes} minutes, {seconds:2,.0f} seconds"
+
+    # Print these stats
+    sample_name = dataset["sample_id"].unique().item()
+    with open(os.path.join(plots_dir, "%s.stats.txt" % name, 'a')) as output_handle:
+        # Print total basepairs
+        output_handle.write("# Stats for sample '%s' #\n" % sample_name)
+        output_handle.write("Total basepairs:\n")
+        output_handle.write(f"\t{total_bp:16,.0f}\t|\t{total_bp_h.rjust(9)}\n")
+        output_handle.write("Description of Read Lengths:\n")
+        # Tab indent each of the descriptor lines
+        output_handle.writelines(f"\t{len_line}\n"
+                                 for len_line in length_describe.split("\n"))
+        output_handle.write("Description of Read Qualities:\n")
+        # Tab indent each of the descriptor lines
+        output_handle.writelines(f"\t{qual_line}\n"
+                                 for qual_line in qual_describe.split("\n"))
+        output_handle.write("NX values:\n")
+        output_handle.writelines(f"\tN{100*percentile:02.0f}:\t{nx_value:8,.0f}\t|\t{nx_h_value.rjust(9)}\n"
+                                 for percentile, nx_value, nx_h_value in zip(percentiles, nx, nx_h))
+        output_handle.write(f"\t{duration:8,.1f} seconds\t|\t{run_duration_h}\n")
+
+
+
 def plot_data(dataset, name, plots_dir):
     # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
     dataset = convert_sample_time_columns(dataset)
@@ -526,3 +586,6 @@ def plot_data(dataset, name, plots_dir):
 
     # Final distplot
     plot_pair_plot(dataset, name, plots_dir)
+
+    # Print out stats
+    print_stats(dataset, name, plots_dir)
