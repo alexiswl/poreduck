@@ -202,6 +202,7 @@ def y_yield_to_human_readable(y, position):
     # Convert distribution to base pairs
     if y == 0:
         return 0
+    y = round(y, 3)
     s = humanfriendly.format_size(y, binary=False)
     return reformat_human_friendly(s)
 
@@ -210,6 +211,7 @@ def y_count_to_human_readable(y, position):
     # Use the same as y yield but strip off the last 'b'
     if y == 0:
         return 0
+    y = round(y, 3)
     s = humanfriendly.format_size(y, binary=False)
     s = reformat_human_friendly(s).rstrip('b')
     return s
@@ -259,6 +261,9 @@ def plot_events_ratio(dataset, name, plots_dir):
     leg = g.ax.legend(title=leg_title, framealpha=0.5)
     for lh in leg.legendHandles:
         lh.set_alpha(1)
+
+    # Zero base y-axis
+    g.set(ylim=(0, None))
 
     # Set x and y labels
     g.set_axis_labels("Time in (HH:MM)", "Events ratio (events / base)")
@@ -325,6 +330,9 @@ def plot_pore_speed(dataset, name, plots_dir):
     leg = g.ax.legend(title=leg_title, framealpha=0.5)    
     for lh in leg.legendHandles:
         lh.set_alpha(1)
+
+    # Zero base y-axis
+    g.set(ylim=(0, None))
 
     # Set axis labels
     g.set_axis_labels("Time (HH:MM)", "Pore Speed (bases / second)")
