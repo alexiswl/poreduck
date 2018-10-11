@@ -38,9 +38,9 @@ def run_process(config_data):
                               capture_output=True)
 
     if tar_proc.returncode == 0:
-        logging.warning("Process completed successfully")
-        logging.warning("Stdout = %s" % tar_proc.stdout.decode())
-        logging.warning("Stderr = %s" % tar_proc.stderr.decode())
+        logging.info("Process completed successfully")
+        logging.info("Stdout = %s" % tar_proc.stdout.decode())
+        logging.info("Stderr = %s" % tar_proc.stderr.decode())
     else:
         logging.warning("Process returned non-zero exit code.")
         logging.warning("Stdout = %s" % tar_proc.stdout.decode())
