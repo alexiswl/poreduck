@@ -56,7 +56,8 @@ def plot_yield_by_quality(dataset, name, plots_dir):
             dataset.set_index("start_time_float_by_sample")["yield"].plot(ax=ax, color=col)
         # Plot the yield per quality
         else:
-            dataset.set_index("start_time_float_by_sample").query("qualitative_pass == '%s' % quality")['quality_yield'].plot(ax=ax, color=col)
+            query = "qualitative_pass == '%s'" % quality
+            dataset.set_index("start_time_float_by_sample").query(query)['quality_yield'].plot(ax=ax, color=col)
 
     # Set x and y ticks
     ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
@@ -76,7 +77,6 @@ def plot_yield_by_quality(dataset, name, plots_dir):
     # Save and close figure
     savefig(os.path.join(plots_dir, "%s.quality.yield.png" % name))
     plt.close('all')
-    
 
 
 # Plot reads
@@ -105,7 +105,6 @@ def plot_reads(dataset, name, plots_dir):
     savefig(os.path.join(plots_dir, "%s.reads.png" % name))
     plt.close('all')
  
-
 
 def plot_flowcell(dataset, name, plots_dir):
     # Set up plots 
@@ -381,6 +380,41 @@ def plot_quality_per_speed(dataset, name, plots_dir):
     plt.close('all')
 
 
+def plot_pair_plot(dataset, name, plots_dir):
+    # Plot everything side by side.
+    sns.set_style("darkgrid")
+
+    # Select columns to plot
+    items = ["mean_qscore_template", "pore_speed", "sequence_length_template", "events_ratio"]
+
+    # Changing the axis labels is easier done first.
+    rename_columns = {"mean_qscore_template": "Mean QScore Template",
+                      "pore_speed": "Pore Speed (b/s)",
+                      "sequence_length_template": "Read Length",
+                      "events_ratio": "Events / base"}
+
+    # Plot grid
+    g = sns.PairGrid(dataset.filter(items=items).rename(columns=rename_columns))
+
+    # KDE plots for each series against itself
+    g.map_diag(sns.kdeplot)
+
+    # Density plots against each other
+    g.map_offdiag(sns.kdeplot)
+
+    # Set title
+    g.fig.suptitle("Pair plot for %s" % name)
+
+    # Set min axis on pair grid plot
+
+    # Reduce plot to make room for suptitle
+    g.fig.subplots_adjust(top=0.95)
+
+    # Save figure
+    savefig(os.path.join(plots_dir, "%s.pore_speed.png" % name))
+    plt.close('all')
+
+
 def plot_pore_speed(dataset, name, plots_dir):
     # Plot setting start_time_float as axis index
 
@@ -393,7 +427,7 @@ def plot_pore_speed(dataset, name, plots_dir):
                    legend=False)
 
     # Create legend with new alpha
-    leg_title="Read Quality"
+    leg_title = "Read Quality"
     leg = g.ax.legend(title=leg_title, framealpha=0.5)    
     for lh in leg.legendHandles:
         lh.set_alpha(1)
@@ -427,7 +461,8 @@ def convert_sample_time_columns(dataset):
 
     # Convert to float because matplotlib doesn't seem to do timedelta on the x axis well.
     # Need to divide by another timedelta object in order to get float
-    dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x: x / timedelta(seconds=1))
+    dataset['start_time_float_by_sample'] = dataset['start_time_timedelta_by_sample'].apply(lambda x:
+                                                                                            x / timedelta(seconds=1))
 
     # Sort values to start_time_float_by_sample (to assist yield plotting)
     dataset.sort_values(['start_time_float_by_sample'], inplace=True)
@@ -451,7 +486,7 @@ def get_yield(dataset):
 
 def get_quality_yield(dataset):
     # Get the yield per quality
-    dataset.groupby(['pass'])['sequence_length_template'].cumsum()
+    return dataset.groupby(['pass'])['sequence_length_template'].cumsum()
 
 
 def get_read_count(dataset):
@@ -489,3 +524,5 @@ def plot_data(dataset, name, plots_dir):
     plot_quality_per_speed(dataset, name, plots_dir) 
     plot_events_ratio(dataset, name, plots_dir)
 
+    # Final distplot
+    plot_pair_plot(dataset, name, plots_dir)
