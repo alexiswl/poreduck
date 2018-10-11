@@ -240,10 +240,10 @@ def plot_events_ratio(dataset, name, plots_dir):
     sns.set_style('darkgrid')
 
     # Generate the plot 
-    g = sns.regplot(x='start_time_float_by_sample', y='events_ratio', data=trimmed,
-                    hue='qualitative_pass', hue_order=['Passed', 'Failed'],
-                    x_estimator=np.mean,
-                    legend=False)
+    g = sns.lmplot(x='start_time_float_by_sample', y='events_ratio', data=trimmed,
+                   hue='qualitative_pass', hue_order=['Passed', 'Failed'],
+                   x_estimator=np.mean, truncate=True, x_bins=10, scatter_kws={'alpha': 0.1}, 
+                   legend=False)
 
     # Create legend and rename
     leg_title = "Read Quality"
@@ -252,7 +252,7 @@ def plot_events_ratio(dataset, name, plots_dir):
         lh.set_alpha(1)
 
     # Set x and y labels
-    g.set_axis_labels("Time in (HH:MM)", "Events ratio (events per base)")
+    g.set_axis_labels("Time in (HH:MM)", "Events ratio (events / base)")
 
     # Set title
     g.fig.suptitle("Events Ratio Graph for %s" % name)
@@ -305,10 +305,10 @@ def plot_pore_speed(dataset, name, plots_dir):
     # Seaborn nomenclature for lmplots/regplots are a little different
     sns.set_style('darkgrid')
 
-    g = sns.regplot(x='start_time_float_by_sample', y='pore_speed', data=dataset,
-                    hue='qualitative_pass', hue_order=["Passed", "Failed"],
-                    x_estimator=np.mean,  
-                    legend=False)
+    g = sns.lmplot(x='start_time_float_by_sample', y='pore_speed', data=dataset,
+                   hue='qualitative_pass', hue_order=["Passed", "Failed"],
+                   x_estimator=np.mean, truncate=True, x_bins=10, scatter_kws={'alpha': 0.1},
+                   legend=False)
 
     # Create legend with new alpha
     leg_title="Read Quality"
@@ -317,7 +317,7 @@ def plot_pore_speed(dataset, name, plots_dir):
         lh.set_alpha(1)
 
     # Set axis labels
-    g.set_axis_labels("Time (HH:MM)", "Pore Speed")
+    g.set_axis_labels("Time (HH:MM)", "Pore Speed (bases / second)")
 
     # Set axis formats
     for ax in g.axes[0]:
