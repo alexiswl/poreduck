@@ -553,7 +553,6 @@ def print_stats(dataset, name, plots_dir):
         output_handle.write(f"\t{duration:8,.1f} seconds\t|\t{run_duration_h}\n")
 
 
-
 def plot_data(dataset, name, plots_dir):
     # Add in the start_time_float_by_sample (allows us to later iterate through plots by sample.
     dataset = convert_sample_time_columns(dataset)
