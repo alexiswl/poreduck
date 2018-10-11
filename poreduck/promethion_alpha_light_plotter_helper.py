@@ -119,7 +119,7 @@ def plot_flowcell(dataset, name, plots_dir):
                 # Prevent extreme values from over-scaling the sidebar.
                 robust=True,
                 # Use the greens scale but in reverse, similar to MinKNOW.
-                cmap="Greens_r",
+                cmap=sns.diverging_palette(255, 133, l=60, as_cmap=True),
                 # Format keyword args for the side bar.
                 cbar_kws={"format": formatter_y,
                           "label": "Bases per channel"})
@@ -263,7 +263,8 @@ def plot_events_ratio(dataset, name, plots_dir):
         lh.set_alpha(1)
 
     # Zero base y-axis
-    g.set(ylim=(0, None))
+    y_max = trimmed['events_ratio'].mean() * 2
+    g.set(ylim=(0, y_max))
 
     # Set x and y labels
     g.set_axis_labels("Time in (HH:MM)", "Events ratio (events / base)")
@@ -332,7 +333,8 @@ def plot_pore_speed(dataset, name, plots_dir):
         lh.set_alpha(1)
 
     # Zero base y-axis
-    g.set(ylim=(0, None))
+    y_max = dataset['pore_speed'].mean() * 2
+    g.set(ylim=(0, y_max))
 
     # Set axis labels
     g.set_axis_labels("Time (HH:MM)", "Pore Speed (bases / second)")
