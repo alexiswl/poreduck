@@ -181,12 +181,14 @@ def tar_up_folder(fast5_path, output_path, overwrite=False, inplace=False, dry_r
 def get_md5sum(output_path):
     logging.info("Obtaining the md5sum for %s" % output_path)
 
-    # Grab the md5sum of the file
-    md5_command = ['md5sum', output_path]
-    md5_proc = subprocess.run(md5_command, stdout=subprocess.PIPE)
+    # Grab the md5sum of the file. Use the relative path
+    output_file = os.path.basename(os.path.normpath(output_path))
+    work_dir = os.path.dirname(os.path.normpath(output_path))
+    md5_command = ['md5sum', output_file]
+    md5_proc = subprocess.run(md5_command, capture_output=True, cwd=work_dir)
     md5_output = md5_proc.stdout.decode().splitlines()[0]
     logging.info("Obtained %s as md5 for %s" % (md5_output, output_path))
-
+    
     # Return the md5 of the file for writing to a checksum file
     return md5_output
 
