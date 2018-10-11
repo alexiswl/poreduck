@@ -53,7 +53,7 @@ def plot_reads(dataset, name, plots_dir):
     dataset.set_index("start_time_float_by_sample")["read_count"].plot(ax=ax)
 
     # Set x and y ticks
-    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax.yaxis.set_major_formatter(FuncFormatter(y_count_to_human_readable))
     ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
 
     # Set x and y labels
@@ -206,6 +206,15 @@ def y_yield_to_human_readable(y, position):
     return reformat_human_friendly(s)
 
 
+def y_count_to_human_readable(y, position):
+    # Use the same as y yield but strip off the last 'b'
+    if y == 0:
+        return 0
+    s = humanfriendly.format_size(y, binary=False)
+    s = reformat_human_friendly(s).rstrip('b')
+    return s
+
+
 def x_yield_to_human_readable(x, position):
     # Convert time in seconds to hours or minutes
     hours = int(x // 3600)
@@ -259,7 +268,8 @@ def plot_events_ratio(dataset, name, plots_dir):
 
     # Set x and y ticks:
     for ax in g.axes[0]:
-        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable)) 
+        ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+        ax.yaxis.set_major_formatter(FuncFormatter(y_count_to_human_readable))
 
     # Format nicely
     g.fig.tight_layout()
