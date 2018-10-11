@@ -42,6 +42,43 @@ def plot_yield(dataset, name, plots_dir):
     plt.close('all')
 
 
+# Plot yield by quality
+def plot_yield_by_quality(dataset, name, plots_dir):
+
+    # Set up plot
+    fig, ax = plt.subplots(1)
+
+    # Iterate through quality and plot each
+    q_classes = {"All": "Blue", "Passed": "Green", "Failed": "Red"}
+    for quality, col in q_classes.items():
+        # Plot the total yield
+        if quality == 'All':
+            dataset.set_index("start_time_float_by_sample")["yield"].plot(ax=ax, color=col)
+        # Plot the yield per quality
+        else:
+            dataset.set_index("start_time_float_by_sample").query("qualitative_pass == '%s' % quality")['quality_yield'].plot(ax=ax, color=col)
+
+    # Set x and y ticks
+    ax.yaxis.set_major_formatter(FuncFormatter(y_yield_to_human_readable))
+    ax.xaxis.set_major_formatter(FuncFormatter(x_yield_to_human_readable))
+
+    # Set x and y labels
+    ax.set_title("Yield over time (by quality) for %s" % name)
+    ax.set_xlabel("Time in (HH:MM)")
+    ax.set_ylabel("Cumulative Yield")
+
+    # Configure legend
+    ax.legend(q_classes.keys())
+
+    # Format nicely
+    fig.tight_layout()
+
+    # Save and close figure
+    savefig(os.path.join(plots_dir, "%s.quality.yield.png" % name))
+    plt.close('all')
+    
+
+
 # Plot reads
 def plot_reads(dataset, name, plots_dir):
     """Plot an estimated yield plot and a histogram plot for each sample but by each flowcell"""
@@ -119,7 +156,7 @@ def plot_flowcell(dataset, name, plots_dir):
                 # Prevent extreme values from over-scaling the sidebar.
                 robust=True,
                 # Use the greens scale but in reverse, similar to MinKNOW.
-                cmap=sns.diverging_palette(255, 133, l=60, as_cmap=True),
+                cmap=sns.diverging_palette(210, 120, l=55, as_cmap=True),
                 # Format keyword args for the side bar.
                 cbar_kws={"format": formatter_y,
                           "label": "Bases per channel"})
@@ -181,6 +218,35 @@ def plot_hist(dataset, name, plots_dir):
     # Save and close figure
     savefig(os.path.join(plots_dir, "%s.hist.png" % name))
     plt.close('all')
+
+
+def plot_quality_hist(dataset, name, plots_dir):
+    # Much simpler histogram with seaborn
+
+    # Open up a plotting frame
+    fig, ax = plt.subplots(1)
+
+    # Set seaborn style
+    sns.set_style("darkgrid")
+
+    # Plot distribution
+    sns.distplot(dataset['mean_qscore_template'], 
+                 hist=True, kde=True, ax=ax)
+
+    # Despine left axis
+    sns.despine(fig=fig, ax=ax, left=True)
+
+    # Set titles
+    ax.set_title("Mean QScore Distribution")
+
+    # Set x and y lables
+    ax.set_xlabel("Mean QScore")
+
+    # Ensure labels are not missed
+    fig.tight_layout()
+    
+    # Save and close figure
+    savefig(os.path.join(plots_dir, "%s.q.hist.png" % name))
 
 
 def reformat_human_friendly(s):
@@ -383,6 +449,11 @@ def get_yield(dataset):
     return dataset['sequence_length_template'].cumsum()
 
 
+def get_quality_yield(dataset):
+    # Get the yield per quality
+    dataset.groupby(['pass'])['sequence_length_template'].cumsum()
+
+
 def get_read_count(dataset):
     # Get the read count dataset
     return dataset.reset_index()['index']
@@ -401,17 +472,20 @@ def plot_data(dataset, name, plots_dir):
     # Get the cumulative channel yield
     dataset['channel_yield'] = get_channel_yield(dataset)
 
-    #dataset.to_csv("dataset_test.csv", index=False, header=True)
+    # Get the cumulative quality yield
+    dataset['quality_yield'] = get_quality_yield(dataset)
 
     # Plot things
     # Matplotlib base plots
     plot_yield(dataset, name, plots_dir)
+    plot_yield_by_quality(dataset, name, plots_dir)
     plot_reads(dataset, name, plots_dir)
     plot_hist(dataset, name, plots_dir)
 
     # Seaborn plots
     plot_flowcell(dataset, name, plots_dir)
     plot_pore_speed(dataset, name, plots_dir)
+    plot_quality_hist(dataset, name, plots_dir)
     plot_quality_per_speed(dataset, name, plots_dir) 
     plot_events_ratio(dataset, name, plots_dir)
 
